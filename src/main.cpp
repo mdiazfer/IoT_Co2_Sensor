@@ -1,16 +1,24 @@
+#ifndef WIFIFRAMEWORK
+  #define WIFIFRAMEWORK
+#endif
+
+#ifndef _DECLAREGLOBALPARAMETERS_
+  #define _DECLAREGLOBALPARAMETERS_
+#endif
+
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <WiFi.h>
 #include "global_setup.h"
-#include "user_setup.h"
+#include "wifiConnection.h"
 
-bool logsOn = true;
+
 uint8_t error_setup = NO_ERROR;
 
 TFT_eSPI tft = TFT_eSPI();  // Invoke library to manage the display
 
 void loadBootImage() {
-  //Load the logo image when booting up
+  //-->>Load the logo image when booting up
 
   return;
 }
@@ -48,12 +56,13 @@ void setup() {
 
   loadBootImage();
   delay(500);
+  //Display messages
   tft.setCursor(0,0,2);
   tft.setTextSize(1);
   tft.setTextColor(TFT_WHITE,TFT_BLACK); tft.println("IoT boot up...............");
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Serial:  [");
-  tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
+  //tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Serial:  [");
+  //tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
+  //tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Display: [");
   tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
@@ -69,42 +78,44 @@ void setup() {
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("Can't continue. STOP");
-    //delay(500);
-    //exit(ERROR_SENSOR_SETUP);
     return;
   }
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
 
-
   //-->>Buttons init
   Serial.print("[setup] - Buttons: ");
-
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Buttons: [");
   if (error_setup != ERROR_BUTTONS_SETUP ) { 
     Serial.println("OK");
     tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
   } else {
-    Serial.println("KO");
+    Serial.println("KO"); Serial.println("Can't continue. STOP");
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
+    tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("Can't continue. STOP");
+    return;
   }
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
 
   //-->>WiFi init
-  Serial.print("[setup] - WiFi:   ");
-
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - WiFi:    [");
+  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - WiFi: ");
+  error_setup=wifiConnect();
+  Serial.print("[setup] - WiFi: ");
   if (error_setup != ERROR_WIFI_SETUP ) { 
     Serial.println("OK");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print(" [");
     tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] - ");
+    tft.setTextColor(TFT_GREEN,TFT_BLACK);tft.print(wifiNet.ssid);tft.print(", ");tft.println(WiFi.localIP().toString());
   } else {
     Serial.println("KO");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("   [");
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
   }
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
-
+  
   //-->>BLE init
-  Serial.print("[setup] - BLE:    ");
-
+  Serial.print("[setup] - BLE: ");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - BLE:     [");
   if (error_setup != ERROR_BLE_SETUP ) { 
     Serial.println("OK");
