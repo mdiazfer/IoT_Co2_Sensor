@@ -1,7 +1,6 @@
 To do list
 -----------
-- Implement pre-heating time to avoid presenting CO2 measurements when the sensor is being warming
-- Temperature calibratioin
+- Temperature calibration
 - Web server to display results
 - Web server for configuration
 - Change from numercial coordinates to parameters for the items in the TFT
@@ -12,3 +11,10 @@ To do list
 - REST API to get results
 - Icons
 - Icon for the bootup screen
+
+
+Done
+-------
++ Change CO2 range to 2000 pppm in MH-Z19B
++ Implement pre-heating time to avoid presenting CO2 measurements when the sensor is being warming
++ CO2 Sensor check-outs at bootup

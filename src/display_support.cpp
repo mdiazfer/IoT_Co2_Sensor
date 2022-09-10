@@ -315,16 +315,20 @@ void CircularGauge::drawGauge(float_t value) {
 }
 
 void CircularGauge::drawTextGauge(String unitsString, uint32_t valueTextSize, boolean isInteger,
-                    uint32_t unitsTextSize, uint32_t valueTextFont, uint32_t unitsTextFont) {
+                  uint32_t unitsTextSize,uint32_t valueTextFont,uint32_t unitsTextFont,uint32_t colorText) {
   //Function to draw the text inside the circular gauge
 
   this->unitsString=unitsString;
   if (isInteger) valueString=valueString.toInt();
 
   //Drawing text value
-  if (angleValue<=angleTh1) colorText=normalColor;
-  else if (angleValue>angleTh1 && angleValue<=angleTh2) colorText=warningColor;
+  if (0==colorText) {
+    //Color text is got depends on the value
+    if (angleValue<=angleTh1) colorText=normalColor;
+    else if (angleValue>angleTh1 && angleValue<=angleTh2) colorText=warningColor;
       else colorText=alarmColor;
+  }
+  
   tft.setTextSize(valueTextSize);
   tft.setTextColor(colorText);
   xStartValueText=x-(tft.textWidth(valueString,valueTextFont))/2;

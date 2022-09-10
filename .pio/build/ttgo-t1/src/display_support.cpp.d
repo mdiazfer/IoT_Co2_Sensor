@@ -222,4 +222,5 @@
  .pio/libdeps/ttgo-t1/TFT_eSPI/Extensions/Touch.h \
  .pio/libdeps/ttgo-t1/TFT_eSPI/Extensions/Smooth_font.h \
  .pio/libdeps/ttgo-t1/TFT_eSPI/Extensions/Button.h \
- .pio/libdeps/ttgo-t1/TFT_eSPI/Extensions/Sprite.h
+ .pio/libdeps/ttgo-t1/TFT_eSPI/Extensions/Sprite.h src/global_setup.h \
+ src/user_setup.h

@@ -16,7 +16,12 @@
 #include "MHZ19.h"
 #include <SoftwareSerial.h>
 
+#ifdef __MHZ19B__
+const ulong co2PreheatingTime=CO2_MHZ19B_WARMING_TIME;
+#endif
 
+
+const String co2SensorType=String(CO2_SENSOR);
 uint8_t error_setup = NO_ERROR;
 TFT_eSPI tft = TFT_eSPI();  // Invoke library to manage the display
 ulong nowTime=0,previousTime=0,gapTime;
@@ -24,10 +29,9 @@ CircularGauge circularGauge=CircularGauge(610,0,2000,80,95,70,30,60,TFT_DARKGREE
 HorizontalBar horizontalBar=HorizontalBar(24.6,-10,50,145,50,95,10,TFT_GREEN,19,TFT_BLUE,27,TFT_RED,TFT_DARKGREY,TFT_BLACK);
 float_t valueCO2,valueT,valueHum,lastValueCO2=-1,tempMeasure;
 String valueString;
-//MHZ co2(MH_Z19_RX, MH_Z19_TX, MHZ19B);
 
-MHZ19 myMHZ19;                                             // Constructor for library
-SoftwareSerial mySerial(MH_Z19_RX, MH_Z19_TX);
+MHZ19 co2Sensor;
+SoftwareSerial co2SensorSerialPort(MH_Z19_RX, MH_Z19_TX);
 
 extern const int MHZ19B;
 
@@ -61,11 +65,11 @@ void setup() {
       Serial.println("          Can't continue");
 
       //-->> Setup LED for error indication
-      exit;
     }
+    return;
   }
   else {
-    Serial.println("[setup] - Display: OK");
+    if (logsOn) Serial.println("[setup] - Display: OK");
     tft.fillScreen(TFT_BLACK);
   }
 
@@ -75,52 +79,63 @@ void setup() {
   tft.setCursor(0,0,TEXT_FONT_BOOT_SCREEN);
   tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
   tft.setTextColor(TFT_WHITE,TFT_BLACK); tft.println("IoT boot up...............");
-  //tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Serial:  [");
-  //tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
-  //tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Display: [");
   tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
 
   //-->>Sensor init
-  Serial.print("[setup] - Sensor: ");
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Sensor:  [");
-  
-  //MHZ co2(MH_Z19_RX, MH_Z19_TX, CO2_IN, MHZ19B);
-  /*if (co2.isPreHeating()) {
-    Serial.print("Preheating");
-    while (co2.isPreHeating()) {
-      Serial.print(".");
-      delay(5000);
-    }
-    Serial.println();
-  }*/
-  /*if (nullptr == ss) {error_setup = ERROR_SENSOR_SETUP; Serial.println("sensor error");}
-  else ss->begin(9600);
-  */
-  mySerial.begin(9600);                               // (Uno example) device to MH-Z19 serial start   
-  myMHZ19.begin(mySerial);                                // *Serial(Stream) refence must be passed to library begin(). 
+  if (logsOn) Serial.print("[setup] - Sensor: ");
+  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Sens.:  [");
+  co2SensorSerialPort.begin(9600);      // (Uno example) device to MH-Z19 serial start   
+  co2Sensor.begin(co2SensorSerialPort); // *Serial(Stream) refence must be passed to library begin(). 
+  co2Sensor.setRange(CO2_RANGE);             // It's aviced to setup range to 2000. Better accuracy
+
+  //Some sensor checks
+  char co2SensorVersion[5];memset(co2SensorVersion, '\0', 5);
+  co2Sensor.getVersion(co2SensorVersion);
+
+  if (CO2_RANGE!=co2Sensor.getRange() || (byte) 0 != co2Sensor.getAccuracy(false) ||
+      0==co2SensorType.compareTo("UNKNOW"))
+    error_setup = ERROR_SENSOR_SETUP;
 
  if (error_setup != ERROR_SENSOR_SETUP ) { 
-    Serial.println("OK");
+    if (logsOn) {
+      Serial.println("OK");
+      Serial.print("  CO2 Sensor type: "); Serial.println(co2SensorType); 
+      Serial.print("  CO2 Sensor version: "); Serial.println(co2SensorVersion);
+      Serial.print("  CO2 Sensor Accuracy: "); Serial.println(co2Sensor.getAccuracy(false));
+      Serial.print("  CO2 Sensor Range: "); Serial.println(co2Sensor.getRange());
+    }
     tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
+    tft.print(co2SensorType);tft.print(",V");tft.println(co2SensorVersion);
   } else {
-    Serial.println("KO"); Serial.println("Can't continue. STOP");
+    if (logsOn) {
+      Serial.println("KO");
+      Serial.print("  CO2 Sensor type: "); Serial.print(co2SensorType);Serial.println(" - Shouldn't be UNKNOWN");
+      Serial.print("  CO2 Sensor version: "); Serial.println(co2SensorVersion);
+      Serial.print("  CO2 Sensor Accuracy: "); Serial.print(co2Sensor.getAccuracy(false)); Serial.println(" - Should be 0");
+      Serial.print("  CO2 Sensor Range: "); Serial.print(co2Sensor.getRange()); Serial.print(" - Should be ");Serial.println(CO2_RANGE);
+      Serial.println("  Can't continue. STOP");
+    }
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
-    tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("Can't continue. STOP");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor type: "); if (0==co2SensorType.compareTo("UNKNOW")) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2SensorType);
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor version: "); tft.println(co2SensorVersion);
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Accuracy: "); if ((byte) 0 != co2Sensor.getAccuracy(false)) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getAccuracy(false));
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Range: "); if  (CO2_RANGE!=co2Sensor.getRange()) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getRange());
+    tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("  Can't continue. STOP");
     return;
   }
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
 
   //-->>Buttons init
-  Serial.print("[setup] - Buttons: ");
+  if (logsOn) Serial.print("[setup] - Buttons: ");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Buttons: [");
   if (error_setup != ERROR_BUTTONS_SETUP ) { 
-    Serial.println("OK");
+    if (logsOn) Serial.println("OK");
     tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
   } else {
-    Serial.println("KO"); Serial.println("Can't continue. STOP");
+    if (logsOn) {Serial.println("KO"); Serial.println("Can't continue. STOP");}
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("Can't continue. STOP");
@@ -131,38 +146,38 @@ void setup() {
   //-->>WiFi init
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - WiFi: ");
   error_setup=wifiConnect();
-  Serial.print("[setup] - WiFi: ");
+  if (logsOn) Serial.print("[setup] - WiFi: ");
   if (error_setup != ERROR_WIFI_SETUP ) { 
-    Serial.println("OK");
+    if (logsOn) Serial.println("OK");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print(" [");
     tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] - ");
     tft.setTextColor(TFT_GREEN,TFT_BLACK);tft.print(wifiNet.ssid);tft.print(", ");tft.println(WiFi.localIP().toString());
   } else {
-    Serial.println("KO");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("   [");
+    if (logsOn) Serial.println("KO");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("   [");
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
   }
   
   //-->>BLE init
-  Serial.print("[setup] - BLE: ");
+  if (logsOn) Serial.print("[setup] - BLE: ");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - BLE:     [");
   if (error_setup != ERROR_BLE_SETUP ) { 
-    Serial.println("OK");
+    if (logsOn) Serial.println("OK");
     tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
   } else {
-    Serial.println("KO");
+    if (logsOn) Serial.println("KO");
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
   }
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
 
 
   if (error_setup != NO_ERROR) {
-    Serial.println("Ready to start with limitations");
+    if (logsOn) Serial.println("Ready to start with limitations");
     tft.setTextColor(TFT_BROWN,TFT_BLACK); tft.println("Ready to start with limitations");
   } else {
-    Serial.println("Ready to start");
+    if (logsOn) Serial.println("Ready to start");
     tft.setTextColor(TFT_DARKGREEN,TFT_BLACK); tft.println("Ready to start");
   }
 
@@ -170,11 +185,26 @@ void setup() {
   tft.setCursor(0,0,TEXT_FONT);
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(TEXT_SIZE);
-  randomSeed(analogRead(0));
+  /*-->*/randomSeed(analogRead(0));
+  circularGauge.drawGauge2(0);
 }
 
 void loop() {
+  if (ERROR_DISPLAY_SETUP==error_setup || ERROR_SENSOR_SETUP==error_setup)
+    return;
+
   nowTime=millis();
+
+  while (nowTime<co2PreheatingTime) {
+    //Waiting for the sensor to warmup before displaying value
+    circularGauge.cleanValueTextGauge();
+    circularGauge.cleanUnitsTextGauge();
+    circularGauge.setValue((int)(co2PreheatingTime-nowTime)/1000);
+    circularGauge.drawTextGauge("warmup",TEXT_SIZE,true,TEXT_SIZE_UNITS_CO2,TEXT_FONT,TEXT_FONT_UNITS_CO2,TFT_GREENYELLOW);
+    delay(1000);
+    nowTime=millis();
+  }
+
   gapTime = previousTime!=0 ? nowTime-previousTime: VALUE_REFRESH_PERIOD;
   
   if (gapTime>=VALUE_REFRESH_PERIOD) {
@@ -182,32 +212,9 @@ void loop() {
 
     tft.setTextSize(TEXT_SIZE);
 
-    /*co2.setDebug(true);
-    int ppm_uart = co2.readCO2UART();
-    Serial.print("PPMuart: ");Serial.print(ppm_uart); 
-    //if (ppm_uart > 0) Serial.print(ppm_uart); 
-    //else Serial.print("n/a");
-
-    int temperature = co2.getLastTemperature();
-    Serial.print(", Temperature: ");Serial.println(temperature);
-    //if (temperature > 0) Serial.println(temperature);
-    //else Serial.println("n/a");
-    */
-
-    /*int CO2;
-    CO2 = myMHZ19.getCO2();                             // Request CO2 (as ppm)
-    Serial.print("CO2 (ppm): ");                      
-    Serial.print(CO2);                                
-
-    int8_t Temp;
-    Temp = myMHZ19.getTemperature();                     // Request Temperature (as Celsius)
-    Serial.print(", Temperature (C): ");                  
-    Serial.println(Temp);                               
-    */
-
     //Cleaning & Drawing circular gauge
-    //valueCO2=(float_t)random(0,2000);
-    valueCO2=(float_t)myMHZ19.getCO2();
+    /*-->valueCO2=(float_t)random(0,2000);*/
+    valueCO2=(float_t)co2Sensor.getCO2();
     if ( lastValueCO2<0 || abs(1-lastValueCO2/valueCO2)*100>10 ||
          (lastValueCO2<circularGauge.th1 && valueCO2>=circularGauge.th1) ||
          (lastValueCO2>=circularGauge.th1 && valueCO2<circularGauge.th1) ||
@@ -242,8 +249,8 @@ void loop() {
     circularGauge.drawTextGauge("ppm");
 
     //Drawing temperature
-    //valueT=(float_t)random(0,600)/10-10.0;
-    tempMeasure=myMHZ19.getTemperature(true,true);
+    /*-->valueT=(float_t)random(0,600)/10-10.0;*/
+    tempMeasure=co2Sensor.getTemperature(true,true);
     if (tempMeasure>-50.0) valueT=tempMeasure;  //Discarding potential wrong values
     valueString=String((int) valueT)+"."+String(abs(((int) (valueT*10))-(((int)valueT)*10)))+"C";
     tft.setTextSize(TEXT_SIZE);

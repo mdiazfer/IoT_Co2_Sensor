@@ -3,4 +3,7 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
-- 0.5   10/Sep/2022   Initial minimal and working version for sensor MH-Z19B. Shows results in the display
+- 0.6   10/Sep/2000   - Changing CO2 range to 2000 pppm in MH-Z19B
+                      - Implementing pre-heating time to avoid presenting CO2 measurements during warming
+                      - CO2 Sensor check-outs at bootup
+- 0.5   10/Sep/2022   - Initial minimal and working version for sensor MH-Z19B. Shows results in the display

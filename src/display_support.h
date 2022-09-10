@@ -4,6 +4,7 @@
 
 #include <Arduino.h>
 #include <TFT_eSPI.h>
+#include "global_setup.h"
 
 extern TFT_eSPI tft;
 
@@ -49,8 +50,9 @@ class CircularGauge {
     void drawGauge1(float_t value);
     void drawGauge2();
     void drawGauge2(float_t value);
-    void drawTextGauge(String unitsString, uint32_t valueTextSize=3, boolean isInteger=true,
-                      uint32_t unitsTextSize=2, uint32_t valueTextFont=1, uint32_t unitsTextFont=1);
+    void drawTextGauge(String unitsString, uint32_t valueTextSize=TEXT_SIZE, boolean isInteger=true,
+                      uint32_t unitsTextSize=TEXT_SIZE_UNITS_CO2, uint32_t valueTextFont=TEXT_FONT,
+                      uint32_t unitsTextFont=TEXT_FONT_UNITS_CO2, uint32_t colorText=0);
     void cleanGauge();
     void cleanValueTextGauge();
     void cleanUnitsTextGauge();

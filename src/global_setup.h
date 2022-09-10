@@ -5,7 +5,8 @@
 
 #include "user_setup.h"
 
-#define VERSION 0.5
+#define VERSION 0.6
+#define __MHZ19B__
 
 //Global board stuff
 #define ERROR_LED 25
@@ -13,9 +14,16 @@
 #define TFT_Y_HEIGH 135
 
 //Co2 Sensor stuff
-#define MH_Z19_RX 26 //12
-#define MH_Z19_TX 27 //13
-#define CO2_IN    37
+#define MH_Z19_RX 26 //RX pin in the ESP board (TX pin in the CO2 sensor)
+#define MH_Z19_TX 27 //TX pin in the ESP board (TX pin in the CO2 sensor)
+#define CO2_IN    37 //GPIO pin in the ESB board to connect the PWM CO2 sensor output
+#define CO2_MHZ19B_WARMING_TIME 30000  //Preheat time according to the datasheet
+#define CO2_RANGE 2000  //Range of CO2 measurments. 0-2000 is adviced for MHZ19B as per datasheet for better accuracy
+#ifdef __MHZ19B__
+  #define CO2_SENSOR  "MH-Z19B"
+#else
+  #define CO2_SENSOR  "UNKNOWN"
+#endif
 
 //Error stuff
 #define NO_ERROR                0x00
@@ -32,6 +40,8 @@
 #define TEXT_FONT_BOOT_SCREEN 2
 #define TEXT_SIZE 3
 #define TEXT_FONT 1
+#define TEXT_SIZE_UNITS_CO2 2
+#define TEXT_FONT_UNITS_CO2 1
 #define VALUE_REFRESH_PERIOD 10000 //milliseconds
 
 
