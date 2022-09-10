@@ -1,0 +1,14 @@
+To do list
+-----------
+- Implement pre-heating time to avoid presenting CO2 measurements when the sensor is being warming
+- Temperature calibratioin
+- Web server to display results
+- Web server for configuration
+- Change from numercial coordinates to parameters for the items in the TFT
+- AP mode to provide first SSID
+- NTP to get time synced
+- BLE sutff
+- Send periodic results and triger alarms
+- REST API to get results
+- Icons
+- Icon for the bootup screen

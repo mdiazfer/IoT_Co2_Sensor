@@ -5,8 +5,17 @@
 
 #include "user_setup.h"
 
+#define VERSION 0.5
+
 //Global board stuff
 #define ERROR_LED 25
+#define TFT_X_WIDTH 240
+#define TFT_Y_HEIGH 135
+
+//Co2 Sensor stuff
+#define MH_Z19_RX 26 //12
+#define MH_Z19_TX 27 //13
+#define CO2_IN    37
 
 //Error stuff
 #define NO_ERROR                0x00
@@ -19,6 +28,12 @@
 
 //Display stuff
 #define TFT_BLACK 0x0000 // black
+#define TEXT_SIZE_BOOT_SCREEN 1
+#define TEXT_FONT_BOOT_SCREEN 2
+#define TEXT_SIZE 3
+#define TEXT_FONT 1
+#define VALUE_REFRESH_PERIOD 10000 //milliseconds
+
 
 //WiFi stuff
 #define MAX_CONNECTION_ATTEMPTS 16

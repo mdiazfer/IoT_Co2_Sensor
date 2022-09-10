@@ -1,0 +1,6 @@
+Change Log
+------------
+
+Version Date          Change
+------- -----------   ------------------------------------------------------------------------------------
+- 0.5   10/Sep/2022   Initial minimal and working version for sensor MH-Z19B. Shows results in the display
