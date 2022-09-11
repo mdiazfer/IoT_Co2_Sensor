@@ -1,20 +1,26 @@
 To do list
 -----------
+- Graph picture with the CO2 measurements/Tº/Hum history
+- Battery monitoring
 - Temperature calibration
-- Web server to display results
-- Web server for configuration
-- Change from numercial coordinates to parameters for the items in the TFT
-- AP mode to provide first SSID
-- NTP to get time synced
-- BLE sutff
 - Send periodic results and triger alarms
-- REST API to get results
 - Icons
 - Icon for the bootup screen
+- Web server to display results
+- REST API to get results
+- Web server for configuration
+- NTP to get time synced
+- AP mode to provide first SSID
+- BLE sutff
+- Firmware upgrade OTA (?)
+
 
 
 Done
 -------
-+ Change CO2 range to 2000 pppm in MH-Z19B
-+ Implement pre-heating time to avoid presenting CO2 measurements when the sensor is being warming
-+ CO2 Sensor check-outs at bootup
++ Improvements in the WIFI bootup message (v0.6.1)
++ Make CO2 parameters sensor-model-independant (working with preprocessor macros _CO2_SENSOR_PARAMETER_, _CONCATENATE_ and _STRINGIFY_) (v0.6.1)
++ Change from numercial coordinates to parameters for the items in the TFT (v0.6.1)
++ Change CO2 range to 2000 pppm in MH-Z19B (v0.6)
++ Implement pre-heating time to avoid presenting CO2 measurements when the sensor is being warming (v0.6)
++ CO2 Sensor check-outs at bootup (v0.6)

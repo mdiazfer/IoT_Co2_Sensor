@@ -5,8 +5,12 @@
 
 #include "user_setup.h"
 
-#define VERSION 0.6
+#define VERSION 0.6.1
+#define _STRINGIFY_(PARAMETER) #PARAMETER
+#define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER               //This two-level macro concatenates 2 labels. Useful to make some
+#define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
 #define __MHZ19B__
+#define __TFT_DISPLAY_PRESENT__
 
 //Global board stuff
 #define ERROR_LED 25
@@ -14,16 +18,33 @@
 #define TFT_Y_HEIGH 135
 
 //Co2 Sensor stuff
-#define MH_Z19_RX 26 //RX pin in the ESP board (TX pin in the CO2 sensor)
-#define MH_Z19_TX 27 //TX pin in the ESP board (TX pin in the CO2 sensor)
-#define CO2_IN    37 //GPIO pin in the ESB board to connect the PWM CO2 sensor output
-#define CO2_MHZ19B_WARMING_TIME 30000  //Preheat time according to the datasheet
-#define CO2_RANGE 2000  //Range of CO2 measurments. 0-2000 is adviced for MHZ19B as per datasheet for better accuracy
-#ifdef __MHZ19B__
-  #define CO2_SENSOR  "MH-Z19B"
+#ifdef __MHZ19B__   //Sensor model dependant parameters
+  #define CO2_SENSOR  _STRINGIFY_(MH-Z19B)
+  #define CO2_SENSOR_TYPE  "MH-Z19B"
+  #define MH_Z19B_RX 26 //RX pin in the ESP board (TX pin in the CO2 sensor)
+  #define MH_Z19B_TX 27 //TX pin in the ESP board (TX pin in the CO2 sensor)
+  #define MH_Z19B_CO2_IN    37 //GPIO pin in the ESB board to connect the PWM CO2 sensor output
+  #define MH_Z19B_CO2_WARMING_TIME 30000  //Preheat time according to the datasheet
+  #define MH_Z19B_CO2_RANGE 2000  //Range of CO2 measurments. 0-2000 is adviced for MHZ19B as per datasheet for better accuracy
+  #define MH_Z19B_CO2_MIN   0
+  #define MH_Z19B_CO2_MAX   MH_Z19B_CO2_RANGE
+  #define MH_Z19B_TEMP_MAX  50
+  #define MH_Z19B_TEMP_MIN  -10 
 #else
+  //For other sensor models copy the parameters for __MHZ19B__ customized for the rith model
   #define CO2_SENSOR  "UNKNOWN"
 #endif
+
+    //Sensor model independant parameters
+    #define CO2_SENSOR_RX _CO2_SENSOR_PARAMETER_(RX)
+    #define CO2_SENSOR_TX _CO2_SENSOR_PARAMETER_(TX)
+    #define CO2_SENSOR_CO2_IN  _CO2_SENSOR_PARAMETER_(CO2_IN)
+    #define CO2_SENSOR_WARMING_TIME _CO2_SENSOR_PARAMETER_(WARMING_TIME)
+    #define CO2_SENSOR_CO2_RANGE _CO2_SENSOR_PARAMETER_(CO2_RANGE)
+    #define CO2_SENSOR_CO2_MIN _CO2_SENSOR_PARAMETER_(CO2_MIN)
+    #define CO2_SENSOR_CO2_MAX _CO2_SENSOR_PARAMETER_(CO2_MAX)
+    #define CO2_SENSOR_TEMP_MAX _CO2_SENSOR_PARAMETER_(TEMP_MAX)
+    #define CO2_SENSOR_TEMP_MIN _CO2_SENSOR_PARAMETER_(TEMP_MIN)
 
 //Error stuff
 #define NO_ERROR                0x00
@@ -43,6 +64,24 @@
 #define TEXT_SIZE_UNITS_CO2 2
 #define TEXT_FONT_UNITS_CO2 1
 #define VALUE_REFRESH_PERIOD 10000 //milliseconds
+#define CO2_GAUGE_X      80
+#define CO2_GAUGE_Y      95
+#define CO2_GAUGE_R      70
+#define CO2_GAUGE_WIDTH  30
+#define CO2_GAUGE_SECTOR 60  //Sector angle (degrees)
+#define CO2_GAUGE_TH1    800 //Threshold for warning (ppm)
+#define CO2_GAUGE_TH2    950 //Threshold for alarm (ppm)
+#define CO2_GAUGE_MIN   CO2_SENSOR_CO2_MIN   //Parameter sensor model independant  
+#define CO2_GAUGE_MAX   CO2_SENSOR_CO2_MAX   //Parameter sensor model independant
+#define CO2_GAUGE_RANGE CO2_SENSOR_CO2_RANGE //Parameter sensor model independant
+#define TEMP_BAR_X       145
+#define TEMP_BAR_Y       50
+#define TEMP_BAR_LENGTH  95
+#define TEMP_BAR_HEIGH   10
+#define TEMP_BAR_TH1     19 //Threshold from cold to normal  temperature
+#define TEMP_BAR_TH2     27 //Threshold from normal to hot temperature
+#define TEMP_BAR_MIN     CO2_SENSOR_TEMP_MIN //Parameter sensor model independant
+#define TEMP_BAR_MAX     CO2_SENSOR_TEMP_MAX //Parameter sensor model independant
 
 
 //WiFi stuff

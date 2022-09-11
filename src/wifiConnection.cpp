@@ -4,6 +4,11 @@
 
 #include "wifiConnection.h"
 
+#ifdef __TFT_DISPLAY_PRESENT__
+  #include <TFT_eSPI.h>
+  extern TFT_eSPI tft;
+#endif
+
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
 
 /******************************************************
@@ -111,6 +116,9 @@ uint8_t wifiConnect() {
   WiFi.begin(WIFI_SSID_CREDENTIALS, WIFI_PW_CREDENTIALS);
   while (status != WL_CONNECTED && counter < MAX_CONNECTION_ATTEMPTS) {
     if (logsOn) {Serial.print("[setup - wifi] Attempting to connect to WPA SSID: ");Serial.println(WIFI_SSID_CREDENTIALS);}
+    #ifdef __TFT_DISPLAY_PRESENT__
+      tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print(".");
+    #endif
     // Connect to WPA/WPA2 network:
     status = WiFi.status();
     delay(500);
@@ -124,6 +132,7 @@ uint8_t wifiConnect() {
       Serial.print("[setup - wifi] Number of connection attempts ");
       Serial.print(counter);Serial.print(">");Serial.println(MAX_CONNECTION_ATTEMPTS);
     }
+
     return(ERROR_WIFI_SETUP); //not wifi connection
   }
 

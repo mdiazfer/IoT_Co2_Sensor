@@ -17,23 +17,27 @@
 #include <SoftwareSerial.h>
 
 #ifdef __MHZ19B__
-const ulong co2PreheatingTime=CO2_MHZ19B_WARMING_TIME;
+  const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
 #endif
 
-
-const String co2SensorType=String(CO2_SENSOR);
+const String co2SensorType=String(CO2_SENSOR_TYPE);
 uint8_t error_setup = NO_ERROR;
 TFT_eSPI tft = TFT_eSPI();  // Invoke library to manage the display
 ulong nowTime=0,previousTime=0,gapTime;
-CircularGauge circularGauge=CircularGauge(610,0,2000,80,95,70,30,60,TFT_DARKGREEN,800,TFT_YELLOW,950,TFT_RED,TFT_DARKGREY,TFT_BLACK);
-HorizontalBar horizontalBar=HorizontalBar(24.6,-10,50,145,50,95,10,TFT_GREEN,19,TFT_BLUE,27,TFT_RED,TFT_DARKGREY,TFT_BLACK);
+CircularGauge circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
+                                          CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
+                                          CO2_GAUGE_TH1,TFT_YELLOW,CO2_GAUGE_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
+HorizontalBar horizontalBar=HorizontalBar(0,TEMP_BAR_MIN,TEMP_BAR_MAX,TEMP_BAR_X,TEMP_BAR_Y,
+                                          TEMP_BAR_LENGTH,TEMP_BAR_HEIGH,TFT_GREEN,TEMP_BAR_TH1,
+                                          TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
 float_t valueCO2,valueT,valueHum,lastValueCO2=-1,tempMeasure;
 String valueString;
 
-MHZ19 co2Sensor;
-SoftwareSerial co2SensorSerialPort(MH_Z19_RX, MH_Z19_TX);
-
-extern const int MHZ19B;
+SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX);
+#ifdef __MHZ19B__
+  MHZ19 co2Sensor;
+  extern const int MHZ19B;
+#endif
 
 void loadBootImage() {
   //-->>Load the logo image when booting up
@@ -88,17 +92,15 @@ void setup() {
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Sens.:  [");
   co2SensorSerialPort.begin(9600);      // (Uno example) device to MH-Z19 serial start   
   co2Sensor.begin(co2SensorSerialPort); // *Serial(Stream) refence must be passed to library begin(). 
-  co2Sensor.setRange(CO2_RANGE);             // It's aviced to setup range to 2000. Better accuracy
+  co2Sensor.setRange(CO2_SENSOR_CO2_RANGE);             // It's aviced to setup range to 2000. Better accuracy
 
   //Some sensor checks
   char co2SensorVersion[5];memset(co2SensorVersion, '\0', 5);
   co2Sensor.getVersion(co2SensorVersion);
-
-  if (CO2_RANGE!=co2Sensor.getRange() || (byte) 0 != co2Sensor.getAccuracy(false) ||
+  if (CO2_SENSOR_CO2_RANGE!=co2Sensor.getRange() || (byte) 0 != co2Sensor.getAccuracy(false) ||
       0==co2SensorType.compareTo("UNKNOW"))
     error_setup = ERROR_SENSOR_SETUP;
-
- if (error_setup != ERROR_SENSOR_SETUP ) { 
+  if (error_setup != ERROR_SENSOR_SETUP ) { 
     if (logsOn) {
       Serial.println("OK");
       Serial.print("  CO2 Sensor type: "); Serial.println(co2SensorType); 
@@ -115,7 +117,7 @@ void setup() {
       Serial.print("  CO2 Sensor type: "); Serial.print(co2SensorType);Serial.println(" - Shouldn't be UNKNOWN");
       Serial.print("  CO2 Sensor version: "); Serial.println(co2SensorVersion);
       Serial.print("  CO2 Sensor Accuracy: "); Serial.print(co2Sensor.getAccuracy(false)); Serial.println(" - Should be 0");
-      Serial.print("  CO2 Sensor Range: "); Serial.print(co2Sensor.getRange()); Serial.print(" - Should be ");Serial.println(CO2_RANGE);
+      Serial.print("  CO2 Sensor Range: "); Serial.print(co2Sensor.getRange()); Serial.print(" - Should be ");Serial.println(CO2_SENSOR_CO2_RANGE);
       Serial.println("  Can't continue. STOP");
     }
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
@@ -123,7 +125,7 @@ void setup() {
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor type: "); if (0==co2SensorType.compareTo("UNKNOW")) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2SensorType);
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor version: "); tft.println(co2SensorVersion);
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Accuracy: "); if ((byte) 0 != co2Sensor.getAccuracy(false)) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getAccuracy(false));
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Range: "); if  (CO2_RANGE!=co2Sensor.getRange()) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getRange());
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Range: "); if  (CO2_SENSOR_CO2_RANGE!=co2Sensor.getRange()) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getRange());
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("  Can't continue. STOP");
     return;
   }
@@ -144,8 +146,14 @@ void setup() {
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
 
   //-->>WiFi init
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - WiFi: ");
+  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - WiFi: ");  
+  int16_t cuX=tft.getCursorX(); int16_t cuY=tft.getCursorY();
+  tft.setCursor(cuX,cuY);
   error_setup=wifiConnect();
+  //Clean-up dots displayed after trying to get connected
+  for (int counter2=0; counter2<MAX_CONNECTION_ATTEMPTS; counter2++) tft.print(" ");
+  tft.setCursor(cuX,cuY);
+  //print Logs
   if (logsOn) Serial.print("[setup] - WiFi: ");
   if (error_setup != ERROR_WIFI_SETUP ) { 
     if (logsOn) Serial.println("OK");
@@ -181,7 +189,7 @@ void setup() {
     tft.setTextColor(TFT_DARKGREEN,TFT_BLACK); tft.println("Ready to start");
   }
 
-  delay(2000);
+  delay(5000);
   tft.setCursor(0,0,TEXT_FONT);
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(TEXT_SIZE);
