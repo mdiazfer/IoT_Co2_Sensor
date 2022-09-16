@@ -1,6 +1,5 @@
 To do list
 -----------
-- Graph picture with the Tº/Hum measurements history
 - Press button to swap between different graphs (?)
 - Battery monitoring
 - Temperature calibration
@@ -20,6 +19,7 @@ To do list
 
 Done
 -------
++ Graph picture with the Tº/Hum measurements history (v0.6.3)
 + Graph picture with the CO2 measurements history (v0.6.2)
 + Improvements in the WIFI bootup message (v0.6.1)
 + Make CO2 parameters sensor-model-independant (working with preprocessor macros _CO2_SENSOR_PARAMETER_, _CONCATENATE_ and _STRINGIFY_) (v0.6.1)

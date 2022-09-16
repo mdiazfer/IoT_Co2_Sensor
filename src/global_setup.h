@@ -5,7 +5,7 @@
 
 #include "user_setup.h"
 
-#define VERSION 0.6.2
+#define VERSION 0.6.3
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER               //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -45,7 +45,9 @@
     #define CO2_SENSOR_CO2_MAX _CO2_SENSOR_PARAMETER_(CO2_MAX)
     #define CO2_SENSOR_TEMP_MAX _CO2_SENSOR_PARAMETER_(TEMP_MAX)
     #define CO2_SENSOR_TEMP_MIN _CO2_SENSOR_PARAMETER_(TEMP_MIN)
-    #define SAMPLE_PERIOD          10000 //milliseconds
+    #define CO2_SENSOR_HUM_MAX 100
+    #define CO2_SENSOR_HUM_MIN 0
+    #define SAMPLE_PERIOD          5000 //10000 //milliseconds
 
 //Error stuff
 #define NO_ERROR                0x00

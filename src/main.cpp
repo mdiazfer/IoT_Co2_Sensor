@@ -32,10 +32,14 @@ CircularGauge circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GA
 HorizontalBar horizontalBar=HorizontalBar(0,TEMP_BAR_MIN,TEMP_BAR_MAX,TEMP_BAR_X,TEMP_BAR_Y,
                                           TEMP_BAR_LENGTH,TEMP_BAR_HEIGH,TFT_GREEN,TEMP_BAR_TH1,
                                           TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
-float_t valueCO2,valueT,valueHum,lastValueCO2=-1,tempMeasure;
+float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure;
 String valueString;
-float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //Circular buffer to record last-hour C02 values
-float_t lastDayCo2Samples[24*3600/SAMPLE_T_LAST_DAY]; //Circular buffer to record last-day C02 values
+float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //Buffer to record last-hour C02 values
+float_t lastHourTempSamples[3600/SAMPLE_T_LAST_HOUR];  //Buffer to record last-hour Temp values
+float_t lastHourHumSamples[3600/SAMPLE_T_LAST_HOUR];   //Buffer to record last-hour Hum values
+float_t lastDayCo2Samples[24*3600/SAMPLE_T_LAST_DAY];  //Buffer to record last-day C02 values
+float_t lastDayTempSamples[24*3600/SAMPLE_T_LAST_DAY];  //Buffer to record last-day Temp values
+float_t lastDayHumSamples[24*3600/SAMPLE_T_LAST_DAY];   //Buffer to record last-day Hum values
 boolean showGraph=false,updateHourSample=true,updateDaySample=true;
 int8_t counterDisplay=-1;
 enum displayModes {bootup,sampleValue,co2LastHourGraph,co2LastDayGraph};
@@ -75,22 +79,29 @@ void drawGraphLastHourCo2() {
   tft.setCursor(CO2_GRAPH_X+125,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-15");
   tft.setCursor(CO2_GRAPH_X+170,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("Now");
   tft.setCursor(CO2_GRAPH_X+190,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("t(m)");
-  tft.setCursor(CO2_GRAPH_X+30,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("CO2 in the last 60 min (ppm)");
-  tft.setCursor(CO2_GRAPH_X-12,CO2_GRAPH_Y+5,TEXT_FONT_BOOT_SCREEN-1);tft.print("2k");
-  tft.setCursor(CO2_GRAPH_X-20,CO2_GRAPH_Y+25,TEXT_FONT_BOOT_SCREEN-1);tft.print("1k5");
-  tft.setCursor(CO2_GRAPH_X-12,CO2_GRAPH_Y+50,TEXT_FONT_BOOT_SCREEN-1);tft.print("1k");
-  tft.setCursor(CO2_GRAPH_X-20,CO2_GRAPH_Y+75,TEXT_FONT_BOOT_SCREEN-1);tft.print("500");
+  //tft.setCursor(CO2_GRAPH_X+30,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("CO2 in the last 60 min (ppm)");
+  tft.setCursor(CO2_GRAPH_X+15,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("Last 60 min   ");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREEN,TFT_BLACK);tft.print("CO2 (ppm) [0-2000]");
+  tft.setCursor(CO2_GRAPH_X+15,14,TEXT_FONT_BOOT_SCREEN-1);
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_MAGENTA,TFT_BLACK);tft.print("Temp (C) [0-50] ");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_BROWN,TFT_BLACK);tft.print(" Hum (%) [0-100]");
 
   //Draw samples
-  int32_t xSample, auxColor;
+  int32_t co2Sample,tempSample,humSample,auxCo2Color,auxTempColor=TFT_MAGENTA,auxHumColor=TFT_BROWN;
   for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++)
   {
-    xSample=(int32_t) (CO2_GRAPH_Y_END-lastHourCo2Samples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX);
-    if (lastHourCo2Samples[i]<=CO2_GAUGE_TH1) auxColor=TFT_GREEN;
-    else if (CO2_GAUGE_TH1 < lastHourCo2Samples[i] && lastHourCo2Samples[i] <= CO2_GAUGE_TH2) auxColor=TFT_YELLOW;
-    else auxColor=TFT_RED;
-    if (xSample==CO2_GRAPH_Y_END) auxColor=TFT_DARKGREY;
-    tft.drawPixel(i+CO2_GRAPH_X,xSample,auxColor);
+    co2Sample=(int32_t) (CO2_GRAPH_Y_END-lastHourCo2Samples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX);
+    tempSample=(int32_t) (CO2_GRAPH_Y_END-lastHourTempSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_TEMP_MAX);
+    humSample=(int32_t) (CO2_GRAPH_Y_END-lastHourHumSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_HUM_MAX);
+    if (lastHourCo2Samples[i]<=CO2_GAUGE_TH1) auxCo2Color=TFT_GREEN;
+    else if (CO2_GAUGE_TH1 < lastHourCo2Samples[i] && lastHourCo2Samples[i] <= CO2_GAUGE_TH2) auxCo2Color=TFT_YELLOW;
+    else auxCo2Color=TFT_RED;
+    if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
+    if(lastHourTempSamples[i]==0) auxTempColor=TFT_DARKGREY;
+    if(lastHourHumSamples[i]==0) auxHumColor=TFT_DARKGREY;
+    tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color); //CO2 sample
+    tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
+    tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
   }
 }
 
@@ -114,22 +125,28 @@ void drawGraphLastDayCo2() {
   tft.setCursor(CO2_GRAPH_X+86,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-12");
   tft.setCursor(CO2_GRAPH_X+134,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-6");
   tft.setCursor(CO2_GRAPH_X+165,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("Now t(h)");
-  tft.setCursor(CO2_GRAPH_X+30,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("CO2 in the last 24 h. (ppm)");
-  tft.setCursor(CO2_GRAPH_X-12,CO2_GRAPH_Y+5,TEXT_FONT_BOOT_SCREEN-1);tft.print("2k");
-  tft.setCursor(CO2_GRAPH_X-20,CO2_GRAPH_Y+25,TEXT_FONT_BOOT_SCREEN-1);tft.print("1k5");
-  tft.setCursor(CO2_GRAPH_X-12,CO2_GRAPH_Y+50,TEXT_FONT_BOOT_SCREEN-1);tft.print("1k");
-  tft.setCursor(CO2_GRAPH_X-20,CO2_GRAPH_Y+75,TEXT_FONT_BOOT_SCREEN-1);tft.print("500");
-
+  //tft.setCursor(CO2_GRAPH_X+30,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("CO2 in the last 24 h. (ppm)");
+  tft.setCursor(CO2_GRAPH_X+15,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("Last 24 h.    ");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREEN,TFT_BLACK);tft.print("CO2 (ppm) [0-2000]");
+  tft.setCursor(CO2_GRAPH_X+15,14,TEXT_FONT_BOOT_SCREEN-1);
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_MAGENTA,TFT_BLACK);tft.print("Temp (C) [0-50] ");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_BROWN,TFT_BLACK);tft.print(" Hum (%) [0-100]");
   //Draw samples
-  int32_t xSample, auxColor;
+  int32_t co2Sample,tempSample,humSample,auxCo2Color,auxTempColor=TFT_MAGENTA,auxHumColor=TFT_BROWN;
   for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY); i++)
   {
-    xSample=(int32_t) (CO2_GRAPH_Y_END-lastDayCo2Samples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX);
-    if (lastDayCo2Samples[i]<=CO2_GAUGE_TH1) auxColor=TFT_GREEN;
-    else if (CO2_GAUGE_TH1 < lastDayCo2Samples[i] && lastDayCo2Samples[i] <= CO2_GAUGE_TH2) auxColor=TFT_YELLOW;
-    else auxColor=TFT_RED;
-    if (xSample==CO2_GRAPH_Y_END) auxColor=TFT_DARKGREY;
-    tft.drawPixel(i+CO2_GRAPH_X,xSample,auxColor);
+    co2Sample=(int32_t) (CO2_GRAPH_Y_END-lastDayCo2Samples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX);
+    tempSample=(int32_t) (CO2_GRAPH_Y_END-lastDayTempSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_TEMP_MAX);
+    humSample=(int32_t) (CO2_GRAPH_Y_END-lastDayHumSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_HUM_MAX);
+    if (lastDayCo2Samples[i]<=CO2_GAUGE_TH1) auxCo2Color=TFT_GREEN;
+    else if (CO2_GAUGE_TH1 < lastDayCo2Samples[i] && lastDayCo2Samples[i] <= CO2_GAUGE_TH2) auxCo2Color=TFT_YELLOW;
+    else auxCo2Color=TFT_RED;
+    if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
+    if(lastDayTempSamples[i]==0) auxTempColor=TFT_DARKGREY;
+    if(lastDayHumSamples[i]==0) auxHumColor=TFT_DARKGREY;
+    tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color);   //CO2 sample
+    tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
+    tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
   }
 }
 
@@ -224,19 +241,20 @@ void setup() {
   randomSeed(analogRead(0));
   <--*/
   
-  //Initiating circula buffer to draw the Co2 graph
-  for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++)  lastHourCo2Samples[i]=0;
-  for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY); i++) lastDayCo2Samples[i]=0;
+  //Initiating buffers to draw the Co2/Temp/Hum graphs
+  for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++)  {lastHourCo2Samples[i]=0;lastHourTempSamples[i]=0;lastHourHumSamples[i]=0;}
+  for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY); i++) {lastDayCo2Samples[i]=0;lastDayTempSamples[i]=0;lastDayHumSamples[i]=0;}
+
   /*-->{
     //Ramdom filling for testing
     positiveSign=random(0,4)>=3?true:false;markUp=(float_t)random(0,5)/100;
-    if (i==0) lastDayCo2Samples[i]=1800;
+    if (i==0) lastDayHumSamples[i]=70;
     else
-      if (positiveSign) lastDayCo2Samples[i]=lastDayCo2Samples[i-1]*(1+markUp);
-      else lastDayCo2Samples[i]=lastDayCo2Samples[i-1]*(1-markUp);
+      if (positiveSign) lastDayHumSamples[i]=lastDayHumSamples[i-1]*(1+markUp);
+      else lastDayHumSamples[i]=lastDayHumSamples[i-1]*(1-markUp);
     Serial.print("\n- i=");Serial.print(i);Serial.print(", positiveSign=");Serial.print(positiveSign);
     Serial.print(", markUp=");Serial.print(markUp);
-    Serial.print(", lastDayCo2Samples[");Serial.print(i);Serial.print("]=");Serial.print(lastDayCo2Samples[i]);
+    Serial.print(", lastDayHumSamples[");Serial.print(i);Serial.print("]=");Serial.print(lastDayHumSamples[i]);
   }<--*/
 
   //-->>Buttons init
@@ -340,20 +358,38 @@ void loop() {
   if (gapTime>=SAMPLE_PERIOD) {
     previousTime=nowTime;lastGapTime=gapTime;gapTime=0;
 
-    //Getting CO2 value
+    //Getting CO2 & Temp values
     /*-->valueCO2=(float_t)random(0,2000);<--*/
+    /*-->valueT=(float_t)random(0,600)/10-10.0;<--*/
+    /*-->valueHum=(float_t)random(0,100);<--*/
     valueCO2=(float_t)co2Sensor.getCO2();
+    tempMeasure=co2Sensor.getTemperature(true,true);
+    valueHum=0;
+    
+    if (tempMeasure>-50.0) valueT=tempMeasure;  //Discarding potential wrong values
 
-    //Updating the last hour Co2 buffer
+    //Updating the last hour buffers
     if (updateHourSample) {
-      for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR)-1; i++) lastHourCo2Samples[i]=lastHourCo2Samples[i+1];
+      for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR)-1; i++) 
+      {lastHourCo2Samples[i]=lastHourCo2Samples[i+1];
+      lastHourTempSamples[i]=lastHourTempSamples[i+1];
+      lastHourHumSamples[i]=lastHourHumSamples[i+1];
+      }
       lastHourCo2Samples[(int)(3600/SAMPLE_T_LAST_HOUR)-1]=valueCO2;
+      lastHourTempSamples[(int)(3600/SAMPLE_T_LAST_HOUR)-1]=valueT;
+      lastHourHumSamples[(int)(3600/SAMPLE_T_LAST_HOUR)-1]=valueHum;
     }
     
     //Updating the last day Co2 buffer
     if (updateDaySample) {
-      for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY)-1; i++) lastDayCo2Samples[i]=lastDayCo2Samples[i+1];
+      for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY)-1; i++) {
+        lastDayCo2Samples[i]=lastDayCo2Samples[i+1];
+        lastDayTempSamples[i]=lastDayTempSamples[i+1];
+        lastDayHumSamples[i]=lastDayHumSamples[i+1];
+      }
       lastDayCo2Samples[(int)(24*3600/SAMPLE_T_LAST_DAY)-1]=valueCO2;
+      lastDayTempSamples[(int)(24*3600/SAMPLE_T_LAST_DAY)-1]=valueT;
+      lastDayHumSamples[(int)(24*3600/SAMPLE_T_LAST_DAY)-1]=valueHum;
     }
   }
 
@@ -421,16 +457,12 @@ void loop() {
           circularGauge.drawTextGauge("ppm");
 
           //Drawing temperature
-          /*-->valueT=(float_t)random(0,600)/10-10.0;*/
-          tempMeasure=co2Sensor.getTemperature(true,true);
-          if (tempMeasure>-50.0) valueT=tempMeasure;  //Discarding potential wrong values
           valueString=String((int) valueT)+"."+String(abs(((int) (valueT*10))-(((int)valueT)*10)))+"C";
           tft.setTextSize(TEXT_SIZE);
           drawText(valueT, String(valueString),TEXT_SIZE,TEXT_FONT,TFT_GREEN,TFT_BLACK,TFT_X_WIDTH-tft.textWidth(String(valueString)),25,20,TFT_BLUE,27,TFT_RED);
           horizontalBar.drawHorizontalBar(valueT);
 
           //Drawing Humidity
-          valueHum=(float_t)random(0,100);
           valueString=String("Hum.");
           tft.setTextSize(TEXT_SIZE);
           drawText(valueHum,String(valueString),TEXT_SIZE,TEXT_FONT,TFT_MAGENTA,TFT_BLACK,TFT_X_WIDTH-tft.textWidth(String(valueString)),90,30,TFT_MAGENTA,55,TFT_MAGENTA);
