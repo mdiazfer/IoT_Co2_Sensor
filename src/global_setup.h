@@ -5,7 +5,7 @@
 
 #include "user_setup.h"
 
-#define VERSION 0.6.1
+#define VERSION 0.6.2
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER               //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -45,6 +45,7 @@
     #define CO2_SENSOR_CO2_MAX _CO2_SENSOR_PARAMETER_(CO2_MAX)
     #define CO2_SENSOR_TEMP_MAX _CO2_SENSOR_PARAMETER_(TEMP_MAX)
     #define CO2_SENSOR_TEMP_MIN _CO2_SENSOR_PARAMETER_(TEMP_MIN)
+    #define SAMPLE_PERIOD          10000 //milliseconds
 
 //Error stuff
 #define NO_ERROR                0x00
@@ -55,7 +56,9 @@
 #define ERROR_BLE_SETUP         0x05
 #define ERROR_SSID_CONNECTION   0x06
 
-//Display stuff
+//Display stuff - Values customized for TTGO T-Display board
+#define TFT_MAX_X 240
+#define TFT_MAX_Y 135
 #define TFT_BLACK 0x0000 // black
 #define TEXT_SIZE_BOOT_SCREEN 1
 #define TEXT_FONT_BOOT_SCREEN 2
@@ -63,7 +66,8 @@
 #define TEXT_FONT 1
 #define TEXT_SIZE_UNITS_CO2 2
 #define TEXT_FONT_UNITS_CO2 1
-#define VALUE_REFRESH_PERIOD 10000 //milliseconds
+#define DISPLAY_REFRESH_PERIOD      1*SAMPLE_PERIOD //milliseconds
+#define DISPLAY_MODE_REFRESH_PERIOD 1*SAMPLE_PERIOD //milliseconds
 #define CO2_GAUGE_X      80
 #define CO2_GAUGE_Y      95
 #define CO2_GAUGE_R      70
@@ -82,6 +86,16 @@
 #define TEMP_BAR_TH2     27 //Threshold from normal to hot temperature
 #define TEMP_BAR_MIN     CO2_SENSOR_TEMP_MIN //Parameter sensor model independant
 #define TEMP_BAR_MAX     CO2_SENSOR_TEMP_MAX //Parameter sensor model independant
+#define GRAPH_WIDTH     200 //Width of the area for drawing the evolution graph
+#define GRAPH_HEIGH     100 //Heigh of the area for drawing the evolution graph
+#define SAMPLE_T_LAST_HOUR  20 //Seconds - Period of last hour samples to be recorded
+#define SAMPLE_T_LAST_DAY   450 //Seconds - Period of last day samples to be recorded
+#define CO2_GRAPH_X     25  //X origin for co2 graph
+#define CO2_GRAPH_Y     12  //Y origin for co2 graph
+#define CO2_GRAPH_WIDTH 200 //WIDTH origin for co2 graph
+#define CO2_GRAPH_HEIGH 100 //HEIGH origin for co2 graph
+#define CO2_GRAPH_X_END CO2_GRAPH_X+CO2_GRAPH_WIDTH //X end for co2 graph
+#define CO2_GRAPH_Y_END CO2_GRAPH_Y+CO2_GRAPH_HEIGH //Y end for co2 graph
 
 
 //WiFi stuff
