@@ -285,4 +285,5 @@
  /Users/madiazfer/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal-log.h \
  .pio/libdeps/ttgo-t1/EspSoftwareSerial/src/SoftwareSerial.h \
  .pio/libdeps/ttgo-t1/EspSoftwareSerial/src/circular_queue/circular_queue.h \
- .pio/libdeps/ttgo-t1/EspSoftwareSerial/src/circular_queue/Delegate.h
+ .pio/libdeps/ttgo-t1/EspSoftwareSerial/src/circular_queue/Delegate.h \
+ src/Button.h

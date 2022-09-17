@@ -4,9 +4,21 @@
 
 #include <Arduino.h>
 #include <TFT_eSPI.h>
-#include "global_setup.h"
+
+#ifndef _DECLAREGLOBALPARAMETERS_
+  #include "global_setup.h"
+  
+  #ifndef _DISPLAYSUPPORTINFO_
+    enum availableStates {menuWhatToDisplay,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+                          displayingCo2LastDayGraphFixed,displayingSequential};
+    
+    #define _DISPLAYSUPPORTINFO_
+  #endif
+#endif
 
 extern TFT_eSPI tft;
+extern enum availableStates stateSelected;
+extern enum availableStates currentState;
 
 class HorizontalBar {
   public:
@@ -62,4 +74,6 @@ class CircularGauge {
 void drawText(float_t value, String textString, int32_t textSize, int32_t font, uint32_t colorForeground,
               uint32_t colorBackground, int32_t x, int32_t y, 
               float_t th1, uint32_t warningColor, float_t th2, uint32_t alarmColor);
+
+void printMenuWhatToDisplay();
 

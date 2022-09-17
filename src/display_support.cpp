@@ -382,5 +382,21 @@ void drawText(float_t value, String textString, int32_t textSize, int32_t font, 
   tft.drawString(String(textString),x,y,font);
 };
 
+void printMenuWhatToDisplay() {
+  //Cleaning and printing menu screen
+  tft.fillScreen(MENU_BACK_COLOR);
+  uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_BACK_COLOR;
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(25,10,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("What to display");
+  if (stateSelected==displayingSampleFixed) {auxColorFore=MENU_BACK_COLOR;auxColorBack=MENU_FORE_COLOR;} else {auxColorFore=MENU_FORE_COLOR;auxColorBack=MENU_BACK_COLOR;}tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,40,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Co2 measurements");
+  if (stateSelected==displayingCo2LastHourGraphFixed) {auxColorFore=MENU_BACK_COLOR;auxColorBack=MENU_FORE_COLOR;} else {auxColorFore=MENU_FORE_COLOR;auxColorBack=MENU_BACK_COLOR;}tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Last hour graph");
+  if (stateSelected==displayingCo2LastDayGraphFixed) {auxColorFore=MENU_BACK_COLOR;auxColorBack=MENU_FORE_COLOR;} else {auxColorFore=MENU_FORE_COLOR;auxColorBack=MENU_BACK_COLOR;}tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Last day graph");
+  if (stateSelected==displayingSequential) {auxColorFore=MENU_BACK_COLOR;auxColorBack=MENU_FORE_COLOR;} else {auxColorFore=MENU_FORE_COLOR;auxColorBack=MENU_BACK_COLOR;}tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.print("Sequentially all");
+}
+
 
 

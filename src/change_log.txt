@@ -3,9 +3,11 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
-- 0.6.3 16/Sep/2000   - Adding graphs in the main screen for last hour and last day Tem & Hum evolution
-- 0.6.2 16/Sep/2000   - Adding graphs in the main screen for last hour and last day CO2 evolution
-- 0.6   10/Sep/2000   - Changing CO2 range to 2000 pppm in MH-Z19B
+- 0.6.4 17/Sep/2022   - Press button to swap between different screens
+                      - Libreries TFT_eSPI & EspSoftwareSerial updated
+- 0.6.3 16/Sep/2022   - Adding graphs in the main screen for last hour and last day Tem & Hum evolution
+- 0.6.2 16/Sep/2022   - Adding graphs in the main screen for last hour and last day CO2 evolution
+- 0.6   10/Sep/2022   - Changing CO2 range to 2000 pppm in MH-Z19B
                       - Implementing pre-heating time to avoid presenting CO2 measurements during warming
                       - CO2 Sensor check-outs at bootup
 - 0.5   10/Sep/2022   - Initial minimal and working version for sensor MH-Z19B. Shows results in the display

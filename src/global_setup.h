@@ -5,7 +5,7 @@
 
 #include "user_setup.h"
 
-#define VERSION 0.6.3
+#define VERSION 0.6.4
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER               //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -13,9 +13,11 @@
 #define __TFT_DISPLAY_PRESENT__
 
 //Global board stuff
-#define ERROR_LED 25
-#define TFT_X_WIDTH 240
-#define TFT_Y_HEIGH 135
+#define ERROR_LED 25    //Customized for TTGO T-DISPLAY (T1) board
+#define TFT_X_WIDTH 240 //Customized for TTGO T-DISPLAY (T1) board
+#define TFT_Y_HEIGH 135 //Customized for TTGO T-DISPLAY (T1) board
+#define BUTTON1     35  //Customized for TTGO T-DISPLAY (T1) board
+#define BUTTON2     0   //Customized for TTGO T-DISPLAY (T1) board
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
@@ -68,6 +70,10 @@
 #define TEXT_FONT 1
 #define TEXT_SIZE_UNITS_CO2 2
 #define TEXT_FONT_UNITS_CO2 1
+#define TEXT_SIZE_MENU 2
+#define TEXT_FONT_MENU 1
+#define MENU_FORE_COLOR TFT_GOLD
+#define MENU_BACK_COLOR TFT_BLACK
 #define DISPLAY_REFRESH_PERIOD      1*SAMPLE_PERIOD //milliseconds
 #define DISPLAY_MODE_REFRESH_PERIOD 1*SAMPLE_PERIOD //milliseconds
 #define CO2_GAUGE_X      80
@@ -121,9 +127,17 @@
   #endif
 
   wifiNetworkInfo wifiNet;
-  
+  #ifndef _DISPLAYSUPPORTINFO_
+    enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph};
+    enum availableStates {menuWhatToDisplay,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+                          displayingCo2LastDayGraphFixed,displayingSequential};
+
+    #define _DISPLAYSUPPORTINFO_
+  #endif
+
   #undef _DECLAREGLOBALPARAMETERS_
 #endif
+
 
 
 

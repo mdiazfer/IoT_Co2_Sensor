@@ -1,6 +1,5 @@
 To do list
 -----------
-- Press button to swap between different graphs (?)
 - Battery monitoring
 - Temperature calibration
 - Send periodic results and triger alarms
@@ -19,6 +18,7 @@ To do list
 
 Done
 -------
++ Press button to swap between different screens (v0.6.4)
 + Graph picture with the Tº/Hum measurements history (v0.6.3)
 + Graph picture with the CO2 measurements history (v0.6.2)
 + Improvements in the WIFI bootup message (v0.6.1)

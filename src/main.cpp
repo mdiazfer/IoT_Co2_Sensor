@@ -14,6 +14,7 @@
 #include "display_support.h"
 #include "MHZ19.h"
 #include <SoftwareSerial.h>
+#include "Button.h"
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -42,14 +43,16 @@ float_t lastDayTempSamples[24*3600/SAMPLE_T_LAST_DAY];  //Buffer to record last-
 float_t lastDayHumSamples[24*3600/SAMPLE_T_LAST_DAY];   //Buffer to record last-day Hum values
 boolean showGraph=false,updateHourSample=true,updateDaySample=true;
 int8_t counterDisplay=-1;
-enum displayModes {bootup,sampleValue,co2LastHourGraph,co2LastDayGraph};
 enum displayModes displayMode=sampleValue, lastDisplayMode=bootup; //Will make starting always in sampleValue
-
+enum availableStates stateSelected=displayingSampleFixed,currentState=displayingSampleFixed,lastState=currentState;
 SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX);
 #ifdef __MHZ19B__
   MHZ19 co2Sensor;
   extern const int MHZ19B;
 #endif
+Button  button1(BUTTON1);
+Button  button2(BUTTON2);
+
 
 //Code
 void loadBootImage() {
@@ -238,7 +241,7 @@ void setup() {
   /*-->
   boolean positiveSign;
   float_t markUp;
-  randomSeed(analogRead(0));
+  randomSeed(analogRead(37));
   <--*/
   
   //Initiating buffers to draw the Co2/Temp/Hum graphs
@@ -260,6 +263,8 @@ void setup() {
   //-->>Buttons init
   if (logsOn) Serial.print("[setup] - Buttons: ");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Buttons: [");
+  button1.begin();
+  button2.begin();
   if (error_setup != ERROR_BUTTONS_SETUP ) { 
     if (logsOn) Serial.println("OK");
     tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
@@ -320,7 +325,7 @@ void setup() {
   tft.setCursor(0,0,TEXT_FONT);
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(TEXT_SIZE);
-  /*-->*/randomSeed(analogRead(0));
+  /*-->*/randomSeed(analogRead(37));
   circularGauge.drawGauge2(0);
 }
 
@@ -354,7 +359,63 @@ void loop() {
   if (gapDaySampleTime>=SAMPLE_T_LAST_DAY*1000) {previousDaySampleTime=nowTime;gapDaySampleTime=0;updateDaySample=true;}
   else updateDaySample=false;
 
+  //Actions if button1 is pushed. It depens on the current state
+  if (button1.pressed())
+  {
+    lastState=currentState;  //Really useful?  Remove??
+
+    //Actions are different based on the current state
+    switch(currentState) {
+      case menuWhatToDisplay:
+      //Changing displayingMode: sampleFixed -> co2LastHourGraphFixe -> co2LastDayGraphFixed -> sequential
+        switch(stateSelected) {
+          case displayingSampleFixed:
+            stateSelected=displayingCo2LastHourGraphFixed;
+            displayMode=co2LastHourGraph;
+          break;
+          case displayingCo2LastHourGraphFixed:
+            stateSelected=displayingCo2LastDayGraphFixed;
+            displayMode=co2LastDayGraph;
+          break;
+          case displayingCo2LastDayGraphFixed:
+            stateSelected=displayingSequential;
+            displayMode=co2LastDayGraph;
+          break;
+          case displayingSequential:
+            stateSelected=displayingSampleFixed;
+            displayMode=sampleValue;
+          break;
+        }
+        printMenuWhatToDisplay();
+      break;
+      default:
+        stateSelected=currentState;
+        currentState=menuWhatToDisplay;
+        printMenuWhatToDisplay();
+      break;
+    }
+  }
+
+  //Actions if button2 is pushed. It depens on the current state
+  if (button2.pressed()) {
+    
+    //Actions are different based on the current state
+    switch(currentState) {
+      case menuWhatToDisplay:
+        currentState=stateSelected;
+        gapTimeDisplay=DISPLAY_REFRESH_PERIOD;
+        gapTimeDisplayMode=DISPLAY_MODE_REFRESH_PERIOD;
+        lastDisplayMode=menu;
+        lastGapTime=SAMPLE_PERIOD;
+        //tft.fillScreen(MENU_BACK_COLOR);
+      break;
+      default:
+      break;
+    }
+  }
+
   //Regular actions every SAMPLE_PERIOD seconds
+  //  Taking CO2, Temp & Hum samples. Moving buffers at the right time
   if (gapTime>=SAMPLE_PERIOD) {
     previousTime=nowTime;lastGapTime=gapTime;gapTime=0;
 
@@ -394,7 +455,8 @@ void loop() {
   }
 
   //Regular actions every DISPLAY_MODE_REFRESH_PERIOD seconds
-  if (gapTimeDisplayMode>=DISPLAY_MODE_REFRESH_PERIOD) {
+  // Selecting what's the screen to display (active screen)
+  if (gapTimeDisplayMode>=DISPLAY_MODE_REFRESH_PERIOD && currentState==displayingSequential) {
     previousTimeDisplayMode=nowTime;gapTimeDisplayMode=0;
 
     switch (displayMode) {
@@ -411,7 +473,8 @@ void loop() {
   }
   
   //Regular actions every DISPLAY_REFRESH_PERIOD seconds
-  if (gapTimeDisplay>=DISPLAY_REFRESH_PERIOD) {
+  // Display the active screen
+  if (gapTimeDisplay>=DISPLAY_REFRESH_PERIOD && currentState!=menuWhatToDisplay) {
     previousTimeDisplay=nowTime;gapTimeDisplay=0;
 
     switch (displayMode) {
