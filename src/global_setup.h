@@ -5,7 +5,7 @@
 
 #include "user_setup.h"
 
-#define VERSION 0.6.4
+#define VERSION 0.6.5
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER               //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant

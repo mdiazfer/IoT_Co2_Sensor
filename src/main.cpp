@@ -41,7 +41,7 @@ float_t lastHourHumSamples[3600/SAMPLE_T_LAST_HOUR];   //Buffer to record last-h
 float_t lastDayCo2Samples[24*3600/SAMPLE_T_LAST_DAY];  //Buffer to record last-day C02 values
 float_t lastDayTempSamples[24*3600/SAMPLE_T_LAST_DAY];  //Buffer to record last-day Temp values
 float_t lastDayHumSamples[24*3600/SAMPLE_T_LAST_DAY];   //Buffer to record last-day Hum values
-boolean showGraph=false,updateHourSample=true,updateDaySample=true;
+boolean showGraph=false,updateHourSample=true,updateDaySample=true,updateHourGraph=true,updateDayGraph=true;
 int8_t counterDisplay=-1;
 enum displayModes displayMode=sampleValue, lastDisplayMode=bootup; //Will make starting always in sampleValue
 enum availableStates stateSelected=displayingSampleFixed,currentState=displayingSampleFixed,lastState=currentState;
@@ -100,8 +100,8 @@ void drawGraphLastHourCo2() {
     else if (CO2_GAUGE_TH1 < lastHourCo2Samples[i] && lastHourCo2Samples[i] <= CO2_GAUGE_TH2) auxCo2Color=TFT_YELLOW;
     else auxCo2Color=TFT_RED;
     if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
-    if(lastHourTempSamples[i]==0) auxTempColor=TFT_DARKGREY;
-    if(lastHourHumSamples[i]==0) auxHumColor=TFT_DARKGREY;
+    if(lastHourTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_MAGENTA;
+    if(lastHourHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_BROWN;
     tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color); //CO2 sample
     tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
     tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
@@ -145,8 +145,8 @@ void drawGraphLastDayCo2() {
     else if (CO2_GAUGE_TH1 < lastDayCo2Samples[i] && lastDayCo2Samples[i] <= CO2_GAUGE_TH2) auxCo2Color=TFT_YELLOW;
     else auxCo2Color=TFT_RED;
     if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
-    if(lastDayTempSamples[i]==0) auxTempColor=TFT_DARKGREY;
-    if(lastDayHumSamples[i]==0) auxHumColor=TFT_DARKGREY;
+    if(lastDayTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_MAGENTA;
+    if(lastDayHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_BROWN;
     tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color);   //CO2 sample
     tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
     tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
@@ -352,11 +352,16 @@ void loop() {
   gapHourSampleTime = previousHourSampleTime!=0 ? nowTime-previousHourSampleTime: SAMPLE_T_LAST_HOUR*1000;
   gapDaySampleTime = previousDaySampleTime!=0 ? nowTime-previousDaySampleTime: SAMPLE_T_LAST_DAY*1000;
   
-  //Checking if circular buffers update is needed
-  if (gapHourSampleTime>=SAMPLE_T_LAST_HOUR*1000) {previousHourSampleTime=nowTime;gapHourSampleTime=0;updateHourSample=true;}
+
+  /*Serial.print("[");Serial.print(nowTime);Serial.print("] - gapHourSampleTime=");Serial.println(gapHourSampleTime);
+  Serial.print("  + previousHourSampleTime=");Serial.println(previousHourSampleTime);
+  Serial.print("  + updateHourSample=");Serial.println(updateHourSample);*/
+
+  //Checking if sample buffers update is needed
+  if (gapHourSampleTime>=SAMPLE_T_LAST_HOUR*1000) {previousHourSampleTime=nowTime;gapHourSampleTime=0;updateHourSample=true;updateHourGraph=true;}
   else updateHourSample=false;
 
-  if (gapDaySampleTime>=SAMPLE_T_LAST_DAY*1000) {previousDaySampleTime=nowTime;gapDaySampleTime=0;updateDaySample=true;}
+  if (gapDaySampleTime>=SAMPLE_T_LAST_DAY*1000) {previousDaySampleTime=nowTime;gapDaySampleTime=0;updateDaySample=true;updateDayGraph=true;}
   else updateDaySample=false;
 
   //Actions if button1 is pushed. It depens on the current state
@@ -538,10 +543,10 @@ void loop() {
       break;
       case co2LastHourGraph:
         //Last Hour graph is displayed
-        
+
         //Cleaning the screen always the first time in
-        if (lastDisplayMode!=co2LastHourGraph) {tft.fillScreen(TFT_BLACK); drawGraphLastHourCo2();}
-        else if (updateHourSample) drawGraphLastHourCo2(); //Draw new graph only if buffer was updated
+        if (lastDisplayMode!=co2LastHourGraph) {tft.fillScreen(TFT_BLACK); drawGraphLastHourCo2(); updateHourGraph=false;}
+        else if (updateHourGraph) {drawGraphLastHourCo2(); updateHourGraph=false;}//Draw new graph only if buffer was updated
 
         lastDisplayMode=co2LastHourGraph;
       break;
@@ -549,8 +554,8 @@ void loop() {
         //Last Day graph is displayed
 
         //Cleaning the screen always the first time in
-        if (lastDisplayMode!=co2LastDayGraph) {tft.fillScreen(TFT_BLACK); drawGraphLastDayCo2();}
-        else if (updateDaySample) drawGraphLastDayCo2(); //Draw new graph only if buffer was updated
+        if (lastDisplayMode!=co2LastDayGraph) {tft.fillScreen(TFT_BLACK); drawGraphLastDayCo2(); updateDayGraph=false;}
+        else if (updateDayGraph) {drawGraphLastDayCo2(); updateDayGraph=false;}//Draw new graph only if buffer was updated
       
         lastDisplayMode=co2LastDayGraph;
       break;

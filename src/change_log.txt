@@ -3,6 +3,9 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.6.5 17/Sep/2022   - Bug fixing
+                        + Graph not updated in fixed mode display
+                        + Wrong Temp & Hum line color in graphs
 - 0.6.4 17/Sep/2022   - Press button to swap between different screens
                       - Libreries TFT_eSPI & EspSoftwareSerial updated
 - 0.6.3 16/Sep/2022   - Adding graphs in the main screen for last hour and last day Tem & Hum evolution
