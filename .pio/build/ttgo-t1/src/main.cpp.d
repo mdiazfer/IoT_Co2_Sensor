@@ -286,4 +286,6 @@
  .pio/libdeps/ttgo-t1/EspSoftwareSerial/src/SoftwareSerial.h \
  .pio/libdeps/ttgo-t1/EspSoftwareSerial/src/circular_queue/circular_queue.h \
  .pio/libdeps/ttgo-t1/EspSoftwareSerial/src/circular_queue/Delegate.h \
- src/Button.h
+ src/Button.h .pio/libdeps/ttgo-t1/SHT2x/SHT2x.h \
+ /Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.h \
+ /Users/madiazfer/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal.h

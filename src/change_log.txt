@@ -3,6 +3,9 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.6.6 18/Sep/2022   - Added sensor SH7021 for Temp and Humidity
+                        + Temp & Humidity samples got from that sensor rather CO2 sensor (better precission)
+                      - Improve rounding to 1 decimals the value of valueT when converting into String
 - 0.6.5 17/Sep/2022   - Bug fixing
                         + Graph not updated in fixed mode display
                         + Wrong Temp & Hum line color in graphs

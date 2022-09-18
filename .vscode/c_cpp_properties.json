@@ -11,6 +11,7 @@
                 "/Users/madiazfer/src/PlatformIO/Projects/IoT_Co2_Sensor/include",
                 "/Users/madiazfer/src/PlatformIO/Projects/IoT_Co2_Sensor/src",
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
+                "/Users/madiazfer/src/PlatformIO/Projects/IoT_Co2_Sensor/.pio/libdeps/ttgo-t1/SHT2x",
                 "/Users/madiazfer/src/PlatformIO/Projects/IoT_Co2_Sensor/.pio/libdeps/ttgo-t1/EspSoftwareSerial/src",
                 "/Users/madiazfer/src/PlatformIO/Projects/IoT_Co2_Sensor/.pio/libdeps/ttgo-t1/TFT_eSPI",
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/LittleFS/src",
@@ -205,6 +206,7 @@
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/qio_qspi/include",
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/variants/ttgo-t1",
+                "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
@@ -231,7 +233,6 @@
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                 "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
-                "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
                 ""
             ],
             "browse": {
@@ -240,6 +241,7 @@
                     "/Users/madiazfer/src/PlatformIO/Projects/IoT_Co2_Sensor/include",
                     "/Users/madiazfer/src/PlatformIO/Projects/IoT_Co2_Sensor/src",
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
+                    "/Users/madiazfer/src/PlatformIO/Projects/IoT_Co2_Sensor/.pio/libdeps/ttgo-t1/SHT2x",
                     "/Users/madiazfer/src/PlatformIO/Projects/IoT_Co2_Sensor/.pio/libdeps/ttgo-t1/EspSoftwareSerial/src",
                     "/Users/madiazfer/src/PlatformIO/Projects/IoT_Co2_Sensor/.pio/libdeps/ttgo-t1/TFT_eSPI",
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/LittleFS/src",
@@ -434,6 +436,7 @@
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32/qio_qspi/include",
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/cores/esp32",
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/variants/ttgo-t1",
+                    "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/ArduinoOTA/src",
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/AsyncUDP/src",
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/BLE/src",
@@ -460,7 +463,6 @@
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                     "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
-                    "/Users/madiazfer/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
                     ""
                 ]
             },

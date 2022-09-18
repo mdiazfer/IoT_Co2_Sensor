@@ -1,2 +1,3 @@
-bodmer/TFT_eSPI@^2.4.75
+robtillaart/SHT2x@^0.2.0
 plerup/EspSoftwareSerial@^6.16.1
+bodmer/TFT_eSPI@^2.4.75

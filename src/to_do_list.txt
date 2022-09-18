@@ -18,6 +18,9 @@ To do list
 
 Done
 -------
+- Bug fixing (v0.6.5)
+  + Graph not updated in fixed mode display
+  + Wrong Temp & Hum line color in graphs
 + Press button to swap between different screens (v0.6.4)
 + Graph picture with the Tº/Hum measurements history (v0.6.3)
 + Graph picture with the CO2 measurements history (v0.6.2)

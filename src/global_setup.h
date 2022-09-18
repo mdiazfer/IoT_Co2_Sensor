@@ -5,12 +5,13 @@
 
 #include "user_setup.h"
 
-#define VERSION 0.6.5
+#define VERSION 0.6.6
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER               //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
 #define __MHZ19B__
 #define __TFT_DISPLAY_PRESENT__
+#define __SI7021__
 
 //Global board stuff
 #define ERROR_LED 25    //Customized for TTGO T-DISPLAY (T1) board
@@ -18,13 +19,17 @@
 #define TFT_Y_HEIGH 135 //Customized for TTGO T-DISPLAY (T1) board
 #define BUTTON1     35  //Customized for TTGO T-DISPLAY (T1) board
 #define BUTTON2     0   //Customized for TTGO T-DISPLAY (T1) board
+#define CO2_RX 26 //RX pin in the ESP board (TX pin in the CO2 sensor)
+#define CO2_TX 27 //TX pin in the ESP board (TX pin in the CO2 sensor)
+#define I2C_SDA 21 //I2C - SDA pin in the ESP board (SDA pin in the sensor)
+#define I2C_SCL 22 //I2C - SCL pin in the ESP board (SCL pin in the sensor)
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
   #define CO2_SENSOR  _STRINGIFY_(MH-Z19B)
   #define CO2_SENSOR_TYPE  "MH-Z19B"
-  #define MH_Z19B_RX 26 //RX pin in the ESP board (TX pin in the CO2 sensor)
-  #define MH_Z19B_TX 27 //TX pin in the ESP board (TX pin in the CO2 sensor)
+  #define MH_Z19B_RX CO2_RX //RX pin in the ESP board (TX pin in the CO2 sensor)
+  #define MH_Z19B_TX CO2_TX //TX pin in the ESP board (TX pin in the CO2 sensor)
   #define MH_Z19B_CO2_IN    37 //GPIO pin in the ESB board to connect the PWM CO2 sensor output
   #define MH_Z19B_CO2_WARMING_TIME 30000  //Preheat time according to the datasheet
   #define MH_Z19B_CO2_RANGE 2000  //Range of CO2 measurments. 0-2000 is adviced for MHZ19B as per datasheet for better accuracy
@@ -35,6 +40,21 @@
 #else
   //For other sensor models copy the parameters for __MHZ19B__ customized for the rith model
   #define CO2_SENSOR  "UNKNOWN"
+#endif
+
+//Temperature & Humidigy Sensor stuff
+#ifdef  __SI7021__ //Sendor model dependant parameters
+  #define TEMP_HUM_SENSOR  _STRINGIFY_(SI7021)  //SI7021, SHT21 and HTU21 are all equivalent
+  #define TEMP_HUM_SENSOR_TYPE  "SI7021"
+  #define SI7021_SDA I2C_SDA //I2C - SDA pin in the ESP board (SDA pin in the sensor)
+  #define SI7021_SCL I2C_SCL //I2C - SCL pin in the ESP board (SCL pin in the sensor)
+  #define SI7021_TEMP_MAX  50
+  #define SI7021_TEMP_MIN  -10
+  #define SI7021_HUM_MAX  100
+  #define SI7021_HUM_MIN  0
+#else
+  //For other sensor models copy the parameters for __SI7021__ customized for the rith model
+  #define TEMP_HUM_SENSOR  "UNKNOWN"
 #endif
 
     //Sensor model independant parameters
@@ -54,11 +74,12 @@
 //Error stuff
 #define NO_ERROR                0x00
 #define ERROR_DISPLAY_SETUP     0x01
-#define ERROR_SENSOR_SETUP      0x02
-#define ERROR_BUTTONS_SETUP     0x03
-#define ERROR_WIFI_SETUP        0x04
-#define ERROR_BLE_SETUP         0x05
-#define ERROR_SSID_CONNECTION   0x06
+#define ERROR_SENSOR_TEMP_HUM_SETUP  0x02
+#define ERROR_SENSOR_CO2_SETUP  0x03
+#define ERROR_BUTTONS_SETUP     0x04
+#define ERROR_WIFI_SETUP        0x05
+#define ERROR_BLE_SETUP         0x06
+#define ERROR_SSID_CONNECTION   0x07
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240

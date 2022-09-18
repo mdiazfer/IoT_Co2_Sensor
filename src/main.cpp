@@ -15,6 +15,7 @@
 #include "MHZ19.h"
 #include <SoftwareSerial.h>
 #include "Button.h"
+#include <SHT2x.h>
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -22,6 +23,7 @@
 
 //Global variable definitions
 const String co2SensorType=String(CO2_SENSOR_TYPE);
+const String tempHumSensorType=String(TEMP_HUM_SENSOR_TYPE);
 uint8_t error_setup = NO_ERROR;
 TFT_eSPI tft = TFT_eSPI();  // Invoke library to manage the display
 ulong nowTime=0,previousTime=0,previousTimeDisplay=0,previousTimeDisplayMode=0,
@@ -44,11 +46,14 @@ float_t lastDayHumSamples[24*3600/SAMPLE_T_LAST_DAY];   //Buffer to record last-
 boolean showGraph=false,updateHourSample=true,updateDaySample=true,updateHourGraph=true,updateDayGraph=true;
 int8_t counterDisplay=-1;
 enum displayModes displayMode=sampleValue, lastDisplayMode=bootup; //Will make starting always in sampleValue
-enum availableStates stateSelected=displayingSampleFixed,currentState=displayingSampleFixed,lastState=currentState;
+enum availableStates stateSelected=displayingSampleFixed,currentState=displayingSequential,lastState=currentState;
 SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX);
 #ifdef __MHZ19B__
   MHZ19 co2Sensor;
   extern const int MHZ19B;
+#endif
+#ifdef __SI7021__
+  SHT2x tempHumSensor;
 #endif
 Button  button1(BUTTON1);
 Button  button2(BUTTON2);
@@ -102,9 +107,9 @@ void drawGraphLastHourCo2() {
     if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
     if(lastHourTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_MAGENTA;
     if(lastHourHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_BROWN;
-    tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color); //CO2 sample
-    tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
     tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
+    tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
+    tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color); //CO2 sample
   }
 }
 
@@ -147,10 +152,45 @@ void drawGraphLastDayCo2() {
     if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
     if(lastDayTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_MAGENTA;
     if(lastDayHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_BROWN;
-    tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color);   //CO2 sample
-    tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
     tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
+    tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
+    tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color);   //CO2 sample
   }
+}
+
+String roundFloattoString(float_t number, uint8_t decimals) {
+  //Round float to "decimals" decimals in String format
+  String myString;  
+
+  int ent,dec,auxEnt,auxDec,aux1,aux2;
+
+  if (decimals==1) {
+    //Better precision operating without pow()
+    aux1=number*100;
+    ent=aux1/100;
+    aux2=ent*100;
+    dec=aux1-aux2; if (dec<0) dec=-dec;
+  }
+  else 
+    if (decimals==2) {
+      //Better precision operating without pow()
+      aux1=number*1000;
+      ent=aux1/1000;
+      aux2=ent*1000;
+      dec=aux1-aux2; if (dec<0) dec=-dec;
+    }
+    else {
+      ent=int(number);
+      dec=abs(number*pow(10,decimals+1)-ent*pow(10,decimals+1));
+    }
+  auxEnt=int(float(dec/10));
+  auxDec=abs(auxEnt*10-dec);
+  if (auxDec>=5) auxEnt++;
+
+  if (decimals==0) myString=String(number).toInt(); 
+  else myString=String(ent)+"."+String(auxEnt);
+  
+  return myString;
 }
 
 void setup() {
@@ -195,20 +235,56 @@ void setup() {
   tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
 
-  //Sensor init
+  //Some Temp & Hum sensor checks and init
+  if (logsOn) Serial.print("[setup] - Sensor Temp/HUM: ");
+  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Tp/Hu:  [");
+  tempHumSensor.begin(SI7021_SDA,SI7021_SCL);
+  int errorSns = tempHumSensor.getError();
+  uint8_t statSns = tempHumSensor.getStatus();
+  if (!tempHumSensor.isConnected() || 0==tempHumSensorType.compareTo("UNKNOW"))
+    error_setup=ERROR_SENSOR_TEMP_HUM_SETUP;
+  if (error_setup != ERROR_SENSOR_TEMP_HUM_SETUP ) { 
+    if (logsOn) {
+      Serial.println("OK");
+      Serial.print("  Tp/Hm Sensor type: "); Serial.println(tempHumSensorType); 
+      Serial.print("  Tp/Hm Sen. status: "); Serial.println(statSns,HEX);
+      Serial.print("  Tp/Hm Sen.  error: "); Serial.println(errorSns,HEX); 
+    }
+    tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
+    tft.println(tempHumSensorType);
+  }
+  else {
+    if (logsOn) {
+      Serial.println("KO");
+      Serial.print("  Tp/Hm Sensor type: "); Serial.print(tempHumSensorType);Serial.println(" - Shouldn't be UNKNOWN");
+      Serial.print("  Tp/Hm Sen. status: "); Serial.println(statSns,HEX);
+      Serial.print("  Tp/Hm Sen.  error: "); Serial.print(errorSns,HEX);Serial.println(" - Should be 0");
+      Serial.println("  Can't continue. STOP");
+    }
+    tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sns. type: "); if (0==tempHumSensorType.compareTo("UNKNOW")) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(tempHumSensorType);
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sen. status: "); tft.println(statSns,HEX);
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sen.  error: "); if (0 != errorSns) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(errorSns,HEX);
+    tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("\n  Can't continue. STOP"); 
+    return;
+  }
+
+  //Sensor CO2 init
   if (logsOn) Serial.print("[setup] - Sensor: ");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Sens.:  [");
   co2SensorSerialPort.begin(9600);      // (Uno example) device to MH-Z19 serial start   
   co2Sensor.begin(co2SensorSerialPort); // *Serial(Stream) refence must be passed to library begin(). 
   co2Sensor.setRange(CO2_SENSOR_CO2_RANGE);             // It's aviced to setup range to 2000. Better accuracy
 
-  //Some sensor checks
+  //Some Co2 sensor checks
   char co2SensorVersion[5];memset(co2SensorVersion, '\0', 5);
   co2Sensor.getVersion(co2SensorVersion);
   if (CO2_SENSOR_CO2_RANGE!=co2Sensor.getRange() || (byte) 0 != co2Sensor.getAccuracy(false) ||
       0==co2SensorType.compareTo("UNKNOW"))
-    error_setup = ERROR_SENSOR_SETUP;
-  if (error_setup != ERROR_SENSOR_SETUP ) { 
+    error_setup = ERROR_SENSOR_CO2_SETUP;
+  if (error_setup != ERROR_SENSOR_CO2_SETUP ) { 
     if (logsOn) {
       Serial.println("OK");
       Serial.print("  CO2 Sensor type: "); Serial.println(co2SensorType); 
@@ -234,10 +310,10 @@ void setup() {
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor version: "); tft.println(co2SensorVersion);
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Accuracy: "); if ((byte) 0 != co2Sensor.getAccuracy(false)) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getAccuracy(false));
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Range: "); if  (CO2_SENSOR_CO2_RANGE!=co2Sensor.getRange()) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getRange());
-    tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("  Can't continue. STOP");
+    tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("\n  Can't continue. STOP");
     return;
   }
-  
+
   /*-->
   boolean positiveSign;
   float_t markUp;
@@ -330,7 +406,8 @@ void setup() {
 }
 
 void loop() {
-  if (ERROR_DISPLAY_SETUP==error_setup || ERROR_SENSOR_SETUP==error_setup)
+  if (ERROR_DISPLAY_SETUP==error_setup || ERROR_SENSOR_CO2_SETUP==error_setup || 
+      ERROR_SENSOR_TEMP_HUM_SETUP==error_setup)
     return;
 
   nowTime=millis();
@@ -429,8 +506,11 @@ void loop() {
     /*-->valueT=(float_t)random(0,600)/10-10.0;<--*/
     /*-->valueHum=(float_t)random(0,100);<--*/
     valueCO2=(float_t)co2Sensor.getCO2();
-    tempMeasure=co2Sensor.getTemperature(true,true);
-    valueHum=0;
+    //tempMeasure=co2Sensor.getTemperature(true,true);
+    tempHumSensor.read();
+    tempMeasure=tempHumSensor.getTemperature();
+    //valueHum=0;
+    valueHum=tempHumSensor.getHumidity();
     
     if (tempMeasure>-50.0) valueT=tempMeasure;  //Discarding potential wrong values
 
@@ -515,8 +595,8 @@ void loop() {
             tft.fillRect(horizontalBar.xStart,horizontalBar.yStart-tft.fontHeight(TEXT_FONT)-1,horizontalBar.width,tft.fontHeight(TEXT_FONT),TFT_BLACK);
             horizontalBar.cleanHorizontalBar();
             tft.fillRect(TFT_X_WIDTH-tft.textWidth(String("Hum.")),90,tft.textWidth(String("Hum.")),tft.fontHeight(TEXT_FONT),TFT_BLACK);
-            tft.fillRect(TFT_X_WIDTH-tft.textWidth(String((uint32_t) valueHum)+"%"),90+tft.fontHeight(TEXT_FONT),tft.textWidth(String((uint32_t) valueHum)+"%"),tft.fontHeight(TEXT_FONT),TFT_BLACK);
-            
+            tft.fillRect(TFT_X_WIDTH-tft.textWidth(String(round(valueHum))+"%"),90+tft.fontHeight(TEXT_FONT),tft.textWidth(String(round(valueHum))+"%"),tft.fontHeight(TEXT_FONT),TFT_BLACK);
+
             //Partial displaying of the circular gauge (only the text value) to don't take too much displaying it
             circularGauge.setValue(valueCO2);
             circularGauge.cleanValueTextGauge();
@@ -525,7 +605,8 @@ void loop() {
           circularGauge.drawTextGauge("ppm");
 
           //Drawing temperature
-          valueString=String((int) valueT)+"."+String(abs(((int) (valueT*10))-(((int)valueT)*10)))+"C";
+          //valueString=String((int) valueT)+"."+String(abs(((int) (valueT*10))-(((int)valueT)*10)))+"C";
+          valueString=roundFloattoString(valueT,1)+"C";
           tft.setTextSize(TEXT_SIZE);
           drawText(valueT, String(valueString),TEXT_SIZE,TEXT_FONT,TFT_GREEN,TFT_BLACK,TFT_X_WIDTH-tft.textWidth(String(valueString)),25,20,TFT_BLUE,27,TFT_RED);
           horizontalBar.drawHorizontalBar(valueT);
@@ -534,8 +615,8 @@ void loop() {
           valueString=String("Hum.");
           tft.setTextSize(TEXT_SIZE);
           drawText(valueHum,String(valueString),TEXT_SIZE,TEXT_FONT,TFT_MAGENTA,TFT_BLACK,TFT_X_WIDTH-tft.textWidth(String(valueString)),90,30,TFT_MAGENTA,55,TFT_MAGENTA);
-          //valueString=String((uint32_t) valueHum)+"%";
-          valueString=String("----");
+          valueString=String(int(round(valueHum)))+"%";
+          //valueString=String("----");
           drawText(valueHum,String(valueString),TEXT_SIZE,TEXT_FONT,TFT_MAGENTA,TFT_BLACK,TFT_X_WIDTH-tft.textWidth(String(valueString)),90+tft.fontHeight(TEXT_FONT),30,TFT_BROWN,55,TFT_RED);
         
         }
