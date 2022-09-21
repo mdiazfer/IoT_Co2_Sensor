@@ -398,5 +398,74 @@ void printMenuWhatToDisplay() {
   tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.print("Sequentially all");
 }
 
+void printGlobalMenu() {
+  //Cleaning and printing menu screen
+  tft.fillScreen(MENU_GLOBAL_BACK_COLOR);
+  uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_GLOBAL_BACK_COLOR;
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(60,10,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Global Menu");
+
+  if (stateSelected==menuWhatToDisplay) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,40,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Display Options");
+  if (stateSelected==displayInfo) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Display Gral. Info");
+  if (  (stateSelected==displayingSampleFixed) || (stateSelected==displayingCo2LastHourGraphFixed) ||
+        (stateSelected==displayingCo2LastDayGraphFixed) || (stateSelected==displayingSequential) )
+        {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;}
+  else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Back");
+
+  //if (stateSelected==menuGlobal) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
+}
+
+void printInfoScreen() {
+  //Cleaning and printing menu screen
+  tft.fillScreen(MENU_GLOBAL_BACK_COLOR);
+  uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_INFO_BACK_COLOR;
+
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(25,10,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Global Info");
+
+  auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(0,40,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.print("Sensor Temp/HUM: ");//tft.println(tempHumSensorType);
+  tft.print("CO2 Sensor type ");//tft.println(co2SensorType);
+  tft.print("  Version: ");//tft.println(co2SensorVersion);
+  tft.print("  FW: ");
+  tft.print("  Accuracy: ");//tft.println(co2Sensor.getAccuracy(false));
+  tft.print("  Int. Temp (C): ");//tft.println(co2Sensor.getTemperature(true,true));
+  tft.println("WiFi Info");
+  tft.print("  SSID: ");//tft.println(wifiNet.ssid);
+  tft.println("  BSSID: ");
+  tft.print("  RSSI: ");//tft.println(wifiNet.RSSI);
+  tft.print("  Encryption Type: ");//tft.println(wifiNet.encryptionType, HEX);
+  tft.print("  WiFi Channel: ");//tft.println(wifiNet.channel);
+  tft.println("Net Info");
+  tft.println("  MAC address: ");
+  tft.print("  IP Address : ");//tft.println(WiFi.localIP().toString());
+  tft.print("  Mask       : ");//tft.println(WiFi.subnetMask().toString());
+  tft.print("  Default GW : ");//tft.println(WiFi.gatewayIP().toString());
+  tft.println("  NTP Server: ");
+
+  /*tft.setCursor(0,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.print("CO2 Sensor type ");tft.println(co2SensorType);
+  tft.setCursor(0,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.print("  Version: ");tft.println(co2SensorVersion);
+  tft.setCursor(0,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.print("  Accuracy: ");tft.println(co2Sensor.getAccuracy(false));
+  tft.setCursor(0,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*4,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.print("  Int. Temp (C): ");tft.println(co2Sensor.getTemperature(true,true));
+  */
+  
+  auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;
+  tft.setTextColor(auxColorFore,auxColorBack);
+  //tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);
+  tft.setTextSize(TEXT_SIZE_MENU);tft.println("\nBack");
+}
+
 
 

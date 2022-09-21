@@ -58,6 +58,7 @@ public:
 
   float    getTemperature();
   float    getHumidity();
+  float    getHumidityCompensated();
   uint16_t getRawTemperature() { return _rawTemperature; };
   uint16_t getRawHumidity()    { return _rawHumidity; };
 

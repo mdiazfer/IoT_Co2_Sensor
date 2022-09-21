@@ -3,6 +3,23 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.6.8 21/Sep/2022   - Added version at bootup screen. Color modifications in graphs for better reading
+                      - Added 2-level menu. Menu Global is the top level
+                      - Added Display Info option in Menu Global
+- 0.6.7 18/Sep/2022   - Added funcion getHumidityCompensated() to class SHT2x to implement the 
+                        temperature coefficient compensation equation to guarantee Relative Humidity accuracy
+
+                        float SHT2x::getHumidityCompensated()
+                        {
+                          //Implementing temperature coefficient compensation equation to guarantee Relative Humidity accuracy
+                          float humidityCompensated = -6.0 + (125.0 / 65536.0) * _rawHumidity;
+                          humidityCompensated += -0.15 * (25.0 - _rawTemperature);
+                          humidityCompensated = (humidityCompensated)<(0.0)?(0.0):((humidityCompensated)>(100.0)?(100.0):(humidityCompensated));
+                          
+                          return humidityCompensated;
+                        }
+
+                        must be added on SHT2x.cpp and SHT2x.h in case the SHT2x library is overwritten (clean all, update, etc)
 - 0.6.6 18/Sep/2022   - Added sensor SH7021 for Temp and Humidity
                         + Temp & Humidity samples got from that sensor rather CO2 sensor (better precission)
                       - Improve rounding to 1 decimals the value of valueT when converting into String

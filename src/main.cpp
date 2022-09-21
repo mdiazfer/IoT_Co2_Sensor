@@ -46,7 +46,7 @@ float_t lastDayHumSamples[24*3600/SAMPLE_T_LAST_DAY];   //Buffer to record last-
 boolean showGraph=false,updateHourSample=true,updateDaySample=true,updateHourGraph=true,updateDayGraph=true;
 int8_t counterDisplay=-1;
 enum displayModes displayMode=sampleValue, lastDisplayMode=bootup; //Will make starting always in sampleValue
-enum availableStates stateSelected=displayingSampleFixed,currentState=displayingSequential,lastState=currentState;
+enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState;
 SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX);
 #ifdef __MHZ19B__
   MHZ19 co2Sensor;
@@ -79,7 +79,8 @@ void drawGraphLastHourCo2() {
   tft.fillRect(CO2_GRAPH_X,(int32_t)(CO2_GRAPH_Y_END-CO2_GAUGE_TH2*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX),CO2_GRAPH_WIDTH,8,TFT_NAVY);
   tft.drawFastVLine(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_HEIGH+5,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_X-5,CO2_GRAPH_Y+2,CO2_GRAPH_X+5,CO2_GRAPH_Y+2,TFT_DARKGREY);
   tft.drawFastHLine(CO2_GRAPH_X,CO2_GRAPH_Y+CO2_GRAPH_HEIGH,CO2_GRAPH_WIDTH,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X_END,CO2_GRAPH_Y_END,CO2_GRAPH_X_END-5,CO2_GRAPH_Y_END-3,CO2_GRAPH_X_END-5,CO2_GRAPH_Y_END+3,TFT_DARKGREY);
-  for (int i=1;i<=4;i++) tft.drawFastVLine(CO2_GRAPH_X+45*i,CO2_GRAPH_Y_END-5,10,TFT_DARKGREY);
+  for (int i=1;i<=12;i++) if (3*(int)(i/3)==i) tft.drawFastVLine(CO2_GRAPH_X+15*i,CO2_GRAPH_Y_END-5,10,TFT_DARKGREY);
+    else tft.drawFastVLine(CO2_GRAPH_X+15*i,CO2_GRAPH_Y_END-2,4,TFT_DARKGREY); 
   for (int i=0;i<=3;i++) tft.drawFastHLine(CO2_GRAPH_X-5,CO2_GRAPH_Y+25*i,10,TFT_DARKGREY);
   tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREY,TFT_BLACK);
   tft.setCursor(CO2_GRAPH_X+35,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-45");
@@ -91,11 +92,11 @@ void drawGraphLastHourCo2() {
   tft.setCursor(CO2_GRAPH_X+15,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("Last 60 min   ");
   tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREEN,TFT_BLACK);tft.print("CO2 (ppm) [0-2000]");
   tft.setCursor(CO2_GRAPH_X+15,14,TEXT_FONT_BOOT_SCREEN-1);
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_MAGENTA,TFT_BLACK);tft.print("Temp (C) [0-50] ");
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_BROWN,TFT_BLACK);tft.print(" Hum (%) [0-100]");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_CYAN,TFT_BLACK);tft.print("Temp (C) [0-50] ");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_MAGENTA,TFT_BLACK);tft.print(" Hum (%) [0-100]");
 
   //Draw samples
-  int32_t co2Sample,tempSample,humSample,auxCo2Color,auxTempColor=TFT_MAGENTA,auxHumColor=TFT_BROWN;
+  int32_t co2Sample,tempSample,humSample,auxCo2Color,auxTempColor=TFT_CYAN,auxHumColor=TFT_MAGENTA;
   for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++)
   {
     co2Sample=(int32_t) (CO2_GRAPH_Y_END-lastHourCo2Samples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX);
@@ -105,8 +106,8 @@ void drawGraphLastHourCo2() {
     else if (CO2_GAUGE_TH1 < lastHourCo2Samples[i] && lastHourCo2Samples[i] <= CO2_GAUGE_TH2) auxCo2Color=TFT_YELLOW;
     else auxCo2Color=TFT_RED;
     if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
-    if(lastHourTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_MAGENTA;
-    if(lastHourHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_BROWN;
+    if(lastHourTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_CYAN;
+    if(lastHourHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_MAGENTA;
     tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
     tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
     tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color); //CO2 sample
@@ -126,7 +127,8 @@ void drawGraphLastDayCo2() {
   tft.fillRect(CO2_GRAPH_X,(int32_t)(CO2_GRAPH_Y_END-CO2_GAUGE_TH2*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX),CO2_GRAPH_WIDTH,8,TFT_NAVY);
   tft.drawFastVLine(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_HEIGH+5,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_X-5,CO2_GRAPH_Y+2,CO2_GRAPH_X+5,CO2_GRAPH_Y+2,TFT_DARKGREY);
   tft.drawFastHLine(CO2_GRAPH_X,CO2_GRAPH_Y+CO2_GRAPH_HEIGH,CO2_GRAPH_WIDTH+12,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X_END+12,CO2_GRAPH_Y_END,CO2_GRAPH_X_END+12-5,CO2_GRAPH_Y_END-3,CO2_GRAPH_X_END+12-5,CO2_GRAPH_Y_END+3,TFT_DARKGREY);
-  for (int i=1;i<=4;i++) tft.drawFastVLine(CO2_GRAPH_X+48*i,CO2_GRAPH_Y_END-5,10,TFT_DARKGREY);
+  for (int i=1;i<=12;i++) if (3*(int)(i/3)==i) tft.drawFastVLine(CO2_GRAPH_X+16*i,CO2_GRAPH_Y_END-5,10,TFT_DARKGREY);
+    else tft.drawFastVLine(CO2_GRAPH_X+16*i,CO2_GRAPH_Y_END-2,4,TFT_DARKGREY);
   for (int i=0;i<=3;i++) tft.drawFastHLine(CO2_GRAPH_X-5,CO2_GRAPH_Y+25*i,10,TFT_DARKGREY);
   tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREY,TFT_BLACK);
   tft.setCursor(CO2_GRAPH_X+38,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-18");
@@ -137,10 +139,10 @@ void drawGraphLastDayCo2() {
   tft.setCursor(CO2_GRAPH_X+15,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("Last 24 h.    ");
   tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREEN,TFT_BLACK);tft.print("CO2 (ppm) [0-2000]");
   tft.setCursor(CO2_GRAPH_X+15,14,TEXT_FONT_BOOT_SCREEN-1);
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_MAGENTA,TFT_BLACK);tft.print("Temp (C) [0-50] ");
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_BROWN,TFT_BLACK);tft.print(" Hum (%) [0-100]");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_CYAN,TFT_BLACK);tft.print("Temp (C) [0-50] ");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_MAGENTA,TFT_BLACK);tft.print(" Hum (%) [0-100]");
   //Draw samples
-  int32_t co2Sample,tempSample,humSample,auxCo2Color,auxTempColor=TFT_MAGENTA,auxHumColor=TFT_BROWN;
+  int32_t co2Sample,tempSample,humSample,auxCo2Color,auxTempColor=TFT_CYAN,auxHumColor=TFT_MAGENTA;
   for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY); i++)
   {
     co2Sample=(int32_t) (CO2_GRAPH_Y_END-lastDayCo2Samples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX);
@@ -150,8 +152,8 @@ void drawGraphLastDayCo2() {
     else if (CO2_GAUGE_TH1 < lastDayCo2Samples[i] && lastDayCo2Samples[i] <= CO2_GAUGE_TH2) auxCo2Color=TFT_YELLOW;
     else auxCo2Color=TFT_RED;
     if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
-    if(lastDayTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_MAGENTA;
-    if(lastDayHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_BROWN;
+    if(lastDayTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_CYAN;
+    if(lastDayHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_MAGENTA;
     tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
     tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
     tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color);   //CO2 sample
@@ -189,15 +191,16 @@ String roundFloattoString(float_t number, uint8_t decimals) {
 
   if (decimals==0) myString=String(number).toInt(); 
   else myString=String(ent)+"."+String(auxEnt);
-  
+
   return myString;
 }
 
 void setup() {
   static uint32_t wr = 1;
   static uint32_t rd = 0xFFFFFFFF;
+  currentState=displayingSequential;lastState=currentState;
 
-  if (logsOn) {Serial.begin(115200);Serial.println("\n[setup] - Serial: OK");}
+  if (logsOn) {Serial.begin(115200);Serial.print("\nCO2 bootup v");Serial.print(VERSION);Serial.println(" ..........");Serial.println("[setup] - Serial: OK");}
 
   //Display init
   tft.init();
@@ -230,7 +233,7 @@ void setup() {
   //Display messages
   tft.setCursor(0,0,TEXT_FONT_BOOT_SCREEN);
   tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  tft.setTextColor(TFT_WHITE,TFT_BLACK); tft.println("IoT boot up...............");
+  tft.setTextColor(TFT_WHITE,TFT_BLACK); tft.print("CO2 bootup v");tft.print(VERSION);tft.println(" ..........");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Display: [");
   tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
@@ -238,6 +241,7 @@ void setup() {
   //Some Temp & Hum sensor checks and init
   if (logsOn) Serial.print("[setup] - Sensor Temp/HUM: ");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Tp/Hu:  [");
+  pinMode(SI7021_SDA,INPUT_PULLUP); pinMode(SI7021_SCL,INPUT_PULLUP);
   tempHumSensor.begin(SI7021_SDA,SI7021_SCL);
   int errorSns = tempHumSensor.getError();
   uint8_t statSns = tempHumSensor.getStatus();
@@ -247,8 +251,10 @@ void setup() {
     if (logsOn) {
       Serial.println("OK");
       Serial.print("  Tp/Hm Sensor type: "); Serial.println(tempHumSensorType); 
+      //Serial.print("  Tp/Hm Sen. version: "); Serial.println(tempHumSensor.getFirmwareVersion());
       Serial.print("  Tp/Hm Sen. status: "); Serial.println(statSns,HEX);
-      Serial.print("  Tp/Hm Sen.  error: "); Serial.println(errorSns,HEX); 
+      Serial.print("  Tp/Hm Sen.  error: "); Serial.println(errorSns,HEX);
+      Serial.print("  Tp/Hm Sen. resolu.: "); Serial.println(tempHumSensor.getResolution());
     }
     tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
@@ -258,15 +264,19 @@ void setup() {
     if (logsOn) {
       Serial.println("KO");
       Serial.print("  Tp/Hm Sensor type: "); Serial.print(tempHumSensorType);Serial.println(" - Shouldn't be UNKNOWN");
+      //Serial.print("  Tp/Hm Sen. version: "); Serial.println(tempHumSensor.getFirmwareVersion());
       Serial.print("  Tp/Hm Sen. status: "); Serial.println(statSns,HEX);
       Serial.print("  Tp/Hm Sen.  error: "); Serial.print(errorSns,HEX);Serial.println(" - Should be 0");
+      Serial.print("  Tp/Hm Sen. resolu.: "); Serial.println(tempHumSensor.getResolution());
       Serial.println("  Can't continue. STOP");
     }
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sns. type: "); if (0==tempHumSensorType.compareTo("UNKNOW")) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(tempHumSensorType);
+    //tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sen. version: "); tft.println(tempHumSensor.getFirmwareVersion());
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sen. status: "); tft.println(statSns,HEX);
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sen.  error: "); if (0 != errorSns) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(errorSns,HEX);
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sen. resolu.: "); tft.println(tempHumSensor.getResolution());
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("\n  Can't continue. STOP"); 
     return;
   }
@@ -313,28 +323,10 @@ void setup() {
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("\n  Can't continue. STOP");
     return;
   }
-
-  /*-->
-  boolean positiveSign;
-  float_t markUp;
-  randomSeed(analogRead(37));
-  <--*/
-  
+ 
   //Initiating buffers to draw the Co2/Temp/Hum graphs
   for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++)  {lastHourCo2Samples[i]=0;lastHourTempSamples[i]=0;lastHourHumSamples[i]=0;}
   for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY); i++) {lastDayCo2Samples[i]=0;lastDayTempSamples[i]=0;lastDayHumSamples[i]=0;}
-
-  /*-->{
-    //Ramdom filling for testing
-    positiveSign=random(0,4)>=3?true:false;markUp=(float_t)random(0,5)/100;
-    if (i==0) lastDayHumSamples[i]=70;
-    else
-      if (positiveSign) lastDayHumSamples[i]=lastDayHumSamples[i-1]*(1+markUp);
-      else lastDayHumSamples[i]=lastDayHumSamples[i-1]*(1-markUp);
-    Serial.print("\n- i=");Serial.print(i);Serial.print(", positiveSign=");Serial.print(positiveSign);
-    Serial.print(", markUp=");Serial.print(markUp);
-    Serial.print(", lastDayHumSamples[");Serial.print(i);Serial.print("]=");Serial.print(lastDayHumSamples[i]);
-  }<--*/
 
   //-->>Buttons init
   if (logsOn) Serial.print("[setup] - Buttons: ");
@@ -403,6 +395,7 @@ void setup() {
   tft.setTextSize(TEXT_SIZE);
   /*-->*/randomSeed(analogRead(37));
   circularGauge.drawGauge2(0);
+  currentState=displayingSequential;lastState=currentState; //Transition to the next state
 }
 
 void loop() {
@@ -414,6 +407,7 @@ void loop() {
 
   while (nowTime<co2PreheatingTime) {
     //Waiting for the sensor to warmup before displaying value
+    if (nowTime<10000) if (logsOn) Serial.println("Waiting for the warmup to finish");
     circularGauge.cleanValueTextGauge();
     circularGauge.cleanUnitsTextGauge();
     circularGauge.setValue((int)(co2PreheatingTime-nowTime)/1000);
@@ -429,11 +423,6 @@ void loop() {
   gapHourSampleTime = previousHourSampleTime!=0 ? nowTime-previousHourSampleTime: SAMPLE_T_LAST_HOUR*1000;
   gapDaySampleTime = previousDaySampleTime!=0 ? nowTime-previousDaySampleTime: SAMPLE_T_LAST_DAY*1000;
   
-
-  /*Serial.print("[");Serial.print(nowTime);Serial.print("] - gapHourSampleTime=");Serial.println(gapHourSampleTime);
-  Serial.print("  + previousHourSampleTime=");Serial.println(previousHourSampleTime);
-  Serial.print("  + updateHourSample=");Serial.println(updateHourSample);*/
-
   //Checking if sample buffers update is needed
   if (gapHourSampleTime>=SAMPLE_T_LAST_HOUR*1000) {previousHourSampleTime=nowTime;gapHourSampleTime=0;updateHourSample=true;updateHourGraph=true;}
   else updateHourSample=false;
@@ -444,10 +433,25 @@ void loop() {
   //Actions if button1 is pushed. It depens on the current state
   if (button1.pressed())
   {
-    lastState=currentState;  //Really useful?  Remove??
-
     //Actions are different based on the current state
     switch(currentState) {
+      case bootupScreen:
+      break;
+      case menuGlobal:
+      //Changing Menus: Global Menu -> What to display Menu -> Display Gra. Info -> back
+        switch(stateSelected) {
+          case menuWhatToDisplay:
+            stateSelected=displayInfo;
+          break;
+          case displayInfo:
+            stateSelected=lastState;
+          break;
+          default:
+            stateSelected=menuWhatToDisplay;
+          break;
+        }
+        printGlobalMenu();
+      break;
       case menuWhatToDisplay:
       //Changing displayingMode: sampleFixed -> co2LastHourGraphFixe -> co2LastDayGraphFixed -> sequential
         switch(stateSelected) {
@@ -470,19 +474,26 @@ void loop() {
         }
         printMenuWhatToDisplay();
       break;
+      case displayInfo:
+      break;
       default:
-        stateSelected=currentState;
-        currentState=menuWhatToDisplay;
-        printMenuWhatToDisplay();
+        lastState=currentState;
+        stateSelected=menuWhatToDisplay;
+        currentState=menuGlobal;
+        printGlobalMenu();
       break;
     }
   }
 
   //Actions if button2 is pushed. It depens on the current state
   if (button2.pressed()) {
-    
     //Actions are different based on the current state
     switch(currentState) {
+      case menuGlobal:
+        currentState=stateSelected;
+        if (currentState==menuWhatToDisplay) {stateSelected=lastState; printMenuWhatToDisplay();}
+        else if (currentState==displayInfo) printInfoScreen();
+      break;
       case menuWhatToDisplay:
         currentState=stateSelected;
         gapTimeDisplay=DISPLAY_REFRESH_PERIOD;
@@ -490,6 +501,11 @@ void loop() {
         lastDisplayMode=menu;
         lastGapTime=SAMPLE_PERIOD;
         //tft.fillScreen(MENU_BACK_COLOR);
+      break;
+      case displayInfo:
+        currentState=menuGlobal;
+        stateSelected=displayInfo;
+        printGlobalMenu();
       break;
       default:
       break;
@@ -510,7 +526,7 @@ void loop() {
     tempHumSensor.read();
     tempMeasure=tempHumSensor.getTemperature();
     //valueHum=0;
-    valueHum=tempHumSensor.getHumidity();
+    valueHum=tempHumSensor.getHumidityCompensated();
     
     if (tempMeasure>-50.0) valueT=tempMeasure;  //Discarding potential wrong values
 
@@ -559,7 +575,8 @@ void loop() {
   
   //Regular actions every DISPLAY_REFRESH_PERIOD seconds
   // Display the active screen
-  if (gapTimeDisplay>=DISPLAY_REFRESH_PERIOD && currentState!=menuWhatToDisplay) {
+  if (gapTimeDisplay>=DISPLAY_REFRESH_PERIOD && (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
+                                                 currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
     previousTimeDisplay=nowTime;gapTimeDisplay=0;
 
     switch (displayMode) {
@@ -624,7 +641,6 @@ void loop() {
       break;
       case co2LastHourGraph:
         //Last Hour graph is displayed
-
         //Cleaning the screen always the first time in
         if (lastDisplayMode!=co2LastHourGraph) {tft.fillScreen(TFT_BLACK); drawGraphLastHourCo2(); updateHourGraph=false;}
         else if (updateHourGraph) {drawGraphLastHourCo2(); updateHourGraph=false;}//Draw new graph only if buffer was updated
@@ -633,7 +649,6 @@ void loop() {
       break;
       case co2LastDayGraph:
         //Last Day graph is displayed
-
         //Cleaning the screen always the first time in
         if (lastDisplayMode!=co2LastDayGraph) {tft.fillScreen(TFT_BLACK); drawGraphLastDayCo2(); updateDayGraph=false;}
         else if (updateDayGraph) {drawGraphLastDayCo2(); updateDayGraph=false;}//Draw new graph only if buffer was updated

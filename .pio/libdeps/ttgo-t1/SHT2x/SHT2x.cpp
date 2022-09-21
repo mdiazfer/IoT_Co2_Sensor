@@ -169,7 +169,18 @@ float SHT2x::getTemperature()
 float SHT2x::getHumidity()
 {
   // par  6.1
+  
   return -6.0 + (125.0 / 65536.0) * _rawHumidity;
+}
+
+float SHT2x::getHumidityCompensated()
+{
+  //Implementing temperature coefficient compensation equation to guarantee Relative Humidity accuracy
+  float humidityCompensated = -6.0 + (125.0 / 65536.0) * _rawHumidity;
+  humidityCompensated += -0.15 * (25.0 - (-46.85 + (175.72 / 65536.0) * _rawTemperature));
+  humidityCompensated = (humidityCompensated)<(0.0)?(0.0):((humidityCompensated)>(100.0)?(100.0):(humidityCompensated));
+  
+  return humidityCompensated;
 }
 
 

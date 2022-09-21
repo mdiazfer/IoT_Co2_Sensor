@@ -5,7 +5,7 @@
 
 #include "user_setup.h"
 
-#define VERSION 0.6.6
+#define VERSION "0.6.8"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER               //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -93,8 +93,12 @@
 #define TEXT_FONT_UNITS_CO2 1
 #define TEXT_SIZE_MENU 2
 #define TEXT_FONT_MENU 1
+#define MENU_GLOBAL_FORE_COLOR TFT_CYAN
+#define MENU_GLOBAL_BACK_COLOR TFT_BLACK
 #define MENU_FORE_COLOR TFT_GOLD
 #define MENU_BACK_COLOR TFT_BLACK
+#define MENU_INFO_FORE_COLOR TFT_WHITE
+#define MENU_INFO_BACK_COLOR TFT_BLACK
 #define DISPLAY_REFRESH_PERIOD      1*SAMPLE_PERIOD //milliseconds
 #define DISPLAY_MODE_REFRESH_PERIOD 1*SAMPLE_PERIOD //milliseconds
 #define CO2_GAUGE_X      80
@@ -150,7 +154,7 @@
   wifiNetworkInfo wifiNet;
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph};
-    enum availableStates {menuWhatToDisplay,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+    enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential};
 
     #define _DISPLAYSUPPORTINFO_
