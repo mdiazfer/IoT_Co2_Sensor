@@ -16,6 +16,7 @@
 #include <SoftwareSerial.h>
 #include "Button.h"
 #include <SHT2x.h>
+#include "ButtonChecks.h"
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -367,7 +368,7 @@ void setup() {
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
   }
-  
+
   //-->>BLE init
   if (logsOn) Serial.print("[setup] - BLE: ");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - BLE:     [");
@@ -431,62 +432,11 @@ void loop() {
   else updateDaySample=false;
 
   //Actions if button1 is pushed. It depens on the current state
-  if (button1.pressed())
-  {
-    //Actions are different based on the current state
-    switch(currentState) {
-      case bootupScreen:
-      break;
-      case menuGlobal:
-      //Changing Menus: Global Menu -> What to display Menu -> Display Gra. Info -> back
-        switch(stateSelected) {
-          case menuWhatToDisplay:
-            stateSelected=displayInfo;
-          break;
-          case displayInfo:
-            stateSelected=lastState;
-          break;
-          default:
-            stateSelected=menuWhatToDisplay;
-          break;
-        }
-        printGlobalMenu();
-      break;
-      case menuWhatToDisplay:
-      //Changing displayingMode: sampleFixed -> co2LastHourGraphFixe -> co2LastDayGraphFixed -> sequential
-        switch(stateSelected) {
-          case displayingSampleFixed:
-            stateSelected=displayingCo2LastHourGraphFixed;
-            displayMode=co2LastHourGraph;
-          break;
-          case displayingCo2LastHourGraphFixed:
-            stateSelected=displayingCo2LastDayGraphFixed;
-            displayMode=co2LastDayGraph;
-          break;
-          case displayingCo2LastDayGraphFixed:
-            stateSelected=displayingSequential;
-            displayMode=co2LastDayGraph;
-          break;
-          case displayingSequential:
-            stateSelected=displayingSampleFixed;
-            displayMode=sampleValue;
-          break;
-        }
-        printMenuWhatToDisplay();
-      break;
-      case displayInfo:
-      break;
-      default:
-        lastState=currentState;
-        stateSelected=menuWhatToDisplay;
-        currentState=menuGlobal;
-        printGlobalMenu();
-      break;
-    }
-  }
+  if (button1.pressed()) checkButton1();
 
   //Actions if button2 is pushed. It depens on the current state
-  if (button2.pressed()) {
+  if (button2.pressed()) checkButton2();
+  /*{
     //Actions are different based on the current state
     switch(currentState) {
       case menuGlobal:
@@ -510,7 +460,7 @@ void loop() {
       default:
       break;
     }
-  }
+  }*/
 
   //Regular actions every SAMPLE_PERIOD seconds
   //  Taking CO2, Temp & Hum samples. Moving buffers at the right time

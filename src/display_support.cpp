@@ -421,7 +421,62 @@ void printGlobalMenu() {
   //if (stateSelected==menuGlobal) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
 }
 
-void printInfoScreen() {
+void printInfoMenu() {
+  //Cleaning and printing menu screen
+  tft.fillScreen(MENU_INFO_BACK_COLOR);
+  uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_INFO_BACK_COLOR;
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(60,10,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Info Menu");
+
+  if ( (stateSelected==displayInfo || stateSelected==displayInfo1) ) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,34,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Gral. Info");
+  if (stateSelected==displayInfo2) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Sensors Info");
+  if (stateSelected==displayInfo3) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("WiFi Info");
+  if (stateSelected==displayInfo4) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Net Info");
+  if (stateSelected==menuGlobal) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*4,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Back");
+  
+}
+
+void printInfoGral() {
+  Serial.println("[printInfoGral] - Exit");
+  
+  tft.fillScreen(MENU_INFO_BACK_COLOR);
+  uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_INFO_BACK_COLOR;
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(60,10,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.println("Gral. Info");
+
+  auxColorFore=MENU_INFO_FORE_COLOR,auxColorBack=MENU_INFO_BACK_COLOR;
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(0,30,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.print("FW version: ");tft.print(VERSION);
+  tft.setCursor(0,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*1,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.print("Date: ");
+  tft.setCursor(0,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*2,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.print("Hour: ");
+  tft.setCursor(0,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*3,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.print("Report URL: ");
+  tft.setCursor(0,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*4,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.print("Uptime: ");
+  tft.setTextColor(MENU_INFO_BACK_COLOR,MENU_INFO_FORE_COLOR);
+  tft.setCursor(0,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*5,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.println("Back");
+  
+  return;
+}
+void printInfoSensors() {Serial.println("[printInfoSensors] - Exit");tft.fillScreen(TFT_BLACK);tft.setTextColor(TFT_WHITE,TFT_BLACK);tft.setCursor(0,0);tft.print("printInfoSensors");return;}
+void printInfoWifi() {Serial.println("[printInfoWifi] - Exit");tft.fillScreen(TFT_BLACK);tft.setTextColor(TFT_WHITE,TFT_BLACK);tft.setCursor(0,0);tft.print("printInfoWifi");return;}
+void printInfoNet() {Serial.println("[printInfoNet] - Exit");tft.fillScreen(TFT_BLACK);tft.setTextColor(TFT_WHITE,TFT_BLACK);tft.setCursor(0,0);tft.print("printInfoNet");return;}
+
+void _printInfoScreen() {
   //Cleaning and printing menu screen
   tft.fillScreen(MENU_GLOBAL_BACK_COLOR);
   uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_INFO_BACK_COLOR;
@@ -429,9 +484,9 @@ void printInfoScreen() {
   tft.setTextColor(auxColorFore,auxColorBack);
   tft.setCursor(25,10,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Global Info");
 
-  auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;
+  auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR; 
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(0,40,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  tft.setCursor(0,40,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
   tft.print("Sensor Temp/HUM: ");//tft.println(tempHumSensorType);
   tft.print("CO2 Sensor type ");//tft.println(co2SensorType);
   tft.print("  Version: ");//tft.println(co2SensorVersion);
@@ -463,7 +518,7 @@ void printInfoScreen() {
   
   auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;
   tft.setTextColor(auxColorFore,auxColorBack);
-  //tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);
+  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*4,TEXT_FONT_MENU);
   tft.setTextSize(TEXT_SIZE_MENU);tft.println("\nBack");
 }
 

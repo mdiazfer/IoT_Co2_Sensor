@@ -154,7 +154,7 @@
   wifiNetworkInfo wifiNet;
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph};
-    enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+    enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential};
 
     #define _DISPLAYSUPPORTINFO_
@@ -162,6 +162,15 @@
 
   #undef _DECLAREGLOBALPARAMETERS_
 #endif
+
+//Definition in display_support.cpp
+void printGlobalMenu();
+void printMenuWhatToDisplay();
+void printInfoMenu();
+void printInfoGral();
+void printInfoSensors();
+void printInfoWifi();
+void printInfoNet();
 
 
 

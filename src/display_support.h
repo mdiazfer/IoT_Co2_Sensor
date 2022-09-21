@@ -9,7 +9,7 @@
   #include "global_setup.h"
   
   #ifndef _DISPLAYSUPPORTINFO_
-    enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+    enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential};
     
     #define _DISPLAYSUPPORTINFO_
@@ -75,7 +75,4 @@ void drawText(float_t value, String textString, int32_t textSize, int32_t font, 
               uint32_t colorBackground, int32_t x, int32_t y, 
               float_t th1, uint32_t warningColor, float_t th2, uint32_t alarmColor);
 
-void printMenuWhatToDisplay();
-void printGlobalMenu();
-void printInfoScreen();
 
