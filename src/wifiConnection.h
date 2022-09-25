@@ -25,5 +25,5 @@ void printCurrentNet();
 uint8_t wifiConnect();*/
 
 void printNetData();
-wifiNetworkInfo * printCurrentWiFi();
+wifiNetworkInfo * printCurrentWiFi(boolean logsOn, int16_t *numberWiFiNetworks);
 uint8_t wifiConnect();

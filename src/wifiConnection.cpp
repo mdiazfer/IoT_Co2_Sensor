@@ -38,7 +38,7 @@ void printNetData() {
  Function printCurrentWiFi
  Target: prints WiFi parameters on Serial and returs variable with Wifi parameters
  *****************************************************/
-wifiNetworkInfo * printCurrentWiFi() {
+wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetworks=nullptr) {
   // print current network parameters
   WiFiScanClass wifiScan = WiFiScanClass();
   int16_t countWiFiNetworks=wifiScan.scanNetworks();
@@ -47,7 +47,7 @@ wifiNetworkInfo * printCurrentWiFi() {
     scanReturn=wifiScan.scanComplete();
     switch (scanReturn) {
       case WIFI_SCAN_FAILED:
-        Serial.println("  [error] - Failed to scan WiFi networks");
+        if (logsOn) Serial.println("  [error] - Failed to scan WiFi networks");
         return nullptr;
       break;
       case WIFI_SCAN_RUNNING:
@@ -59,6 +59,8 @@ wifiNetworkInfo * printCurrentWiFi() {
       break;
     }
   } //Wait till scan is finished
+
+  *numberWiFiNetworks=scanReturn;
 
   uint8_t wifiNetworkNode=255;
   for (uint8_t i=0; i<countWiFiNetworks; i++) {
@@ -76,32 +78,34 @@ wifiNetworkInfo * printCurrentWiFi() {
   }
 
   // print current network parameters
-  Serial.print("  Wifi Network Node: ");Serial.print(wifiNetworkNode);
-  Serial.print(", "); Serial.print(scanReturn); Serial.println(" detected");
-  //Serial.print("SSID: ");Serial.println(WiFi.SSID());
-  Serial.print("  SSID: ");Serial.println(wifiNet.ssid);
+  if (logsOn) {
+    Serial.print("  Wifi Network Node: ");Serial.print(wifiNetworkNode);
+    Serial.print(", "); Serial.print(scanReturn); Serial.println(" detected");
+    //Serial.print("SSID: ");Serial.println(WiFi.SSID());
+    Serial.print("  SSID: ");Serial.println(wifiNet.ssid);
 
-  // print the MAC address of the router you're attached to:
-  uint8_t bssid[6];
-  //memcpy(bssid, WiFi.BSSID(), 6);
-  memcpy(bssid, wifiNet.BSSID, 6);
-  Serial.print("  BSSID: ");
-  Serial.print(bssid[5], HEX); Serial.print(":");
-  Serial.print(bssid[4], HEX); Serial.print(":");
-  Serial.print(bssid[3], HEX); Serial.print(":");
-  Serial.print(bssid[2], HEX); Serial.print(":");
-  Serial.print(bssid[1], HEX); Serial.print(":");
-  Serial.println(bssid[0], HEX);
+    // print the MAC address of the router you're attached to:
+    uint8_t bssid[6];
+    //memcpy(bssid, WiFi.BSSID(), 6);
+    memcpy(bssid, wifiNet.BSSID, 6);
+    Serial.print("  BSSID: ");
+    Serial.print(bssid[5], HEX); Serial.print(":");
+    Serial.print(bssid[4], HEX); Serial.print(":");
+    Serial.print(bssid[3], HEX); Serial.print(":");
+    Serial.print(bssid[2], HEX); Serial.print(":");
+    Serial.print(bssid[1], HEX); Serial.print(":");
+    Serial.println(bssid[0], HEX);
 
-  // print the received signal strength:
-  //Serial.print("signal strength (RSSI):");Serial.println((long) WiFi.RSSI());
-  Serial.print("  Signal strength (RSSI): ");Serial.println(wifiNet.RSSI);
+    // print the received signal strength:
+    //Serial.print("signal strength (RSSI):");Serial.println((long) WiFi.RSSI());
+    Serial.print("  Signal strength (RSSI): ");Serial.println(wifiNet.RSSI);
 
-  // print the encryption type:
-  Serial.print("  Encryption Type: ");Serial.println(wifiNet.encryptionType, HEX);
+    // print the encryption type:
+    Serial.print("  Encryption Type: ");Serial.println(wifiNet.encryptionType, HEX);
 
-  // print the channel:
-  Serial.print("  WiFi Channel: ");Serial.println(wifiNet.channel);
+    // print the channel:
+    Serial.print("  WiFi Channel: ");Serial.println(wifiNet.channel);
+  }
 
   return &wifiNet;
 }
@@ -138,7 +142,8 @@ uint8_t wifiConnect() {
 
   // you're connected now, so print out the data:
   if (logsOn) {
-    Serial.println("[setup - wifi] Connected to the network. Waiting for getting WiFi info: "); printCurrentWiFi();
+    int16_t numberWiFiNetworks;
+    Serial.println("[setup - wifi] Connected to the network. Waiting for getting WiFi info: "); printCurrentWiFi(true,&numberWiFiNetworks);
     Serial.print("[setup - wifi] Net info: \n");printNetData();
   }
 

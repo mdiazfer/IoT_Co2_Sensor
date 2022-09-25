@@ -4,6 +4,12 @@
 
 #include <Arduino.h>
 #include <TFT_eSPI.h>
+#include "wifiConnection.h"
+#include "MHZ19.h"
+#include "time.h"
+#include "Button.h"
+#include "ButtonChecks.h"
+#include "wifiConnection.h"
 
 #ifndef _DECLAREGLOBALPARAMETERS_
   #include "global_setup.h"
@@ -14,11 +20,35 @@
     
     #define _DISPLAYSUPPORTINFO_
   #endif
+
+  #ifndef _WIFINETWORKINFO_
+    typedef struct {
+      uint8_t networkItem;
+      String ssid;
+      uint8_t encryptionType;
+      int32_t RSSI;
+      uint8_t* BSSID;
+      int32_t channel;
+    } wifiNetworkInfo;  //Struct to store WiFi parameters
+
+    extern wifiNetworkInfo wifiNet; //Struct to store WiFi parameters
+    #define _WIFINETWORKINFO_ 
+  #endif
+#endif
+
+#ifdef __MHZ19B__
+  extern MHZ19 co2Sensor;
 #endif
 
 extern TFT_eSPI tft;
 extern enum availableStates stateSelected;
 extern enum availableStates currentState;
+extern const String tempHumSensorType,co2SensorType;
+extern char co2SensorVersion[];
+extern struct tm startTimeInfo;
+extern Button button2;
+extern IPAddress serverToUploadSamplesIPAddress;
+extern boolean uploadSamplesToServer;
 
 class HorizontalBar {
   public:
@@ -74,5 +104,14 @@ class CircularGauge {
 void drawText(float_t value, String textString, int32_t textSize, int32_t font, uint32_t colorForeground,
               uint32_t colorBackground, int32_t x, int32_t y, 
               float_t th1, uint32_t warningColor, float_t th2, uint32_t alarmColor);
+
+//Definition in display_support.cpp
+void printGlobalMenu();
+void printMenuWhatToDisplay();
+void printInfoMenu();
+void printInfoGral();
+void printInfoSensors();
+void printInfoWifi();
+void printInfoNet();
 
 

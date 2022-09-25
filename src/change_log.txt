@@ -7,6 +7,8 @@ Version Date          Change
                       - Bug fixing function SHT2x::getHumidityCompensated()
                       - Added 2-level menu. Menu Global is the top level
                       - Added Display Info menu in Menu Global
+                      - Added NTP server
+                      - Added URL to upload samples to external server
 - 0.6.7 18/Sep/2022   - Added funcion getHumidityCompensated() to class SHT2x to implement the 
                         temperature coefficient compensation equation to guarantee Relative Humidity accuracy
 

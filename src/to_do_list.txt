@@ -2,13 +2,12 @@ To do list
 -----------
 - Battery monitoring
 - Temperature calibration
-- Send periodic results and triger alarms
+- Triger alarms
 - Icons
 - Icon for the bootup screen
 - Web server to display results
 - REST API to get results
 - Web server for configuration
-- NTP to get time synced
 - Save CO2 samples in cloud to not lose graph pictures when the battery runs out
 - AP mode to provide first SSID
 - BLE sutff
@@ -18,7 +17,10 @@ To do list
 
 Done
 -------
-- Bug fixing (v0.6.5)
++ Added 2-level menu. Menu Global is the top level (v0.6.8)
++ Added NTP to get time synced  (v0.6.8)
++ Added URL to upload periodically samples to external server (v0.6.8)
++ Bug fixing (v0.6.5)
   + Graph not updated in fixed mode display
   + Wrong Temp & Hum line color in graphs
 + Press button to swap between different screens (v0.6.4)

@@ -17,6 +17,8 @@
 #include "Button.h"
 #include <SHT2x.h>
 #include "ButtonChecks.h"
+#include "time.h"
+#include "httpClient.h"
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -25,11 +27,12 @@
 //Global variable definitions
 const String co2SensorType=String(CO2_SENSOR_TYPE);
 const String tempHumSensorType=String(TEMP_HUM_SENSOR_TYPE);
+char co2SensorVersion[5];
 uint8_t error_setup = NO_ERROR;
 TFT_eSPI tft = TFT_eSPI();  // Invoke library to manage the display
 ulong nowTime=0,previousTime=0,previousTimeDisplay=0,previousTimeDisplayMode=0,
-      previousHourSampleTime=0,previousDaySampleTime=0,
-      gapTime,lastGapTime,gapTimeDisplay,gapTimeDisplayMode,gapHourSampleTime,gapDaySampleTime;
+      previousHourSampleTime=0,previousDaySampleTime=0,previousUploadSampleTime=0,
+      gapTime,lastGapTime,gapTimeDisplay,gapTimeDisplayMode,gapHourSampleTime,gapDaySampleTime,gapUploadSampleTime=0;
 CircularGauge circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
                                           CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
                                           CO2_GAUGE_TH1,TFT_YELLOW,CO2_GAUGE_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
@@ -58,12 +61,21 @@ SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX);
 #endif
 Button  button1(BUTTON1);
 Button  button2(BUTTON2);
-
+const char* ntpServer = NTP_SERVER;
+const long  gmtOffset_sec = GMT_OFFSET_SEC;
+const int   daylightOffset_sec = DAYLIGHT_OFFSET_SEC;
+struct tm startTimeInfo;
+String serverToUploadSamplesString(SERVER_UPLOAD_SAMPLES);
+IPAddress serverToUploadSamplesIPAddress;
+boolean uploadSamplesToServer=UPLOAD_SAMPLES_TO_SERVER;
+String device(DEVICE_NAME);
+static const char hex_digits[] = "0123456789ABCDEF";
+boolean waitingMessage=true,runningMessage=true;
 
 //Code
 void loadBootImage() {
   //-->>Load the logo image when booting up
-
+  
   return;
 }
 
@@ -290,7 +302,7 @@ void setup() {
   co2Sensor.setRange(CO2_SENSOR_CO2_RANGE);             // It's aviced to setup range to 2000. Better accuracy
 
   //Some Co2 sensor checks
-  char co2SensorVersion[5];memset(co2SensorVersion, '\0', 5);
+  memset(co2SensorVersion, '\0', 5);
   co2Sensor.getVersion(co2SensorVersion);
   if (CO2_SENSOR_CO2_RANGE!=co2Sensor.getRange() || (byte) 0 != co2Sensor.getAccuracy(false) ||
       0==co2SensorType.compareTo("UNKNOW"))
@@ -369,6 +381,73 @@ void setup() {
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
   }
 
+  //Setting up URL things to upload samples to an external server
+  if (error_setup != ERROR_WIFI_SETUP && uploadSamplesToServer) { 
+    //Converting SERVER_UPLOAD_SAMPLES into IPAddress variable
+    char charToTest;
+    int IPAddressOctectArray[4];
+    uint lastBegin=0,indexArray=0;
+    for (uint i=0; i<=serverToUploadSamplesString.length(); i++) {
+      charToTest=serverToUploadSamplesString.charAt(i);
+      if (charToTest=='.') {    
+        IPAddressOctectArray[indexArray]=serverToUploadSamplesString.substring(lastBegin,i).toInt();
+        lastBegin=i+1;
+        if (indexArray==2) {
+          indexArray++;
+          IPAddressOctectArray[indexArray]=serverToUploadSamplesString.substring(lastBegin,serverToUploadSamplesString.length()).toInt();
+        }
+        else indexArray++;
+      }
+    }
+    serverToUploadSamplesIPAddress=IPAddress(IPAddressOctectArray[0],IPAddressOctectArray[1],IPAddressOctectArray[2],IPAddressOctectArray[3]);
+
+    //Adding the 3 latest mac bytes to the device name (in Hex format)
+    byte mac[6];
+    WiFi.macAddress(mac);
+    device=device+"-"+String((char)hex_digits[mac[2]>>4])+String((char)hex_digits[mac[2]&15])+
+      String((char)hex_digits[mac[1]>>4])+String((char)hex_digits[mac[1]&15])+
+      String((char)hex_digits[mac[0]>>4])+String((char)hex_digits[mac[0]&15]);
+    Serial.println("[setup] - URL: [OK]");
+    Serial.print("  - URL: ");Serial.println("http://"+serverToUploadSamplesIPAddress.toString()+
+      String(GET_REQUEST_TO_UPLOAD_SAMPLES).substring(4,String(GET_REQUEST_TO_UPLOAD_SAMPLES).length()-1));
+    Serial.print("  - Device name=");Serial.println(device);
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - URL: [");
+    tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
+  }
+
+  //NTP Server
+  if (error_setup != ERROR_WIFI_SETUP ) { 
+    if (logsOn) {
+      Serial.println("[setup - NTP] Connecting to NTP Server: ");
+      Serial.print("  NTP Server: ");Serial.println(NTP_SERVER);
+    }
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+    if(!getLocalTime(&startTimeInfo)){
+      if (logsOn) {
+        Serial.println("Time: Failed to get time");
+        Serial.print("[setup] - NTP: ");Serial.println("KO");
+      }
+      
+      tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - NTP: [");
+      tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
+      tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
+      tft.setTextColor(TFT_RED,TFT_BLACK);tft.println(NTP_SERVER);tft.setTextColor(TFT_GOLD,TFT_BLACK);
+      error_setup=ERROR_NTP_SERVER;
+    }
+    else {
+      if (logsOn) {
+        Serial.print("  Time: "); Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
+        Serial.print("[setup] - NTP: ");Serial.println("OK");}
+      
+      tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - NTP: [");
+      tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
+      tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
+      tft.setTextColor(TFT_GREEN,TFT_BLACK);tft.println(NTP_SERVER);tft.setTextColor(TFT_GOLD,TFT_BLACK);
+    }
+  }
+
   //-->>BLE init
   if (logsOn) Serial.print("[setup] - BLE: ");
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - BLE:     [");
@@ -408,7 +487,7 @@ void loop() {
 
   while (nowTime<co2PreheatingTime) {
     //Waiting for the sensor to warmup before displaying value
-    if (nowTime<10000) if (logsOn) Serial.println("Waiting for the warmup to finish");
+    if (waitingMessage) {if (logsOn) Serial.println("Waiting for the warmup to finish");waitingMessage=false;}
     circularGauge.cleanValueTextGauge();
     circularGauge.cleanUnitsTextGauge();
     circularGauge.setValue((int)(co2PreheatingTime-nowTime)/1000);
@@ -416,6 +495,7 @@ void loop() {
     delay(1000);
     nowTime=millis();
   }
+  if (runningMessage) {if (logsOn) Serial.println("Running.... :-)");runningMessage=false;}
 
   //Taking time since last updates
   gapTime = previousTime!=0 ? nowTime-previousTime: SAMPLE_PERIOD;
@@ -423,45 +503,18 @@ void loop() {
   gapTimeDisplayMode = previousTimeDisplayMode!=0 ? nowTime-previousTimeDisplayMode: DISPLAY_MODE_REFRESH_PERIOD;
   gapHourSampleTime = previousHourSampleTime!=0 ? nowTime-previousHourSampleTime: SAMPLE_T_LAST_HOUR*1000;
   gapDaySampleTime = previousDaySampleTime!=0 ? nowTime-previousDaySampleTime: SAMPLE_T_LAST_DAY*1000;
+  gapUploadSampleTime = previousUploadSampleTime!=0 ? nowTime-previousUploadSampleTime: UPLOAD_SAMPLES_PERIOD;
   
   //Checking if sample buffers update is needed
   if (gapHourSampleTime>=SAMPLE_T_LAST_HOUR*1000) {previousHourSampleTime=nowTime;gapHourSampleTime=0;updateHourSample=true;updateHourGraph=true;}
-  else updateHourSample=false;
-
   if (gapDaySampleTime>=SAMPLE_T_LAST_DAY*1000) {previousDaySampleTime=nowTime;gapDaySampleTime=0;updateDaySample=true;updateDayGraph=true;}
-  else updateDaySample=false;
 
   //Actions if button1 is pushed. It depens on the current state
   if (button1.pressed()) checkButton1();
 
   //Actions if button2 is pushed. It depens on the current state
   if (button2.pressed()) checkButton2();
-  /*{
-    //Actions are different based on the current state
-    switch(currentState) {
-      case menuGlobal:
-        currentState=stateSelected;
-        if (currentState==menuWhatToDisplay) {stateSelected=lastState; printMenuWhatToDisplay();}
-        else if (currentState==displayInfo) printInfoScreen();
-      break;
-      case menuWhatToDisplay:
-        currentState=stateSelected;
-        gapTimeDisplay=DISPLAY_REFRESH_PERIOD;
-        gapTimeDisplayMode=DISPLAY_MODE_REFRESH_PERIOD;
-        lastDisplayMode=menu;
-        lastGapTime=SAMPLE_PERIOD;
-        //tft.fillScreen(MENU_BACK_COLOR);
-      break;
-      case displayInfo:
-        currentState=menuGlobal;
-        stateSelected=displayInfo;
-        printGlobalMenu();
-      break;
-      default:
-      break;
-    }
-  }*/
-
+  
   //Regular actions every SAMPLE_PERIOD seconds
   //  Taking CO2, Temp & Hum samples. Moving buffers at the right time
   if (gapTime>=SAMPLE_PERIOD) {
@@ -490,6 +543,7 @@ void loop() {
       lastHourCo2Samples[(int)(3600/SAMPLE_T_LAST_HOUR)-1]=valueCO2;
       lastHourTempSamples[(int)(3600/SAMPLE_T_LAST_HOUR)-1]=valueT;
       lastHourHumSamples[(int)(3600/SAMPLE_T_LAST_HOUR)-1]=valueHum;
+      updateHourSample=false;
     }
     
     //Updating the last day Co2 buffer
@@ -502,8 +556,22 @@ void loop() {
       lastDayCo2Samples[(int)(24*3600/SAMPLE_T_LAST_DAY)-1]=valueCO2;
       lastDayTempSamples[(int)(24*3600/SAMPLE_T_LAST_DAY)-1]=valueT;
       lastDayHumSamples[(int)(24*3600/SAMPLE_T_LAST_DAY)-1]=valueHum;
+      updateDaySample=false;
     }
   }
+
+  //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
+  if (gapUploadSampleTime>=UPLOAD_SAMPLES_PERIOD && uploadSamplesToServer) {
+    String httpRequest=String(GET_REQUEST_TO_UPLOAD_SAMPLES);
+    previousUploadSampleTime=nowTime;gapUploadSampleTime=0;
+    //GET /lar-to/?device=co2-sensor&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
+    httpRequest=httpRequest+"device="+device+"&local_ip_address="+
+      IpAddress2String(WiFi.localIP())+"&co2="+valueCO2+"&temp_by_co2_sensor="+valueT+"&hum_by_co2_sensor="+
+      valueHum+"&temp_co2_sensor="+co2Sensor.getTemperature(true,true)+" HTTP/1.1";
+
+    sendHttpRequest(serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, httpRequest);
+  }
+  else gapUploadSampleTime=nowTime-previousUploadSampleTime;
 
   //Regular actions every DISPLAY_MODE_REFRESH_PERIOD seconds
   // Selecting what's the screen to display (active screen)

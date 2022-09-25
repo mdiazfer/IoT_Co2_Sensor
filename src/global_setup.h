@@ -7,8 +7,9 @@
 
 #define VERSION "0.6.8"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
-#define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER               //This two-level macro concatenates 2 labels. Useful to make some
+#define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
+
 #define __MHZ19B__
 #define __TFT_DISPLAY_PRESENT__
 #define __SI7021__
@@ -23,6 +24,7 @@
 #define CO2_TX 27 //TX pin in the ESP board (TX pin in the CO2 sensor)
 #define I2C_SDA 21 //I2C - SDA pin in the ESP board (SDA pin in the sensor)
 #define I2C_SCL 22 //I2C - SCL pin in the ESP board (SCL pin in the sensor)
+#define DEVICE_NAME "co2-sensor"
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
@@ -80,6 +82,7 @@
 #define ERROR_WIFI_SETUP        0x05
 #define ERROR_BLE_SETUP         0x06
 #define ERROR_SSID_CONNECTION   0x07
+#define ERROR_NTP_SERVER        0X08
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240
@@ -133,6 +136,15 @@
 
 //WiFi stuff
 #define MAX_CONNECTION_ATTEMPTS 16
+#define NTP_SERVER  "10.88.50.5"
+#define GMT_OFFSET_SEC 3600
+#define DAYLIGHT_OFFSET_SEC 3600
+//GET /lar-to/?device=co2-sensor&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
+#define SERVER_UPLOAD_SAMPLES "10.88.50.5"
+#define SERVER_UPLOAD_PORT  80
+#define GET_REQUEST_TO_UPLOAD_SAMPLES  "GET /lar-to/?"
+#define UPLOAD_SAMPLES_PERIOD 300000  //millisenconds
+#define UPLOAD_SAMPLES_TO_SERVER  true
 
 //Global stuff
 #ifdef _DECLAREGLOBALPARAMETERS_
@@ -164,13 +176,13 @@
 #endif
 
 //Definition in display_support.cpp
-void printGlobalMenu();
+/*void printGlobalMenu();
 void printMenuWhatToDisplay();
 void printInfoMenu();
 void printInfoGral();
 void printInfoSensors();
 void printInfoWifi();
-void printInfoNet();
+void printInfoNet();*/
 
 
 

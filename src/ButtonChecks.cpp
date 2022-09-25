@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "ButtonChecks.h"
+#include "display_support.h"
 
 void checkButton1() {
   /*Serial.println("[B1] - Begin");
