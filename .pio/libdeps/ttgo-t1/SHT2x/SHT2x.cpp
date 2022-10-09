@@ -118,6 +118,10 @@ bool SHT2x::read()
   _rawTemperature += buffer[1];
   _rawTemperature &= 0xFFFC;
 
+  #if BUILD_ENV_NAME==sensorCap
+      _rawTemperature-=SI7021_TEMP_OFFSET; //Temp is offset due to the cap
+  #endif
+
   _status = buffer[1] & 0x0003;
   if (_status == 0xFF)  // TODO  != 0x01  (need HW to test)
   {

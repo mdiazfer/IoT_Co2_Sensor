@@ -5,7 +5,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.6.8"
+#define VERSION "0.7.0"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -25,6 +25,7 @@
 #define I2C_SDA 21 //I2C - SDA pin in the ESP board (SDA pin in the sensor)
 #define I2C_SCL 22 //I2C - SCL pin in the ESP board (SCL pin in the sensor)
 #define DEVICE_NAME "co2-sensor"
+#define PIN_TFT_BACKLIGHT 4
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
@@ -54,6 +55,7 @@
   #define SI7021_TEMP_MIN  -10
   #define SI7021_HUM_MAX  100
   #define SI7021_HUM_MIN  0
+  #define SI7021_TEMP_OFFSET  0 //6.8
 #else
   //For other sensor models copy the parameters for __SI7021__ customized for the rith model
   #define TEMP_HUM_SENSOR  "UNKNOWN"
@@ -71,7 +73,7 @@
     #define CO2_SENSOR_TEMP_MIN _CO2_SENSOR_PARAMETER_(TEMP_MIN)
     #define CO2_SENSOR_HUM_MAX 100
     #define CO2_SENSOR_HUM_MIN 0
-    #define SAMPLE_PERIOD          5000 //10000 //milliseconds
+    #define SAMPLE_PERIOD          5000  //milliseconds
 
 //Error stuff
 #define NO_ERROR                0x00
@@ -132,6 +134,9 @@
 #define CO2_GRAPH_HEIGH 100 //HEIGH origin for co2 graph
 #define CO2_GRAPH_X_END CO2_GRAPH_X+CO2_GRAPH_WIDTH //X end for co2 graph
 #define CO2_GRAPH_Y_END CO2_GRAPH_Y+CO2_GRAPH_HEIGH //Y end for co2 graph
+#define ICON_STATUS_REFRESH_PERIOD  3*DISPLAY_REFRESH_PERIOD  //milliseconds
+#define TIME_TURN_OFF_BACKLIGHT 30000 //millisenconds
+#define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // milliseconds
 
 
 //WiFi stuff
@@ -139,14 +144,21 @@
 #define NTP_SERVER  "10.88.50.5"
 #define GMT_OFFSET_SEC 3600
 #define DAYLIGHT_OFFSET_SEC 3600
-//GET /lar-to/?device=co2-sensor&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
+//GET /lar-co2/?device=co2-sensor-XXXXXX&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
 #define SERVER_UPLOAD_SAMPLES "10.88.50.5"
 #define SERVER_UPLOAD_PORT  80
-#define GET_REQUEST_TO_UPLOAD_SAMPLES  "GET /lar-to/?"
+#define GET_REQUEST_TO_UPLOAD_SAMPLES  "GET /lar-co2/?"
 #define UPLOAD_SAMPLES_PERIOD 300000  //millisenconds
 #define UPLOAD_SAMPLES_TO_SERVER  true
+#define WIFI_100_RSSI -60  //RSSI > -60 dBm Excellent - Consider 100% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
+#define WIFI_075_RSSI -70  //RSSI > -70 dBm Very Good - Consider 75% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
+#define WIFI_050_RSSI -80  //RSSI > -80 dBm Good - Consider 50% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
+#define WIFI_025_RSSI -90  //RSSI > -90 dBm Low - Consider 25% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
+#define WIFI_000_RSSI -100 //RSSI < -100 dBm No Signal - Lower values mean no SSID visibiliy, 0% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 
 //Global stuff
+#define BUILD_TYPE_DEVELOPMENT  1
+#define BUILD_TYPE_SENSOR_CASE  2
 #ifdef _DECLAREGLOBALPARAMETERS_
   bool logsOn = true;         //Whether enable or not logs on the seriaml line [TRUE | FALSE]
 
@@ -168,21 +180,18 @@
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph};
     enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential};
-
+    enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
+    enum batteryStatus {batteryCharging10Status,batteryCharging25Status,batteryCharging50Status,
+                        batteryCharging75Status,batteryCharging100Status,battery100Status,battery75Status,
+                        battery50Status,battery25Status,battery10Status,battery0Status} batteryCurrentStatus;
+    enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus} BLEClurrentStatus;
+    enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus} CloudClockCurrentStatus;
+    enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus} CloudSyncCurrentStatus;
     #define _DISPLAYSUPPORTINFO_
   #endif
 
   #undef _DECLAREGLOBALPARAMETERS_
 #endif
-
-//Definition in display_support.cpp
-/*void printGlobalMenu();
-void printMenuWhatToDisplay();
-void printInfoMenu();
-void printInfoGral();
-void printInfoSensors();
-void printInfoWifi();
-void printInfoNet();*/
 
 
 

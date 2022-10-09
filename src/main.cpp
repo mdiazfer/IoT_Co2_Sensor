@@ -15,10 +15,11 @@
 #include "MHZ19.h"
 #include <SoftwareSerial.h>
 #include "Button.h"
-#include <SHT2x.h>
+#include "SHT2x.h"
 #include "ButtonChecks.h"
 #include "time.h"
 #include "httpClient.h"
+#include "icons.h"
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -31,8 +32,10 @@ char co2SensorVersion[5];
 uint8_t error_setup = NO_ERROR;
 TFT_eSPI tft = TFT_eSPI();  // Invoke library to manage the display
 ulong nowTime=0,previousTime=0,previousTimeDisplay=0,previousTimeDisplayMode=0,
-      previousHourSampleTime=0,previousDaySampleTime=0,previousUploadSampleTime=0,
-      gapTime,lastGapTime,gapTimeDisplay,gapTimeDisplayMode,gapHourSampleTime,gapDaySampleTime,gapUploadSampleTime=0;
+      previousHourSampleTime=0,previousDaySampleTime=0,previousUploadSampleTime=0,previousTimeIconStatusRefresh=0,
+      gapTime,lastGapTime,gapTimeDisplay,gapTimeDisplayMode,gapHourSampleTime,gapDaySampleTime,
+      gapUploadSampleTime=0,gapTimeIconStatusRefresh=0,previousTurnOffBacklightTime=0,gapTurnOffBacklight=0,
+      timePressButton2,timeReleaseButton2;
 CircularGauge circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
                                           CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
                                           CO2_GAUGE_TH1,TFT_YELLOW,CO2_GAUGE_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
@@ -71,12 +74,136 @@ boolean uploadSamplesToServer=UPLOAD_SAMPLES_TO_SERVER;
 String device(DEVICE_NAME);
 static const char hex_digits[] = "0123456789ABCDEF";
 boolean waitingMessage=true,runningMessage=true;
+boolean autoBackLightOff=true;
 
 //Code
 void loadBootImage() {
   //-->>Load the logo image when booting up
   
   return;
+}
+
+void showIcons() {
+  //Load the icons
+
+  tft.setSwapBytes(true);
+  
+  //Drawign wifi icon
+  switch (wifiCurrentStatus) {
+    case (wifi100Status):
+      tft.pushImage(0,0,24,24,wifi100);
+    break;
+    case (wifi75Status):
+      tft.pushImage(0,0,24,24,wifi075);
+    break;
+    case (wifi50Status):
+      tft.pushImage(0,0,24,24,wifi050);
+    break;
+    case (wifi25Status):
+      tft.pushImage(0,0,24,24,wifi025);
+    break;
+    case (wifi0Status):
+      tft.pushImage(0,0,24,24,wifi000);
+    break;
+    case (wifiOffStatus):
+      tft.pushImage(0,0,24,24,wifiOff);
+    break;
+  }
+  
+  //-->>Get BLE status
+  tft.pushImage(30,0,24,24,bluetoothOff);
+  //-->>Get NTP status
+  tft.pushImage(95,0,24,24,cloudClockOn);
+  //-->>Get Cloud status
+  tft.pushImage(125,0,24,24,cloudSyncOn);
+  //-->>Get Batery status
+  tft.pushImage(215,0,24,24,StatusBatteryCharging010);
+  
+}
+
+void loadAllIcons() {
+  tft.setSwapBytes(true);
+
+  tft.pushImage(0,0,24,24,StatusBattery000);
+  tft.pushImage(30,0,24,24,StatusBattery010);
+  tft.pushImage(60,0,24,24,StatusBattery025);
+  tft.pushImage(90,0,24,24,StatusBattery050);
+  tft.pushImage(120,0,24,24,StatusBattery075);
+  tft.pushImage(150,0,24,24,StatusBattery100);
+    
+  tft.pushImage(30,30,24,24,StatusBatteryCharging010);
+  tft.pushImage(60,30,24,24,StatusBatteryCharging025);
+  tft.pushImage(90,30,24,24,StatusBatteryCharging050);
+  tft.pushImage(120,30,24,24,StatusBatteryCharging075);
+  tft.pushImage(150,30,24,24,StatusBatteryCharging100);
+
+  tft.pushImage(0,60,24,24,wifi000);
+  tft.pushImage(30,60,24,24,wifi025);
+  tft.pushImage(60,60,24,24,wifi050);
+  tft.pushImage(90,60,24,24,wifi075);
+  tft.pushImage(120,60,24,24,wifi100);
+  tft.pushImage(150,60,24,24,wifiOff);
+
+  tft.pushImage(0,90,24,24,bluetooth);
+  tft.pushImage(30,90,24,24,bluetoothConnected);
+  tft.pushImage(60,90,24,24,bluetoothOff);
+
+  tft.pushImage(180,0,24,24,cloudClockOn);
+  tft.pushImage(180,30,24,24,cloudClockOff);
+
+  tft.pushImage(210,0,24,24,cloudSyncOn);
+  tft.pushImage(210,30,24,24,cloudSyncOff);
+  
+  while(true);
+}
+
+void loadAllWiFiIcons() {
+  tft.setSwapBytes(true);
+
+  /*tft.pushImage(0,0,24,24,wifi000_blue);
+  tft.pushImage(30,0,24,24,wifi025_blue);
+  tft.pushImage(60,0,24,24,wifi050_blue);
+  tft.pushImage(90,0,24,24,wifi075_blue);
+  tft.pushImage(120,0,24,24,wifi100_blue);
+  tft.pushImage(150,0,24,24,wifiOff_blue);
+
+  tft.pushImage(0,30,24,24,wifi000_blue_bis);
+  tft.pushImage(30,30,24,24,wifi025_blue_bis);
+  tft.pushImage(60,30,24,24,wifi050_blue_bis);
+  tft.pushImage(90,30,24,24,wifi075_blue_bis);
+  tft.pushImage(120,30,24,24,wifi100_blue);
+  tft.pushImage(150,30,24,24,wifiOff_blue_bis);
+
+  tft.pushImage(0,70,24,24,wifi000_white);
+  tft.pushImage(30,70,24,24,wifi025_white);
+  tft.pushImage(60,70,24,24,wifi050_white);
+  tft.pushImage(90,70,24,24,wifi075_white);
+  tft.pushImage(120,70,24,24,wifi100_white);
+  tft.pushImage(150,70,24,24,wifiOff_white);
+
+  tft.pushImage(0,100,24,24,wifi000_bis3);
+  tft.pushImage(30,100,24,24,wifi025_bis2);
+  tft.pushImage(60,100,24,24,wifi050_bis2);
+  tft.pushImage(90,100,24,24,wifi075_bis2);
+  tft.pushImage(120,100,24,24,wifi100_bis2);
+  tft.pushImage(150,100,24,24,wifiOff);
+  */
+  
+  /*tft.pushImage(0,100,24,24,wifi000_white_bis);
+  tft.pushImage(30,100,24,24,wifi025_white_bis);
+  tft.pushImage(60,100,24,24,wifi050_white_bis);
+  tft.pushImage(90,100,24,24,wifi075_white_bis);
+  tft.pushImage(120,100,24,24,wifi100_white);
+  tft.pushImage(150,100,24,24,wifiOff_white_bis);
+
+  tft.pushImage(0,100,24,24,wifi000_bis);
+  tft.pushImage(30,100,24,24,wifi025_bis);
+  tft.pushImage(60,100,24,24,wifi050_bis);
+  tft.pushImage(90,100,24,24,wifi075_bis);
+  tft.pushImage(120,100,24,24,wifi100);
+  tft.pushImage(150,100,24,24,wifiOff);*/
+  
+  while(true);
 }
 
 void drawGraphLastHourCo2() {
@@ -199,8 +326,10 @@ String roundFloattoString(float_t number, uint8_t decimals) {
       dec=abs(number*pow(10,decimals+1)-ent*pow(10,decimals+1));
     }
   auxEnt=int(float(dec/10));
+  if (auxEnt>=10) auxEnt=9; //Need adjustment for wrong rounds in xx.98 or xx.99
   auxDec=abs(auxEnt*10-dec);
   if (auxDec>=5) auxEnt++;
+  if (auxEnt>=10) {auxEnt=0; ent++;}
 
   if (decimals==0) myString=String(number).toInt(); 
   else myString=String(ent)+"."+String(auxEnt);
@@ -216,6 +345,7 @@ void setup() {
   if (logsOn) {Serial.begin(115200);Serial.print("\nCO2 bootup v");Serial.print(VERSION);Serial.println(" ..........");Serial.println("[setup] - Serial: OK");}
 
   //Display init
+  pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
@@ -240,6 +370,8 @@ void setup() {
     if (logsOn) Serial.println("[setup] - Display: OK");
     tft.fillScreen(TFT_BLACK);
   }
+  
+  //-->>loadAllWiFiIcons();
 
   loadBootImage();
   delay(500);
@@ -256,8 +388,47 @@ void setup() {
   tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Tp/Hu:  [");
   pinMode(SI7021_SDA,INPUT_PULLUP); pinMode(SI7021_SCL,INPUT_PULLUP);
   tempHumSensor.begin(SI7021_SDA,SI7021_SCL);
+
   int errorSns = tempHumSensor.getError();
   uint8_t statSns = tempHumSensor.getStatus();
+  
+  /*-->//Test sensor heater effect in the measured temperature
+  tempHumSensor.setHeatTimeout(30); 
+  uint8_t heatLevel;
+  tempHumSensor.getHeaterLevel(heatLevel);
+  Serial.println("[Heat Test] - Init");
+  Serial.print("  - errorSns=");Serial.println(errorSns);
+  Serial.print("  - statSns=");Serial.println(statSns);
+  Serial.print("  - heatLevel=");Serial.println(heatLevel);
+  tempHumSensor.setHeaterLevel(15);
+  tempHumSensor.setHeatTimeout(30);
+  tempHumSensor.heatOn();
+  Serial.println("[Heat Test] - Heater ON");
+  while (tempHumSensor.isHeaterOn())
+  {
+    statSns = tempHumSensor.getStatus();
+    tempHumSensor.getHeaterLevel(heatLevel);
+    tempHumSensor.read();
+    Serial.print("  - time=");Serial.println(millis());
+    Serial.print("    + statSns=");Serial.println(statSns);
+    Serial.print("    + tempera=");Serial.println(tempHumSensor.getTemperature());
+    Serial.print("    + heatLevel=");Serial.println(heatLevel);
+    delay(5000);
+  }
+  Serial.println("[Heat Test] - Heater OFF");
+  tempHumSensor.heatOff();
+  while (true) {
+    statSns = tempHumSensor.getStatus();
+    tempHumSensor.getHeaterLevel(heatLevel);
+    tempHumSensor.read();
+    Serial.print("  - time=");Serial.println(millis());
+    Serial.print("    + statSns=");Serial.println(statSns);
+    Serial.print("    + tempera=");Serial.println(tempHumSensor.getTemperature());
+    Serial.print("    + heatLevel=");Serial.println(heatLevel);
+    delay(5000);
+  }
+  <--*/
+
   if (!tempHumSensor.isConnected() || 0==tempHumSensorType.compareTo("UNKNOW"))
     error_setup=ERROR_SENSOR_TEMP_HUM_SETUP;
   if (error_setup != ERROR_SENSOR_TEMP_HUM_SETUP ) { 
@@ -334,9 +505,11 @@ void setup() {
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Accuracy: "); if ((byte) 0 != co2Sensor.getAccuracy(false)) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getAccuracy(false));
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Range: "); if  (CO2_SENSOR_CO2_RANGE!=co2Sensor.getRange()) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getRange());
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("\n  Can't continue. STOP");
-    return;
+    #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
+      return;  //Development doesn't have CO2 sensor
+    #endif
   }
- 
+
   //Initiating buffers to draw the Co2/Temp/Hum graphs
   for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++)  {lastHourCo2Samples[i]=0;lastHourTempSamples[i]=0;lastHourHumSamples[i]=0;}
   for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY); i++) {lastDayCo2Samples[i]=0;lastDayTempSamples[i]=0;lastDayHumSamples[i]=0;}
@@ -374,14 +547,17 @@ void setup() {
     tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] - ");
     tft.setTextColor(TFT_GREEN,TFT_BLACK);tft.print(wifiNet.ssid);tft.print(", ");tft.println(WiFi.localIP().toString());
+    wifiCurrentStatus=wifi0Status;
   } else {
     if (logsOn) Serial.println("KO");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("   [");
     tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
+    wifiCurrentStatus=wifiOffStatus;
   }
 
   //Setting up URL things to upload samples to an external server
+  CloudSyncCurrentStatus=CloudSyncOffStatus;
   if (error_setup != ERROR_WIFI_SETUP && uploadSamplesToServer) { 
     //Converting SERVER_UPLOAD_SAMPLES into IPAddress variable
     char charToTest;
@@ -404,19 +580,21 @@ void setup() {
     //Adding the 3 latest mac bytes to the device name (in Hex format)
     byte mac[6];
     WiFi.macAddress(mac);
-    device=device+"-"+String((char)hex_digits[mac[2]>>4])+String((char)hex_digits[mac[2]&15])+
-      String((char)hex_digits[mac[1]>>4])+String((char)hex_digits[mac[1]&15])+
-      String((char)hex_digits[mac[0]>>4])+String((char)hex_digits[mac[0]&15]);
+    device=device+"-"+String((char)hex_digits[mac[3]>>4])+String((char)hex_digits[mac[3]&15])+
+      String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
+      String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
     Serial.println("[setup] - URL: [OK]");
     Serial.print("  - URL: ");Serial.println("http://"+serverToUploadSamplesIPAddress.toString()+
       String(GET_REQUEST_TO_UPLOAD_SAMPLES).substring(4,String(GET_REQUEST_TO_UPLOAD_SAMPLES).length()-1));
     Serial.print("  - Device name=");Serial.println(device);
     tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - URL: [");
     tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
+    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("] ");
+    CloudSyncCurrentStatus=CloudSyncOnStatus;
   }
 
   //NTP Server
+  CloudClockCurrentStatus=CloudClockOffStatus;
   if (error_setup != ERROR_WIFI_SETUP ) { 
     if (logsOn) {
       Serial.println("[setup - NTP] Connecting to NTP Server: ");
@@ -439,12 +617,13 @@ void setup() {
     else {
       if (logsOn) {
         Serial.print("  Time: "); Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
-        Serial.print("[setup] - NTP: ");Serial.println("OK");}
-      
+        Serial.print("[setup] - NTP: ");Serial.println("OK");
+      }
       tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - NTP: [");
       tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
       tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
       tft.setTextColor(TFT_GREEN,TFT_BLACK);tft.println(NTP_SERVER);tft.setTextColor(TFT_GOLD,TFT_BLACK);
+      CloudClockCurrentStatus=CloudClockOnStatus;
     }
   }
 
@@ -484,7 +663,7 @@ void loop() {
     return;
 
   nowTime=millis();
-
+  
   while (nowTime<co2PreheatingTime) {
     //Waiting for the sensor to warmup before displaying value
     if (waitingMessage) {if (logsOn) Serial.println("Waiting for the warmup to finish");waitingMessage=false;}
@@ -492,8 +671,15 @@ void loop() {
     circularGauge.cleanUnitsTextGauge();
     circularGauge.setValue((int)(co2PreheatingTime-nowTime)/1000);
     circularGauge.drawTextGauge("warmup",TEXT_SIZE,true,TEXT_SIZE_UNITS_CO2,TEXT_FONT,TEXT_FONT_UNITS_CO2,TFT_GREENYELLOW);
+    if (wifiNet.RSSI>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
+        else if (wifiNet.RSSI>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
+        else if (wifiNet.RSSI>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
+        else if (wifiNet.RSSI>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
+        else if (wifiNet.RSSI<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+    showIcons();
     delay(1000);
     nowTime=millis();
+    previousTurnOffBacklightTime=nowTime;
   }
   if (runningMessage) {if (logsOn) Serial.println("Running.... :-)");runningMessage=false;}
 
@@ -504,6 +690,18 @@ void loop() {
   gapHourSampleTime = previousHourSampleTime!=0 ? nowTime-previousHourSampleTime: SAMPLE_T_LAST_HOUR*1000;
   gapDaySampleTime = previousDaySampleTime!=0 ? nowTime-previousDaySampleTime: SAMPLE_T_LAST_DAY*1000;
   gapUploadSampleTime = previousUploadSampleTime!=0 ? nowTime-previousUploadSampleTime: UPLOAD_SAMPLES_PERIOD;
+  gapTimeIconStatusRefresh = previousTimeIconStatusRefresh!=0 ? nowTime-previousTimeIconStatusRefresh: ICON_STATUS_REFRESH_PERIOD;
+  gapTurnOffBacklight = previousTurnOffBacklightTime!=0 ? nowTime-previousTurnOffBacklightTime: 0;
+  
+  //Cheking if BackLight should be turned off
+  if ( digitalRead(PIN_TFT_BACKLIGHT)!=LOW && autoBackLightOff==true &&
+      (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
+       currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) &&
+      gapTurnOffBacklight >= TIME_TURN_OFF_BACKLIGHT) {
+    digitalWrite(PIN_TFT_BACKLIGHT,LOW);
+    previousTurnOffBacklightTime=nowTime;
+    gapTurnOffBacklight=0;
+  }
   
   //Checking if sample buffers update is needed
   if (gapHourSampleTime>=SAMPLE_T_LAST_HOUR*1000) {previousHourSampleTime=nowTime;gapHourSampleTime=0;updateHourSample=true;updateHourGraph=true;}
@@ -513,7 +711,28 @@ void loop() {
   if (button1.pressed()) checkButton1();
 
   //Actions if button2 is pushed. It depens on the current state
-  if (button2.pressed()) checkButton2();
+  if (button2.pressed()) {
+    //Take time to check if it is long press
+    if (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
+        currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential)
+      timePressButton2=millis();
+    else
+      timePressButton2=0;
+    checkButton2();
+  }
+
+  //Check if Button2 was long pressed
+  if (button2.released() && timePressButton2!=0) {
+    if ((millis()-timePressButton2) > TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT) {
+      autoBackLightOff=!autoBackLightOff;
+      if (autoBackLightOff) {
+        //Turn off back light
+        digitalWrite(PIN_TFT_BACKLIGHT,LOW);
+        previousTurnOffBacklightTime=nowTime;
+        gapTurnOffBacklight=0;
+      }
+    }
+  }
   
   //Regular actions every SAMPLE_PERIOD seconds
   //  Taking CO2, Temp & Hum samples. Moving buffers at the right time
@@ -525,6 +744,7 @@ void loop() {
     /*-->valueT=(float_t)random(0,600)/10-10.0;<--*/
     /*-->valueHum=(float_t)random(0,100);<--*/
     valueCO2=(float_t)co2Sensor.getCO2();
+    
     //tempMeasure=co2Sensor.getTemperature(true,true);
     tempHumSensor.read();
     tempMeasure=tempHumSensor.getTemperature();
@@ -564,7 +784,8 @@ void loop() {
   if (gapUploadSampleTime>=UPLOAD_SAMPLES_PERIOD && uploadSamplesToServer) {
     String httpRequest=String(GET_REQUEST_TO_UPLOAD_SAMPLES);
     previousUploadSampleTime=nowTime;gapUploadSampleTime=0;
-    //GET /lar-to/?device=co2-sensor&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
+
+    //GET /lar-co2/?device=co2-sensor&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
     httpRequest=httpRequest+"device="+device+"&local_ip_address="+
       IpAddress2String(WiFi.localIP())+"&co2="+valueCO2+"&temp_by_co2_sensor="+valueT+"&hum_by_co2_sensor="+
       valueHum+"&temp_co2_sensor="+co2Sensor.getTemperature(true,true)+" HTTP/1.1";
@@ -573,6 +794,37 @@ void loop() {
   }
   else gapUploadSampleTime=nowTime-previousUploadSampleTime;
 
+  //Regular actions every ICON_STATUS_REFRESH_PERIOD seconds
+  // Refresh icon status
+  if (gapTimeIconStatusRefresh>=ICON_STATUS_REFRESH_PERIOD) {
+    //Make sure scanning doesn't block display printing
+    if ((DISPLAY_REFRESH_PERIOD-gapTimeDisplay) <= 2500) {
+      previousTimeIconStatusRefresh=nowTime+DISPLAY_REFRESH_PERIOD+gapTimeDisplay+500-ICON_STATUS_REFRESH_PERIOD;
+      gapTimeIconStatusRefresh=nowTime-previousTimeIconStatusRefresh;
+    }
+    else {
+      previousTimeIconStatusRefresh=nowTime;gapTimeIconStatusRefresh=0;
+
+      if ((wifiCurrentStatus != wifiOffStatus) && 
+          (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
+           currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
+        int16_t numberWiFiNetworks=0;
+        printCurrentWiFi(false,&numberWiFiNetworks);
+        if (wifiNet.RSSI>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
+        else if (wifiNet.RSSI>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
+        else if (wifiNet.RSSI>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
+        else if (wifiNet.RSSI>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
+        else if (wifiNet.RSSI<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+        
+        /*-->Serial.print("[Refresh Display] - nowTime=");Serial.print(nowTime);Serial.print(", previousTimeIconStatusRefresh=");Serial.print(previousTimeIconStatusRefresh);
+        Serial.print(", lasted time=");Serial.print((nowTime-previousTimeIconStatusRefresh)/1000);Serial.print(", wifiNet.ssid=");Serial.print(wifiNet.ssid);
+        Serial.print(", wifiCurrentStatus=");Serial.print(wifiCurrentStatus);Serial.print(", wifiNet.RSSI=");Serial.println(wifiNet.RSSI); 
+        /<--*/
+      }
+    }
+  }
+  
+  
   //Regular actions every DISPLAY_MODE_REFRESH_PERIOD seconds
   // Selecting what's the screen to display (active screen)
   if (gapTimeDisplayMode>=DISPLAY_MODE_REFRESH_PERIOD && currentState==displayingSequential) {
@@ -605,6 +857,9 @@ void loop() {
 
           //Cleaning the screen always the first time in
           if (lastDisplayMode!=sampleValue) {tft.fillScreen(TFT_BLACK); lastValueCO2=-1;} //Force re-rendering CO2 values in the main screen
+          
+          //Drawing Icons
+          showIcons();
 
           //Cleaning & Drawing circular gauge
           tft.setTextSize(TEXT_SIZE);
@@ -643,7 +898,7 @@ void loop() {
           //valueString=String((int) valueT)+"."+String(abs(((int) (valueT*10))-(((int)valueT)*10)))+"C";
           valueString=roundFloattoString(valueT,1)+"C";
           tft.setTextSize(TEXT_SIZE);
-          drawText(valueT, String(valueString),TEXT_SIZE,TEXT_FONT,TFT_GREEN,TFT_BLACK,TFT_X_WIDTH-tft.textWidth(String(valueString)),25,20,TFT_BLUE,27,TFT_RED);
+          drawText(valueT, String(valueString),TEXT_SIZE,TEXT_FONT,TFT_GREEN,TFT_BLACK,TFT_X_WIDTH-tft.textWidth(String(valueString)),25,19.95,TFT_BLUE,27.05,TFT_RED);
           horizontalBar.drawHorizontalBar(valueT);
 
           //Drawing Humidity

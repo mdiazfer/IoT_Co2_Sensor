@@ -8,6 +8,19 @@ void checkButton1() {
   Serial.print("  - stateSelected="); Serial.println(stateSelected);
   Serial.print("  - lastState="); Serial.println(lastState);*/
 
+  //If TFT is off, turn it on and exit;
+  if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) {
+      digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+      previousTurnOffBacklightTime=nowTime;
+      gapTurnOffBacklight=0;
+
+      //Display samples when back to light if displaying in sequential mode
+      gapTimeDisplay=DISPLAY_REFRESH_PERIOD;
+      if (currentState==displayingSequential) displayMode=sampleValue;
+
+      return;
+  }
+
   //Actions are different based on the current state
   switch(currentState) {
     case bootupScreen:
@@ -93,6 +106,22 @@ void checkButton2() {
   Serial.print("  - currentState="); Serial.println(currentState);
   Serial.print("  - stateSelected="); Serial.println(stateSelected);
   Serial.print("  - lastState="); Serial.println(lastState);*/
+
+  //If TFT is off, turn it on and exit;
+  if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) {
+      digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+      previousTurnOffBacklightTime=nowTime;
+      gapTurnOffBacklight=0;
+
+      //Display samples when back to light if displaying in sequential mode
+      gapTimeDisplay=DISPLAY_REFRESH_PERIOD;
+      if (currentState==displayingSequential) displayMode=sampleValue;
+      return;
+  } else {
+    previousTurnOffBacklightTime=nowTime;
+    gapTurnOffBacklight=0;
+  }
+
   
   //Actions are different based on the current state
   switch(currentState) {

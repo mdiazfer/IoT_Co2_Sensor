@@ -3,6 +3,16 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.7.0  9/Oct/2022   - wifi icon is refreshed in the first sample display
+                      - platformio.ini configure for bulding either development or sensor cab
+                      - development build doesn't take into account the presence of CO2 sensor
+                      - correction of Temperature Offset in sensor cab (SHT2x.cpp)
+                      - SHT2x.cpp and SHT2x.h are now in src to avoid loosing changes if library upgrade
+                      - Display is off after TIME_TURN_OFF_BACKLIGHT seconds
+                      - Press Button1 or Button2 to Turn On the TFT again
+                      - Long press Button2 (>=TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT) to toggle autoBackLightOff
+- 0.6.9  2/Oct/2022   - Icons support. Status refresh for WiFi.
+                      - Bug fix. Round decimals in temperature
 - 0.6.8 21/Sep/2022   - Added version at bootup screen. Color modifications in graphs for better reading
                       - Bug fixing function SHT2x::getHumidityCompensated()
                       - Added 2-level menu. Menu Global is the top level

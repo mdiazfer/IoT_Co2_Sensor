@@ -583,7 +583,7 @@ void printInfoNet() {
   tft.setCursor(15,30,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
   byte mac[6];
   WiFi.macAddress(mac);
-  tft.print("MAC address: ");tft.print(mac[5], HEX); tft.print(":");tft.print(mac[4], HEX); tft.print(":");tft.print(mac[3], HEX); tft.print(":");tft.print(mac[2], HEX); tft.print(":");tft.print(mac[1], HEX); tft.print(":");tft.println(mac[0], HEX);
+  tft.print("MAC address: ");tft.print(mac[0], HEX);tft.print(":");tft.print(mac[1], HEX);tft.print(":");tft.print(mac[2], HEX);tft.print(":");tft.print(mac[3], HEX);tft.print(":");tft.print(mac[4], HEX);tft.print(":");tft.println(mac[5], HEX);
   tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*1,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
   tft.print("IP Address: "); tft.print(WiFi.localIP().toString());
   tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*2,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);

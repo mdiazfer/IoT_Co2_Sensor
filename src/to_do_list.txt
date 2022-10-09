@@ -1,11 +1,15 @@
 To do list
 -----------
+- Bug fix:
+  + Show fix samples -> Menu Gral -> Menu info -> Print sometning -> back -> back
+  + No wifi => error message in Serial; should force no ntp connection and no GET send
+- Roll back SHT2x.h and SHT2x.cpp to library directory again
+- Get info for: wifi, bluetooth, ntp, sync, battery
+- Icon for the bootup screen
+- Web server to display results
 - Battery monitoring
 - Temperature calibration
 - Triger alarms
-- Icons
-- Icon for the bootup screen
-- Web server to display results
 - REST API to get results
 - Web server for configuration
 - Save CO2 samples in cloud to not lose graph pictures when the battery runs out
@@ -17,6 +21,7 @@ To do list
 
 Done
 -------
++ Icons (v0.6.9)
 + Added 2-level menu. Menu Global is the top level (v0.6.8)
 + Added NTP to get time synced  (v0.6.8)
 + Added URL to upload periodically samples to external server (v0.6.8)

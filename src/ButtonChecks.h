@@ -12,7 +12,8 @@
 
 extern enum availableStates currentState,lastState,stateSelected;
 extern enum displayModes displayMode,lastDisplayMode;
-extern unsigned long lastGapTime,gapTimeDisplay,gapTimeDisplayMode;
+extern unsigned long lastGapTime,gapTimeDisplay,gapTimeDisplayMode,nowTime,previousTurnOffBacklightTime,gapTurnOffBacklight;
+extern boolean autoBackLightOff;
 
 void checkButton1();
 void checkButton2();
