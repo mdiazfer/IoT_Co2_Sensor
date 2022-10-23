@@ -1,11 +1,11 @@
 To do list
 -----------
 - Bug fix:
-  + Show fix samples -> Menu Gral -> Menu info -> Print sometning -> back -> back
   + No wifi => error message in Serial; should force no ntp connection and no GET send
-- Roll back SHT2x.h and SHT2x.cpp to library directory again
-- Get info for: wifi, bluetooth, ntp, sync, battery
+- Adding Booup info Option to the Display Info Menu
+- Get info about bluetooth & battery to update icons
 - Icon for the bootup screen
+- Backup SSID
 - Web server to display results
 - Battery monitoring
 - Temperature calibration
@@ -21,6 +21,12 @@ To do list
 
 Done
 -------
++ Bug fixing
+  + Show fix samples -> Menu Gral -> Menu info -> Print sometning -> back -> back (v0.7.1)
+  + Show Las 24h graph -> Menu Gral -> back doesn't work (v0.7.1)
++ Scroll up/down for the bootup screen v0.7.1)
++ Get info about ntp and web server to update icons v0.7.1)
++ Get info for: wifi (v0.7.0)
 + Icons (v0.6.9)
 + Added 2-level menu. Menu Global is the top level (v0.6.8)
 + Added NTP to get time synced  (v0.6.8)

@@ -28,16 +28,29 @@ uint8_t sendHttpRequest(IPAddress server, uint16_t port, String httpRequest) {
     client.println("Connection: close");
     client.println();
   }
-
+  
   // if there are incoming bytes available
   // from the server, read them and print them:
-  while (!client.available()); //wait till there is server answer
-  if (logsOn) {Serial.println("Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
-  while (client.available()) {
-    char c = client.read();
-    if (logsOn) {Serial.write(c);}
+  u_long nowMilliseconds,lastMilliseconds=millis();
+  CloudSyncCurrentStatus=CloudSyncOnStatus;
+  while (!client.available()){
+    nowMilliseconds=millis();
+    if (nowMilliseconds>=lastMilliseconds+HTTP_ANSWER_TIMEOUT) {
+      //Too long with no server answer. Something was wrong. Changing icon
+      CloudSyncCurrentStatus=CloudSyncOffStatus;
+      if (logsOn) {Serial.println("NO Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
+      break;
+    }
+  }; //wait till there is server answer
+
+  if (CloudSyncCurrentStatus==CloudSyncOnStatus) {
+    if (logsOn) {Serial.println("Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
+    while (client.available()) {
+      char c = client.read();
+      if (logsOn) {Serial.write(c);}
+    }
+    if (logsOn) {Serial.println("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
   }
-  if (logsOn) {Serial.println("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
 
   // if the server's disconnected, stop the client:
   if (!client.connected()) {

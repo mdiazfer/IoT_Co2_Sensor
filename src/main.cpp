@@ -29,13 +29,15 @@
 const String co2SensorType=String(CO2_SENSOR_TYPE);
 const String tempHumSensorType=String(TEMP_HUM_SENSOR_TYPE);
 char co2SensorVersion[5];
-uint8_t error_setup = NO_ERROR;
+uint8_t error_setup=NO_ERROR,remainingBootupSeconds=0;
+int16_t cuX,cuY;
 TFT_eSPI tft = TFT_eSPI();  // Invoke library to manage the display
-ulong nowTime=0,previousTime=0,previousTimeDisplay=0,previousTimeDisplayMode=0,
+TFT_eSprite stext1 = TFT_eSprite(&tft); // Sprite object stext1
+ulong nowTime=0,previousTime=0,previousTimeDisplay=0,previousTimeDisplayMode=0,previousTimeNTPCheck=0,
       previousHourSampleTime=0,previousDaySampleTime=0,previousUploadSampleTime=0,previousTimeIconStatusRefresh=0,
-      gapTime,lastGapTime,gapTimeDisplay,gapTimeDisplayMode,gapHourSampleTime,gapDaySampleTime,
+      gapTime,lastGapTime,gapTimeDisplay,gapTimeDisplayMode,gapHourSampleTime,gapDaySampleTime,gapTimeNTPCheck,
       gapUploadSampleTime=0,gapTimeIconStatusRefresh=0,previousTurnOffBacklightTime=0,gapTurnOffBacklight=0,
-      timePressButton2,timeReleaseButton2;
+      timePressButton2,timeReleaseButton2,remainingBootupTime=BOOTUP_TIMEOUT*1000;
 CircularGauge circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
                                           CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
                                           CO2_GAUGE_TH1,TFT_YELLOW,CO2_GAUGE_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
@@ -52,7 +54,7 @@ float_t lastDayTempSamples[24*3600/SAMPLE_T_LAST_DAY];  //Buffer to record last-
 float_t lastDayHumSamples[24*3600/SAMPLE_T_LAST_DAY];   //Buffer to record last-day Hum values
 boolean showGraph=false,updateHourSample=true,updateDaySample=true,updateHourGraph=true,updateDayGraph=true;
 int8_t counterDisplay=-1;
-enum displayModes displayMode=sampleValue, lastDisplayMode=bootup; //Will make starting always in sampleValue
+enum displayModes displayMode=bootup, lastDisplayMode=bootup; 
 enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState;
 SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX);
 #ifdef __MHZ19B__
@@ -75,6 +77,16 @@ String device(DEVICE_NAME);
 static const char hex_digits[] = "0123456789ABCDEF";
 boolean waitingMessage=true,runningMessage=true;
 boolean autoBackLightOff=true;
+boolean button2Pressed=false;
+uint8_t pixelsPerLine,
+    spL,            //Number of Lines in the Sprite
+    scL,            //Number of Lines in the Scroll
+    pFL,            //Pointer First Line
+    pLL,            //pointer Last Line written
+    spFL,           //Sprite First Line Window
+    spLL,           //Sprite Last Line Window
+    scFL,           //Scroll First Line Window
+    scLL;           //Scroll Last Line Window
 
 //Code
 void loadBootImage() {
@@ -112,10 +124,26 @@ void showIcons() {
   
   //-->>Get BLE status
   tft.pushImage(30,0,24,24,bluetoothOff);
+  
   //-->>Get NTP status
-  tft.pushImage(95,0,24,24,cloudClockOn);
+  switch (CloudClockCurrentStatus) {
+    case (CloudClockOnStatus):
+      tft.pushImage(95,0,24,24,cloudClockOn);
+    break;
+    case (CloudClockOffStatus):
+      tft.pushImage(95,0,24,24,cloudClockOff);
+    break;
+  }
+  
   //-->>Get Cloud status
-  tft.pushImage(125,0,24,24,cloudSyncOn);
+  switch (CloudSyncCurrentStatus) {
+    case (CloudSyncOnStatus):
+      tft.pushImage(125,0,24,24,cloudSyncOn);
+    break;
+    case (CloudSyncOffStatus):
+      tft.pushImage(125,0,24,24,cloudSyncOff);
+    break;
+   }
   //-->>Get Batery status
   tft.pushImage(215,0,24,24,StatusBatteryCharging010);
   
@@ -340,7 +368,8 @@ String roundFloattoString(float_t number, uint8_t decimals) {
 void setup() {
   static uint32_t wr = 1;
   static uint32_t rd = 0xFFFFFFFF;
-  currentState=displayingSequential;lastState=currentState;
+  currentState=bootupScreen;lastState=currentState;
+  displayMode=bootup;lastDisplayMode=bootup;
 
   if (logsOn) {Serial.begin(115200);Serial.print("\nCO2 bootup v");Serial.print(VERSION);Serial.println(" ..........");Serial.println("[setup] - Serial: OK");}
 
@@ -350,6 +379,23 @@ void setup() {
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
 
+  // Create a sprite for text and initialize sprite parameters
+  stext1.setColorDepth(4);
+  stext1.createSprite(TFT_MAX_X, TFT_MAX_Y*SCROLL_PER_SPRITE);
+  stext1.fillSprite(TFT_BLACK); // Note: Sprite is filled with black when created
+  stext1.setTextColor(TFT_GOLD); // Gold text, no background
+  stext1.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  stext1.setTextFont(TEXT_FONT_BOOT_SCREEN);
+  pixelsPerLine=tft.fontHeight(TEXT_FONT_BOOT_SCREEN);
+  spL=LINES_PER_TEXT_SPRITE;            //Number of Lines in the Sprite
+  scL=LINES_PER_TEXT_SCROLL;            //Number of Lines in the Scroll
+  spFL=1;                               //Sprite First Line Window
+  spLL=spL;                             //Sprite Last Line Window
+  scFL=(spL-scL)/2+1;                   //Scroll First Line Window
+  scLL=scFL+scL-1;                      //Scroll Last Line Window
+  pFL=scFL;                             //Pointer First Line
+  pLL=pFL;                              //pointer Last Line written
+  
   delay(500);
   //Check out the TFT display
   tft.drawPixel(30,30,wr);
@@ -376,58 +422,17 @@ void setup() {
   loadBootImage();
   delay(500);
   //Display messages
-  tft.setCursor(0,0,TEXT_FONT_BOOT_SCREEN);
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  tft.setTextColor(TFT_WHITE,TFT_BLACK); tft.print("CO2 bootup v");tft.print(VERSION);tft.println(" ..........");
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Display: [");
-  tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
-
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_WHITE,TFT_BLACK);stext1.print("CO2 bootup v");stext1.print(VERSION);stext1.println(" ..........");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Display: [");stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  
   //Some Temp & Hum sensor checks and init
   if (logsOn) Serial.print("[setup] - Sensor Temp/HUM: ");
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Tp/Hu:  [");
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Tp/Hu:  [");
   pinMode(SI7021_SDA,INPUT_PULLUP); pinMode(SI7021_SCL,INPUT_PULLUP);
   tempHumSensor.begin(SI7021_SDA,SI7021_SCL);
 
   int errorSns = tempHumSensor.getError();
   uint8_t statSns = tempHumSensor.getStatus();
-  
-  /*-->//Test sensor heater effect in the measured temperature
-  tempHumSensor.setHeatTimeout(30); 
-  uint8_t heatLevel;
-  tempHumSensor.getHeaterLevel(heatLevel);
-  Serial.println("[Heat Test] - Init");
-  Serial.print("  - errorSns=");Serial.println(errorSns);
-  Serial.print("  - statSns=");Serial.println(statSns);
-  Serial.print("  - heatLevel=");Serial.println(heatLevel);
-  tempHumSensor.setHeaterLevel(15);
-  tempHumSensor.setHeatTimeout(30);
-  tempHumSensor.heatOn();
-  Serial.println("[Heat Test] - Heater ON");
-  while (tempHumSensor.isHeaterOn())
-  {
-    statSns = tempHumSensor.getStatus();
-    tempHumSensor.getHeaterLevel(heatLevel);
-    tempHumSensor.read();
-    Serial.print("  - time=");Serial.println(millis());
-    Serial.print("    + statSns=");Serial.println(statSns);
-    Serial.print("    + tempera=");Serial.println(tempHumSensor.getTemperature());
-    Serial.print("    + heatLevel=");Serial.println(heatLevel);
-    delay(5000);
-  }
-  Serial.println("[Heat Test] - Heater OFF");
-  tempHumSensor.heatOff();
-  while (true) {
-    statSns = tempHumSensor.getStatus();
-    tempHumSensor.getHeaterLevel(heatLevel);
-    tempHumSensor.read();
-    Serial.print("  - time=");Serial.println(millis());
-    Serial.print("    + statSns=");Serial.println(statSns);
-    Serial.print("    + tempera=");Serial.println(tempHumSensor.getTemperature());
-    Serial.print("    + heatLevel=");Serial.println(heatLevel);
-    delay(5000);
-  }
-  <--*/
 
   if (!tempHumSensor.isConnected() || 0==tempHumSensorType.compareTo("UNKNOW"))
     error_setup=ERROR_SENSOR_TEMP_HUM_SETUP;
@@ -440,9 +445,8 @@ void setup() {
       Serial.print("  Tp/Hm Sen.  error: "); Serial.println(errorSns,HEX);
       Serial.print("  Tp/Hm Sen. resolu.: "); Serial.println(tempHumSensor.getResolution());
     }
-    tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
-    tft.println(tempHumSensorType);
+    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("OK");stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Sensor: ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(tempHumSensorType);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
   else {
     if (logsOn) {
@@ -454,20 +458,20 @@ void setup() {
       Serial.print("  Tp/Hm Sen. resolu.: "); Serial.println(tempHumSensor.getResolution());
       Serial.println("  Can't continue. STOP");
     }
-    tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sns. type: "); if (0==tempHumSensorType.compareTo("UNKNOW")) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(tempHumSensorType);
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("KO");stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Tp/Hm Sns. type: ");if (0==tempHumSensorType.compareTo("UNKNOW")) stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print(tempHumSensorType);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     //tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sen. version: "); tft.println(tempHumSensor.getFirmwareVersion());
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sen. status: "); tft.println(statSns,HEX);
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sen.  error: "); if (0 != errorSns) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(errorSns,HEX);
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  Tp/Hm Sen. resolu.: "); tft.println(tempHumSensor.getResolution());
-    tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("\n  Can't continue. STOP"); 
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Tp/Hm Sen. status: ");stext1.print(statSns,HEX);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Tp/Hm Sen.  error: ");if (0 != errorSns) stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print(errorSns,HEX);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Tp/Hm Sen. resolu.: ");stext1.print(tempHumSensor.getResolution());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.print(" ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Can't continue. STOP");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     return;
   }
 
   //Sensor CO2 init
   if (logsOn) Serial.print("[setup] - Sensor: ");
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Sens.:  [");
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Sens.:  [");
   co2SensorSerialPort.begin(9600);      // (Uno example) device to MH-Z19 serial start   
   co2Sensor.begin(co2SensorSerialPort); // *Serial(Stream) refence must be passed to library begin(). 
   co2Sensor.setRange(CO2_SENSOR_CO2_RANGE);             // It's aviced to setup range to 2000. Better accuracy
@@ -486,9 +490,8 @@ void setup() {
       Serial.print("  CO2 Sensor Accuracy: "); Serial.println(co2Sensor.getAccuracy(false));
       Serial.print("  CO2 Sensor Range: "); Serial.println(co2Sensor.getRange());
     }
-    tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
-    tft.print(co2SensorType);tft.print(",V");tft.println(co2SensorVersion);
+    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("OK");stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("] ");stext1.print(co2SensorType);stext1.print(",V");stext1.print(co2SensorVersion);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+
   } else {
     if (logsOn) {
       Serial.println("KO");
@@ -498,13 +501,13 @@ void setup() {
       Serial.print("  CO2 Sensor Range: "); Serial.print(co2Sensor.getRange()); Serial.print(" - Should be ");Serial.println(CO2_SENSOR_CO2_RANGE);
       Serial.println("  Can't continue. STOP");
     }
-    tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor type: "); if (0==co2SensorType.compareTo("UNKNOW")) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2SensorType);
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor version: "); tft.println(co2SensorVersion);
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Accuracy: "); if ((byte) 0 != co2Sensor.getAccuracy(false)) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getAccuracy(false));
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("  CO2 Sensor Range: "); if  (CO2_SENSOR_CO2_RANGE!=co2Sensor.getRange()) tft.setTextColor(TFT_RED,TFT_BLACK); tft.println(co2Sensor.getRange());
-    tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("\n  Can't continue. STOP");
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("KO");stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  CO2 Sensor type: ");if (0==co2SensorType.compareTo("UNKNOW")) stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print(co2SensorType);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  CO2 Sensor version: ");stext1.print(co2SensorVersion);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  CO2 Sensor Accuracy: ");if ((byte) 0 != co2Sensor.getAccuracy(false)) stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print(co2Sensor.getAccuracy(false));if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  CO2 Sensor Range: ");if  (CO2_SENSOR_CO2_RANGE!=co2Sensor.getRange()) stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print(co2Sensor.getRange());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.print(" ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Can't continue. STOP");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
       return;  //Development doesn't have CO2 sensor
     #endif
@@ -516,43 +519,55 @@ void setup() {
 
   //-->>Buttons init
   if (logsOn) Serial.print("[setup] - Buttons: ");
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - Buttons: [");
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Buttons: [");
   button1.begin();
   button2.begin();
   if (error_setup != ERROR_BUTTONS_SETUP ) { 
     if (logsOn) Serial.println("OK");
-    tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
+    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("OK");
   } else {
     if (logsOn) {Serial.println("KO"); Serial.println("Can't continue. STOP");}
-    tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
-    tft.setTextColor(TFT_RED,TFT_BLACK); tft.println("Can't continue. STOP");
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("KO");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.print(" ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Can't continue. STOP");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     return;
   }
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
+  stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
 
   //WiFi init
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - WiFi: ");  
-  int16_t cuX=tft.getCursorX(); int16_t cuY=tft.getCursorY();
-  tft.setCursor(cuX,cuY);
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - WiFi: ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  cuX=stext1.getCursorX(); cuY=stext1.getCursorY()-pixelsPerLine;
+  stext1.setCursor(cuX,cuY);
   error_setup=wifiConnect();
   //Clean-up dots displayed after trying to get connected
-  for (int counter2=0; counter2<MAX_CONNECTION_ATTEMPTS; counter2++) tft.print(" ");
-  tft.setCursor(cuX,cuY);
+  stext1.setCursor(cuX,cuY);
+  for (int counter2=0; counter2<MAX_CONNECTION_ATTEMPTS; counter2++) stext1.print(" ");
+  stext1.setCursor(cuX,cuY);
+
   //print Logs
   if (logsOn) Serial.print("[setup] - WiFi: ");
   if (error_setup != ERROR_WIFI_SETUP ) { 
     if (logsOn) Serial.println("OK");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print(" [");
-    tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] - ");
-    tft.setTextColor(TFT_GREEN,TFT_BLACK);tft.print(wifiNet.ssid);tft.print(", ");tft.println(WiFi.localIP().toString());
-    wifiCurrentStatus=wifi0Status;
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print(" [");
+    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("OK");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");//if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  SSID:  ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(wifiNet.ssid);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("    IP:  ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.localIP().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  MASK: ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.subnetMask().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  DFGW: ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.gatewayIP().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+
+    if (wifiNet.RSSI>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
+        else if (wifiNet.RSSI>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
+        else if (wifiNet.RSSI>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
+        else if (wifiNet.RSSI>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
+        else if (wifiNet.RSSI<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
   } else {
     if (logsOn) Serial.println("KO");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("   [");
-    tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print(" [");
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("KO");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  SSID: ");stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print(WIFI_SSID_CREDENTIALS);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     wifiCurrentStatus=wifiOffStatus;
   }
 
@@ -583,14 +598,41 @@ void setup() {
     device=device+"-"+String((char)hex_digits[mac[3]>>4])+String((char)hex_digits[mac[3]&15])+
       String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
       String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
-    Serial.println("[setup] - URL: [OK]");
+    
+    //Send HttpRequest to check the server status
+    // The request updates CloudSyncCurrentStatus
+    sendHttpRequest(serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1");
+
+    Serial.print("[setup] - URL: [");
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - URL: [");
+
+    if (CloudSyncCurrentStatus==CloudSyncOnStatus) {
+      Serial.println("OK]");
+      
+      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  URL: ");
+      stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);
+    }
+    else {
+      Serial.println("KO]");
+
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  URL: ");
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);
+
+      error_setup != ERROR_WEB_SERVER;
+    }
+
     Serial.print("  - URL: ");Serial.println("http://"+serverToUploadSamplesIPAddress.toString()+
-      String(GET_REQUEST_TO_UPLOAD_SAMPLES).substring(4,String(GET_REQUEST_TO_UPLOAD_SAMPLES).length()-1));
+        String(GET_REQUEST_TO_UPLOAD_SAMPLES).substring(4,String(GET_REQUEST_TO_UPLOAD_SAMPLES).length()-1));
     Serial.print("  - Device name=");Serial.println(device);
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - URL: [");
-    tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
-    tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("] ");
-    CloudSyncCurrentStatus=CloudSyncOnStatus;
+
+    stext1.print("http://"+serverToUploadSamplesIPAddress.toString()+
+        String(GET_REQUEST_TO_UPLOAD_SAMPLES).substring(4,String(GET_REQUEST_TO_UPLOAD_SAMPLES).length()-1));if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine); 
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Device name: ");
+    stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(device);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
   //NTP Server
@@ -608,10 +650,12 @@ void setup() {
         Serial.print("[setup] - NTP: ");Serial.println("KO");
       }
       
-      tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - NTP: [");
-      tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
-      tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
-      tft.setTextColor(TFT_RED,TFT_BLACK);tft.println(NTP_SERVER);tft.setTextColor(TFT_GOLD,TFT_BLACK);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print(NTP_SERVER);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+
       error_setup=ERROR_NTP_SERVER;
     }
     else {
@@ -619,63 +663,125 @@ void setup() {
         Serial.print("  Time: "); Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
         Serial.print("[setup] - NTP: ");Serial.println("OK");
       }
-      tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - NTP: [");
-      tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
-      tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("] ");
-      tft.setTextColor(TFT_GREEN,TFT_BLACK);tft.println(NTP_SERVER);tft.setTextColor(TFT_GOLD,TFT_BLACK);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
+      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK); stext1.print("  Date: ");stext1.print(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
+      stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(NTP_SERVER);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
       CloudClockCurrentStatus=CloudClockOnStatus;
     }
   }
 
   //-->>BLE init
   if (logsOn) Serial.print("[setup] - BLE: ");
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print("[setup] - BLE:     [");
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - BLE:     [");
   if (error_setup != ERROR_BLE_SETUP ) { 
     if (logsOn) Serial.println("OK");
-    tft.setTextColor(TFT_GREEN,TFT_BLACK); tft.print("OK");
+    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
   } else {
     if (logsOn) Serial.println("KO");
-    tft.setTextColor(TFT_RED,TFT_BLACK); tft.print("KO");
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
   }
-  tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.println("]");
-
-
+  stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  
   if (error_setup != NO_ERROR) {
-    if (logsOn) Serial.println("Ready to start with limitations");
-    tft.setTextColor(TFT_BROWN,TFT_BLACK); tft.println("Ready to start with limitations");
+    if (logsOn) Serial.println("Ready to start but with limitations");
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("Buttons to scroll UP/DOWN");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_ORANGE_4_BITS_PALETTE,TFT_BLACK);stext1.print("Ready in ");cuX=stext1.getCursorX();cuY=stext1.getCursorY();
+    stext1.print(BOOTUP_TIMEOUT);stext1.print(" sec. but with limitations");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   } else {
     if (logsOn) Serial.println("Ready to start");
-    tft.setTextColor(TFT_DARKGREEN,TFT_BLACK); tft.println("Ready to start");
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("Buttons to scroll UP/DOWN");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("Ready to start in ");cuX=stext1.getCursorX();cuY=stext1.getCursorY();
+    stext1.print(BOOTUP_TIMEOUT);stext1.print(" sec.");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
-  delay(5000);
-  tft.setCursor(0,0,TEXT_FONT);
-  tft.fillScreen(TFT_BLACK);
-  tft.setTextSize(TEXT_SIZE);
   /*-->*/randomSeed(analogRead(37));
-  circularGauge.drawGauge2(0);
-  currentState=displayingSequential;lastState=currentState; //Transition to the next state
+
+  previousTime=millis();
+  remainingBootupTime=BOOTUP_TIMEOUT*1000;
+  remainingBootupSeconds=(uint8_t)(remainingBootupTime/1000);
 }
 
 void loop() {
-  if (ERROR_DISPLAY_SETUP==error_setup || ERROR_SENSOR_CO2_SETUP==error_setup || 
-      ERROR_SENSOR_TEMP_HUM_SETUP==error_setup)
-    return;
-
   nowTime=millis();
+  if (remainingBootupTime>0) {
+    //Only while showing bootup screen
+    remainingBootupTime-=(nowTime-previousTime);
+    previousTime=nowTime;
+  }
+
+  //Keep showing bootup screen for a while
+  if (currentState==bootupScreen) {
+      if (remainingBootupSeconds!=(uint8_t)(remainingBootupTime/1000)) {
+      remainingBootupSeconds=(uint8_t)(remainingBootupTime/1000);
+      
+      //Update screen if last line is visible in the scroll window
+      if (pLL-1>=scFL && pLL-1<=scLL) {
+        stext1.setCursor(cuX,(pLL-2)*pixelsPerLine);stext1.print(remainingBootupSeconds);
+        stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      }
+    }
+
+    //Scroll DOWN
+    if (button1.pressed()) {
+      if (pFL<scFL) {
+        pFL++;
+        if (pLL-1<spLL) pLL++;
+        stext1.scroll(0,pixelsPerLine);
+        stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      }
+      //Reset timeout to give more time to read while scrolling the screen 
+      if (pLL-1>=scFL && pLL-1<=scLL)
+        remainingBootupTime=BOOTUP_TIMEOUT*1000;
+      else
+        remainingBootupTime=BOOTUP_TIMEOUT2*1000; //If last line is not in scroll windows, wait a bit more
+    }
+
+    //Scroll UP
+    if (button2.pressed()) {
+      if (pLL-1>scLL) {
+        pLL--;
+        if (pFL>spFL) pFL--;
+        stext1.scroll(0,-pixelsPerLine);
+        stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      }
+      //Reset timeout to give more time to read while scrolling the screen 
+      if (pLL-1>=scFL && pLL-1<=scLL)
+        remainingBootupTime=BOOTUP_TIMEOUT*1000;
+      else
+        remainingBootupTime=BOOTUP_TIMEOUT2*1000; //If last line is not in scroll windows, wait a bit more
+    }
+    
+    if (ERROR_DISPLAY_SETUP==error_setup || ERROR_SENSOR_CO2_SETUP==error_setup || 
+        ERROR_SENSOR_TEMP_HUM_SETUP==error_setup || ERROR_BUTTONS_SETUP==error_setup)
+          remainingBootupTime=BOOTUP_TIMEOUT*1000;
+          
+    if (remainingBootupTime<=0) {
+      //After BOOTUP_TIMEOUT secons with no activity leaves bootupScreen and continue
+      tft.setCursor(0,0,TEXT_FONT);
+      tft.fillScreen(TFT_BLACK);
+      tft.setTextSize(TEXT_SIZE);
+      displayMode=sampleValue;lastDisplayMode=bootup; //Will make starting in sampleValue      
+      lastState=currentState;currentState=displayingSequential;  //Transition to the next state
+      previousTime=0;
+    }
   
+    return;
+  }
+  
+  //Show Warming screen
   while (nowTime<co2PreheatingTime) {
     //Waiting for the sensor to warmup before displaying value
-    if (waitingMessage) {if (logsOn) Serial.println("Waiting for the warmup to finish");waitingMessage=false;}
+    if (waitingMessage) {if (logsOn) Serial.println("Waiting for the warmup to finish");circularGauge.drawGauge2(0);waitingMessage=false;}
     circularGauge.cleanValueTextGauge();
     circularGauge.cleanUnitsTextGauge();
-    circularGauge.setValue((int)(co2PreheatingTime-nowTime)/1000);
+    circularGauge.setValue((int)(co2PreheatingTime-millis())/1000);
     circularGauge.drawTextGauge("warmup",TEXT_SIZE,true,TEXT_SIZE_UNITS_CO2,TEXT_FONT,TEXT_FONT_UNITS_CO2,TFT_GREENYELLOW);
-    if (wifiNet.RSSI>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
-        else if (wifiNet.RSSI>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
-        else if (wifiNet.RSSI>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
-        else if (wifiNet.RSSI>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
-        else if (wifiNet.RSSI<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+    
     showIcons();
     delay(1000);
     nowTime=millis();
@@ -691,16 +797,35 @@ void loop() {
   gapDaySampleTime = previousDaySampleTime!=0 ? nowTime-previousDaySampleTime: SAMPLE_T_LAST_DAY*1000;
   gapUploadSampleTime = previousUploadSampleTime!=0 ? nowTime-previousUploadSampleTime: UPLOAD_SAMPLES_PERIOD;
   gapTimeIconStatusRefresh = previousTimeIconStatusRefresh!=0 ? nowTime-previousTimeIconStatusRefresh: ICON_STATUS_REFRESH_PERIOD;
-  gapTurnOffBacklight = previousTurnOffBacklightTime!=0 ? nowTime-previousTurnOffBacklightTime: 0;
+  gapTurnOffBacklight = previousTurnOffBacklightTime!=0 ? nowTime-previousTurnOffBacklightTime: TIME_TURN_OFF_BACKLIGHT;
+  gapTimeNTPCheck = previousTimeNTPCheck!=0 ? nowTime-previousTimeNTPCheck: NTP_KO_CHECK;
+  
+  //Cheking if NTP if off or should be checked
+  if (gapTimeNTPCheck>=NTP_KO_CHECK && lastDisplayMode!=bootup) {
+    previousTimeNTPCheck=nowTime;
+    if (CloudClockCurrentStatus==CloudClockOffStatus ||
+        (startTimeInfo.tm_hour==NTP_OK_CHECK_HOUR && startTimeInfo.tm_min==NTP_OK_CHECK_MINUTE) ) {
+      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+      //NTP server recovered
+      if(getLocalTime(&startTimeInfo))
+        CloudClockCurrentStatus=CloudClockOnStatus;
+      else
+        CloudClockCurrentStatus=CloudClockOffStatus;
+    }
+  }
   
   //Cheking if BackLight should be turned off
   if ( digitalRead(PIN_TFT_BACKLIGHT)!=LOW && autoBackLightOff==true &&
       (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
        currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) &&
       gapTurnOffBacklight >= TIME_TURN_OFF_BACKLIGHT) {
-    digitalWrite(PIN_TFT_BACKLIGHT,LOW);
-    previousTurnOffBacklightTime=nowTime;
-    gapTurnOffBacklight=0;
+        if (lastDisplayMode==bootup)
+          previousTurnOffBacklightTime=nowTime;
+        else {
+          digitalWrite(PIN_TFT_BACKLIGHT,LOW);
+          previousTurnOffBacklightTime=nowTime;
+          gapTurnOffBacklight=0;
+        }
   }
   
   //Checking if sample buffers update is needed
@@ -713,6 +838,7 @@ void loop() {
   //Actions if button2 is pushed. It depens on the current state
   if (button2.pressed()) {
     //Take time to check if it is long press
+    button2Pressed=true;
     if (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
         currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential)
       timePressButton2=millis();
@@ -721,15 +847,41 @@ void loop() {
     checkButton2();
   }
 
+  if (button2.released()) button2Pressed=false;
   //Check if Button2 was long pressed
-  if (button2.released() && timePressButton2!=0) {
+  //if (button2.released() && timePressButton2!=0) {
+  if (button2Pressed && timePressButton2!=0) { 
     if ((millis()-timePressButton2) > TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT) {
+      //Long press, so toggle autoBackLightOff and display message
       autoBackLightOff=!autoBackLightOff;
+      timePressButton2=0;
+      lastDisplayMode=AutoSwitchOffMessage;
+
+      //Preparing to display message in the screen
+      tft.fillScreen(TFT_BLACK);
+      tft.setTextSize(TEXT_SIZE_MENU);
+      tft.setTextColor(TFT_GOLD,TFT_BLACK);
+      tft.setCursor(0,tft.height()/2-2*(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println("      Display");
+      tft.setCursor(0,tft.height()/2-(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println("  Auto switch off");
+      
       if (autoBackLightOff) {
+        //Display message in the screen
+        tft.setTextColor(TFT_GREEN,TFT_BLACK);
+        tft.setCursor(0,tft.height()/2+2,TEXT_FONT_MENU);tft.println("      Enabled");
+        delay(2500);
+        tft.fillScreen(TFT_BLACK);
+
         //Turn off back light
         digitalWrite(PIN_TFT_BACKLIGHT,LOW);
         previousTurnOffBacklightTime=nowTime;
         gapTurnOffBacklight=0;
+      }
+      else {
+        //Display message in the screen
+        tft.setTextColor(TFT_RED,TFT_BLACK);
+        tft.setCursor(0,tft.height()/2+2,TEXT_FONT_MENU);tft.println("     Disabled");
+        delay(2500);
+        tft.fillScreen(TFT_BLACK);
       }
     }
   }
@@ -781,7 +933,7 @@ void loop() {
   }
 
   //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
-  if (gapUploadSampleTime>=UPLOAD_SAMPLES_PERIOD && uploadSamplesToServer) {
+  if (gapUploadSampleTime>=UPLOAD_SAMPLES_PERIOD && uploadSamplesToServer && lastDisplayMode!=bootup) {
     String httpRequest=String(GET_REQUEST_TO_UPLOAD_SAMPLES);
     previousUploadSampleTime=nowTime;gapUploadSampleTime=0;
 
@@ -796,7 +948,7 @@ void loop() {
 
   //Regular actions every ICON_STATUS_REFRESH_PERIOD seconds
   // Refresh icon status
-  if (gapTimeIconStatusRefresh>=ICON_STATUS_REFRESH_PERIOD) {
+  if (gapTimeIconStatusRefresh>=ICON_STATUS_REFRESH_PERIOD && lastDisplayMode!=bootup) {
     //Make sure scanning doesn't block display printing
     if ((DISPLAY_REFRESH_PERIOD-gapTimeDisplay) <= 2500) {
       previousTimeIconStatusRefresh=nowTime+DISPLAY_REFRESH_PERIOD+gapTimeDisplay+500-ICON_STATUS_REFRESH_PERIOD;

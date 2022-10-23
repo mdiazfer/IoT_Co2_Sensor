@@ -129,6 +129,10 @@ void checkButton2() {
       currentState=stateSelected;
       if (currentState==menuWhatToDisplay) {stateSelected=lastState; printMenuWhatToDisplay();}
       else if (currentState==displayInfo) {stateSelected=displayInfo1; printInfoMenu();}
+      else if (currentState==displayingSampleFixed){gapTimeDisplay=DISPLAY_REFRESH_PERIOD;lastDisplayMode=menu;}
+      else if (currentState==displayingCo2LastHourGraphFixed){gapTimeDisplay=DISPLAY_REFRESH_PERIOD;updateHourGraph=true;}
+      else if (currentState==displayingCo2LastDayGraphFixed){gapTimeDisplay=DISPLAY_REFRESH_PERIOD;updateDayGraph=true;}
+      else if (currentState==displayingSequential){gapTimeDisplay=DISPLAY_REFRESH_PERIOD;lastDisplayMode=menu;displayMode=sampleValue;}
     break;
     case menuWhatToDisplay:
       currentState=stateSelected;

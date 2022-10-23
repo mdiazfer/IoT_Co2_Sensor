@@ -3,6 +3,14 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.7.1 18/Oct/2022   - autoBackLightOff message after Button2 long press
+                      - Bug fix: infinitive loop when sending HTTP Request and the Server doen't answer
+                      - Improve behaviour to ENABLE/DISABLE Auto TFT switch off by long-pressed Button2
+                      - Bug fixing
+                        + Back button from global menu for currentState differente than sequential
+                      - Scroll UP/DOWN booup screen
+                      - NTP connection status and icons updates
+                      - Web server connection status and icons updates
 - 0.7.0  9/Oct/2022   - wifi icon is refreshed in the first sample display
                       - platformio.ini configure for bulding either development or sensor cab
                       - development build doesn't take into account the presence of CO2 sensor

@@ -5,7 +5,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.7.0"
+#define VERSION "0.7.1"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -34,7 +34,7 @@
   #define MH_Z19B_RX CO2_RX //RX pin in the ESP board (TX pin in the CO2 sensor)
   #define MH_Z19B_TX CO2_TX //TX pin in the ESP board (TX pin in the CO2 sensor)
   #define MH_Z19B_CO2_IN    37 //GPIO pin in the ESB board to connect the PWM CO2 sensor output
-  #define MH_Z19B_CO2_WARMING_TIME 30000  //Preheat time according to the datasheet
+  #define MH_Z19B_CO2_WARMING_TIME 40000  //Preheat time according to the datasheet
   #define MH_Z19B_CO2_RANGE 2000  //Range of CO2 measurments. 0-2000 is adviced for MHZ19B as per datasheet for better accuracy
   #define MH_Z19B_CO2_MIN   0
   #define MH_Z19B_CO2_MAX   MH_Z19B_CO2_RANGE
@@ -55,7 +55,7 @@
   #define SI7021_TEMP_MIN  -10
   #define SI7021_HUM_MAX  100
   #define SI7021_HUM_MIN  0
-  #define SI7021_TEMP_OFFSET  0 //6.8
+  #define SI7021_TEMP_OFFSET  0
 #else
   //For other sensor models copy the parameters for __SI7021__ customized for the rith model
   #define TEMP_HUM_SENSOR  "UNKNOWN"
@@ -84,7 +84,8 @@
 #define ERROR_WIFI_SETUP        0x05
 #define ERROR_BLE_SETUP         0x06
 #define ERROR_SSID_CONNECTION   0x07
-#define ERROR_NTP_SERVER        0X08
+#define ERROR_NTP_SERVER        0x08
+#define ERROR_WEB_SERVER        0x09
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240
@@ -98,6 +99,10 @@
 #define TEXT_FONT_UNITS_CO2 1
 #define TEXT_SIZE_MENU 2
 #define TEXT_FONT_MENU 1
+#define SCROLL_PER_SPRITE 5
+#define LINES_PER_TEXT_SCROLL 8
+#define LINES_PER_TEXT_SPRITE SCROLL_PER_SPRITE*LINES_PER_TEXT_SCROLL
+#define FIRST_LINE_TO_PRINT 5
 #define MENU_GLOBAL_FORE_COLOR TFT_CYAN
 #define MENU_GLOBAL_BACK_COLOR TFT_BLACK
 #define MENU_FORE_COLOR TFT_GOLD
@@ -136,14 +141,34 @@
 #define CO2_GRAPH_Y_END CO2_GRAPH_Y+CO2_GRAPH_HEIGH //Y end for co2 graph
 #define ICON_STATUS_REFRESH_PERIOD  3*DISPLAY_REFRESH_PERIOD  //milliseconds
 #define TIME_TURN_OFF_BACKLIGHT 30000 //millisenconds
-#define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // milliseconds
+#define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // 
+#define TFT_BLACK_4_BITS_PALETTE  0    //  0  ^
+#define TFT_BROWN_4_BITS_PALETTE  1  //  1  |
+#define TFT_RED_4_BITS_PALETTE    2  //  2  |
+#define TFT_ORANGE_4_BITS_PALETTE 3  //  3  |
+#define TFT_YELLOW_4_BITS_PALETTE 4  //  4  Colours 0-9 follow the resistor colour code!
+#define TFT_GREEN_4_BITS_PALETTE  5  //  5  |
+#define TFT_BLUE_4_BITS_PALETTE   6  //  6  |
+#define TFT_PURPLE_4_BITS_PALETTE 7  //  7  |
+#define TFT_DARKGREY_4_BITS_PALETTE 8//  8  |
+#define TFT_WHITE_4_BITS_PALETTE  9  //  9  v
+#define TFT_CYAN_4_BITS_PALETTE   10  // 10  Blue+green mix
+#define TFT_MAGENTA_4_BITS_PALETTE 11 // 11  Blue+red mix
+#define TFT_MAROON_4_BITS_PALETTE  12 // 12  Darker red colour
+#define TFT_DARKGREEN_4_BITS_PALETTE 13// 13  Darker green colour
+#define TFT_NAVY_4_BITS_PALETTE   14  // 14  Darker blue colour
+#define TFT_PINK_4_BITS_PALETTE   15   // 15
 
 
 //WiFi stuff
 #define MAX_CONNECTION_ATTEMPTS 16
 #define NTP_SERVER  "10.88.50.5"
+#define NTP_KO_CHECK  60000 //Milliseconds. 1 minute
+#define NTP_OK_CHECK_HOUR 3
+#define NTP_OK_CHECK_MINUTE 1
 #define GMT_OFFSET_SEC 3600
 #define DAYLIGHT_OFFSET_SEC 3600
+#define HTTP_ANSWER_TIMEOUT 7000  //Millisenconds
 //GET /lar-co2/?device=co2-sensor-XXXXXX&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
 #define SERVER_UPLOAD_SAMPLES "10.88.50.5"
 #define SERVER_UPLOAD_PORT  80
@@ -157,6 +182,8 @@
 #define WIFI_000_RSSI -100 //RSSI < -100 dBm No Signal - Lower values mean no SSID visibiliy, 0% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 
 //Global stuff
+#define BOOTUP_TIMEOUT  7  //Seconds. Timeout to leave bootup screen
+#define BOOTUP_TIMEOUT2 50 //Seconds. Timeout to leave bootup screen after scrolling UP/DOWN
 #define BUILD_TYPE_DEVELOPMENT  1
 #define BUILD_TYPE_SENSOR_CASE  2
 #ifdef _DECLAREGLOBALPARAMETERS_
@@ -177,7 +204,7 @@
 
   wifiNetworkInfo wifiNet;
   #ifndef _DISPLAYSUPPORTINFO_
-    enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph};
+    enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
     enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential};
     enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
