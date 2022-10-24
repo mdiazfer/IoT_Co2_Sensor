@@ -122,7 +122,6 @@ uint8_t wifiConnect() {
   while (status != WL_CONNECTED && counter < MAX_CONNECTION_ATTEMPTS) {
     if (logsOn) {Serial.print("[setup - wifi] Attempting to connect to WPA SSID: ");Serial.println(WIFI_SSID_CREDENTIALS);}
     #ifdef __TFT_DISPLAY_PRESENT__
-      /*-->tft.setTextColor(TFT_GOLD,TFT_BLACK); tft.print(".");<--*/
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print(".");
       stext1.pushSprite(0,(LINES_PER_TEXT_SCROLL-LINES_PER_TEXT_SPRITE)/2*tft.fontHeight(TEXT_FONT_BOOT_SCREEN));
     #endif
