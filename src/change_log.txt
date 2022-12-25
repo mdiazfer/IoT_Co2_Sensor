@@ -3,6 +3,13 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.7.2 25/Dec/2022   - Battery icons manually modified
+                      - Battery voltage check for battery charge monitoring
+                      - No NTP checks nor sample updates if no WiFi connection available
+                      - Temperature sensor calibration
+                      - Backup SSID
+                      - Backup NTP Server
+                      - Battery info in General Info menu
 - 0.7.1 18/Oct/2022   - autoBackLightOff message after Button2 long press
                       - Bug fix: infinitive loop when sending HTTP Request and the Server doen't answer
                       - Improve behaviour to ENABLE/DISABLE Auto TFT switch off by long-pressed Button2

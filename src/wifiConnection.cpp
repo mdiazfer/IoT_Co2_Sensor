@@ -65,7 +65,8 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
 
   uint8_t wifiNetworkNode=255;
   for (uint8_t i=0; i<countWiFiNetworks; i++) {
-    String mySSID=String(WIFI_SSID_CREDENTIALS);
+    //String mySSID=String(WIFI_SSID_CREDENTIALS);
+    String mySSID=wifiCred.wifiSSIDs[wifiCred.activeIndex];
     wifiScan.getNetworkInfo(i, wifiNet.ssid, wifiNet.encryptionType, wifiNet.RSSI, wifiNet.BSSID, wifiNet.channel);
     if (mySSID.compareTo(wifiNet.ssid) == 0) {
       //if (logsOn) {Serial.print(mySSID);Serial.print(" is equal than "); Serial.println(wifiNet.ssid);
@@ -117,30 +118,41 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
  *****************************************************/
 uint8_t wifiConnect() {
   int counter=0;
+  boolean errorWifiConnection;
   // attempt to connect to Wifi network:
-  WiFi.begin(WIFI_SSID_CREDENTIALS, WIFI_PW_CREDENTIALS);
-  while (status != WL_CONNECTED && counter < MAX_CONNECTION_ATTEMPTS) {
-    if (logsOn) {Serial.print("[setup - wifi] Attempting to connect to WPA SSID: ");Serial.println(WIFI_SSID_CREDENTIALS);}
-    #ifdef __TFT_DISPLAY_PRESENT__
-      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print(".");
-      stext1.pushSprite(0,(LINES_PER_TEXT_SCROLL-LINES_PER_TEXT_SPRITE)/2*tft.fontHeight(TEXT_FONT_BOOT_SCREEN));
-    #endif
-    // Connect to WPA/WPA2 network:
-    status = WiFi.status();
-    delay(500);
-    counter++;
-  }
+  for (uint8_t loopCounter=0; loopCounter<(uint8_t)sizeof(wifiCred.wifiSSIDs)/sizeof(String); loopCounter++) {
+    counter=0;errorWifiConnection=false;
+    //WiFi.begin(WIFI_SSID_CREDENTIALS, WIFI_PW_CREDENTIALS);
+    WiFi.begin(wifiCred.wifiSSIDs[loopCounter].c_str(), wifiCred.wifiPSSWs[loopCounter].c_str());
 
-  if (counter>=MAX_CONNECTION_ATTEMPTS) {
-    if (logsOn) {
-      Serial.print("[setup - wifi] WiFi network ERROR: ");
-      Serial.print("No connection to SSID ");Serial.println(WIFI_SSID_CREDENTIALS);
-      Serial.print("[setup - wifi] Number of connection attempts ");
-      Serial.print(counter);Serial.print(">");Serial.println(MAX_CONNECTION_ATTEMPTS);
+    while (status != WL_CONNECTED && counter < MAX_CONNECTION_ATTEMPTS) {
+      if (logsOn) {Serial.print("[setup - wifi] Attempting to connect to WPA SSID: ");Serial.println(wifiCred.wifiSSIDs[loopCounter].c_str());}
+      #ifdef __TFT_DISPLAY_PRESENT__
+        stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print(".");
+        stext1.pushSprite(0,(LINES_PER_TEXT_SCROLL-LINES_PER_TEXT_SPRITE)/2*tft.fontHeight(TEXT_FONT_BOOT_SCREEN));
+      #endif
+      // Connect to WPA/WPA2 network:
+      status = WiFi.status();
+      delay(500);
+      counter++;
     }
 
-    return(ERROR_WIFI_SETUP); //not wifi connection
+    if (counter>=MAX_CONNECTION_ATTEMPTS) {
+      if (logsOn) {
+        Serial.print("[setup - wifi] WiFi network ERROR: ");
+        Serial.print("No connection to SSID ");Serial.println(wifiCred.wifiSSIDs[loopCounter].c_str());
+        Serial.print("[setup - wifi] Number of connection attempts ");
+        Serial.print(counter);Serial.print(">");Serial.println(MAX_CONNECTION_ATTEMPTS);
+      }
+      errorWifiConnection=true;
+    }
+    else {
+      wifiCred.activeIndex=loopCounter;
+      loopCounter=sizeof(wifiCred.wifiSSIDs); //loop end
+    }
   }
+
+  if (errorWifiConnection) return(ERROR_WIFI_SETUP); //not wifi connection
 
   // you're connected now, so print out the data:
   if (logsOn) {

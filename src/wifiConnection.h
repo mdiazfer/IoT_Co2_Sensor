@@ -14,10 +14,19 @@
       uint8_t* BSSID;
       int32_t channel;
     } wifiNetworkInfo;  //Struct to store WiFi parameters
-    
+
+    typedef struct {
+      String wifiSSIDs[3];
+      String wifiPSSWs[3];
+      uint8_t activeIndex;
+    } wifiCredentials;  //Struct to store user WiFi credentials    
+
     #define _WIFINETWORKINFO_ 
   #endif
   extern wifiNetworkInfo wifiNet; //Struct to store WiFi parameters
+  extern wifiCredentials wifiCred;
+  extern String ntpServers[4];
+  extern uint8_t ntpServerIndex;
 #endif
 
 /*void printWifiData();

@@ -20,6 +20,7 @@
 #include "time.h"
 #include "httpClient.h"
 #include "icons.h"
+#include "battery.h"
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -33,11 +34,11 @@ uint8_t error_setup=NO_ERROR,remainingBootupSeconds=0;
 int16_t cuX,cuY;
 TFT_eSPI tft = TFT_eSPI();  // Invoke library to manage the display
 TFT_eSprite stext1 = TFT_eSprite(&tft); // Sprite object stext1
-ulong nowTime=0,previousTime=0,previousTimeDisplay=0,previousTimeDisplayMode=0,previousTimeNTPCheck=0,
+ulong nowTime=0,previousTime=0,previousTimeDisplay=0,previousTimeDisplayMode=0,previousTimeNTPCheck=0,previousTimeVOLTCheck=0,previousTimeBATCheck=0,
       previousHourSampleTime=0,previousDaySampleTime=0,previousUploadSampleTime=0,previousTimeIconStatusRefresh=0,
-      gapTime,lastGapTime,gapTimeDisplay,gapTimeDisplayMode,gapHourSampleTime,gapDaySampleTime,gapTimeNTPCheck,
+      gapTime,lastGapTime,gapTimeDisplay,gapTimeDisplayMode,gapHourSampleTime,gapDaySampleTime,gapTimeNTPCheck,gapTimeVOLTCheck,gapTimeBATCheck,
       gapUploadSampleTime=0,gapTimeIconStatusRefresh=0,previousTurnOffBacklightTime=0,gapTurnOffBacklight=0,
-      timePressButton2,timeReleaseButton2,remainingBootupTime=BOOTUP_TIMEOUT*1000;
+      timeUSBPower=0,timePressButton2,timeReleaseButton2,remainingBootupTime=BOOTUP_TIMEOUT*1000;
 CircularGauge circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
                                           CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
                                           CO2_GAUGE_TH1,TFT_YELLOW,CO2_GAUGE_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
@@ -56,6 +57,7 @@ boolean showGraph=false,updateHourSample=true,updateDaySample=true,updateHourGra
 int8_t counterDisplay=-1;
 enum displayModes displayMode=bootup, lastDisplayMode=bootup; 
 enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState;
+enum CloudClockStatus CloudClockCurrentStatus;
 SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX);
 #ifdef __MHZ19B__
   MHZ19 co2Sensor;
@@ -66,7 +68,6 @@ SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX);
 #endif
 Button  button1(BUTTON1);
 Button  button2(BUTTON2);
-const char* ntpServer = NTP_SERVER;
 const long  gmtOffset_sec = GMT_OFFSET_SEC;
 const int   daylightOffset_sec = DAYLIGHT_OFFSET_SEC;
 struct tm startTimeInfo;
@@ -87,6 +88,8 @@ uint8_t pixelsPerLine,
     spLL,           //Sprite Last Line Window
     scFL,           //Scroll First Line Window
     scLL;           //Scroll Last Line Window
+enum powerModes powerState=off,lastPowerState=off;
+enum batteryChargingStatus batteryStatus=battery000;
 
 //Code
 void loadBootImage() {
@@ -144,8 +147,46 @@ void showIcons() {
       tft.pushImage(125,0,24,24,cloudSyncOff);
     break;
    }
+  
   //-->>Get Batery status
-  tft.pushImage(215,0,24,24,StatusBatteryCharging010);
+  switch (batteryStatus) {
+    case (batteryCharging000):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging000);
+    break;
+    case (batteryCharging010):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging010);
+    break;
+    case (batteryCharging025):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging025);
+    break;
+    case (batteryCharging050):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging050);
+    break;
+    case (batteryCharging075):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging075);
+    break;
+    case (batteryCharging100):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging100);
+    break;
+    case (battery000):
+      tft.pushImage(215,0,24,24,StatusBattery000);
+    break;
+    case (battery010):
+      tft.pushImage(215,0,24,24,StatusBattery010);
+    break;
+    case (battery025):
+      tft.pushImage(215,0,24,24,StatusBattery025);
+    break;
+    case (battery050):
+      tft.pushImage(215,0,24,24,StatusBattery050);
+    break;
+    case (battery075):
+      tft.pushImage(215,0,24,24,StatusBattery075);
+    break;
+    case (battery100):
+      tft.pushImage(215,0,24,24,StatusBattery100);
+    break;
+  }
   
 }
 
@@ -159,6 +200,7 @@ void loadAllIcons() {
   tft.pushImage(120,0,24,24,StatusBattery075);
   tft.pushImage(150,0,24,24,StatusBattery100);
     
+  tft.pushImage(0,30,24,24,StatusBatteryCharging000);
   tft.pushImage(30,30,24,24,StatusBatteryCharging010);
   tft.pushImage(60,30,24,24,StatusBatteryCharging025);
   tft.pushImage(90,30,24,24,StatusBatteryCharging050);
@@ -365,6 +407,58 @@ String roundFloattoString(float_t number, uint8_t decimals) {
   return myString;
 }
 
+void setupNTPConfig(boolean fromSetup) {
+  //If function called fron setup(), then logs are displayed
+
+  CloudClockCurrentStatus=CloudClockOffStatus;
+  //User credentials definition
+  ntpServers[0]="\0";ntpServers[1]="\0";ntpServers[2]="\0";ntpServers[3]="\0";
+  #ifdef NTP_SERVER
+    ntpServers[0]=NTP_SERVER;
+  #endif
+  #ifdef NTP_SERVER2
+    ntpServers[1]=NTP_SERVER2;
+  #endif
+  #ifdef NTP_SERVER3
+    ntpServers[2]=NTP_SERVER3;
+  #endif
+  #ifdef NTP_SERVER4
+    ntpServers[3]=NTP_SERVER4;
+  #endif
+
+  if (error_setup != ERROR_WIFI_SETUP ) {
+    uint8_t previousError_Setup=error_setup;
+    for (uint8_t loopCounter=0; loopCounter<(uint8_t)sizeof(ntpServers)/sizeof(String); loopCounter++) {
+      error_setup=ERROR_NTP_SERVER;
+      if (ntpServers[loopCounter].charAt(0)=='\0') loopCounter++;
+      else {
+        if (logsOn && fromSetup) {
+          Serial.println("[setup - NTP] Connecting to NTP Server: ");
+          Serial.print("  NTP Server: ");Serial.println(ntpServers[loopCounter].c_str());
+        }
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServers[loopCounter].c_str());
+
+        if (!getLocalTime(&startTimeInfo)) {
+          if (logsOn && fromSetup) {
+            Serial.println("  Time: Failed to get time");
+            Serial.print("[setup] - NTP: ");Serial.println("KO");
+          }          
+        }
+        else {
+          if (logsOn && fromSetup) {
+            Serial.print("  Time: "); Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
+            Serial.print("[setup] - NTP: ");Serial.println("OK");
+          }
+          CloudClockCurrentStatus=CloudClockOnStatus;
+          ntpServerIndex=loopCounter;
+          error_setup=previousError_Setup;
+          loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String);
+        }
+      }
+    }
+  }
+}
+
 void setup() {
   static uint32_t wr = 1;
   static uint32_t rd = 0xFFFFFFFF;
@@ -541,10 +635,31 @@ void setup() {
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - WiFi: ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   cuX=stext1.getCursorX(); cuY= pLL>scLL? stext1.getCursorY()-pixelsPerLine : stext1.getCursorY();
   stext1.setCursor(cuX,cuY);
+
+  //User credentials definition
+  #ifdef WIFI_SSID_CREDENTIALS
+    wifiCred.wifiSSIDs[0]=WIFI_SSID_CREDENTIALS;
+  #endif
+  #ifdef WIFI_PW_CREDENTIALS
+    wifiCred.wifiPSSWs[0]=WIFI_PW_CREDENTIALS;
+  #endif
+  #ifdef WIFI_SSID_CREDENTIALS_BK1
+    wifiCred.wifiSSIDs[1]=WIFI_SSID_CREDENTIALS_BK1;
+  #endif
+  #ifdef WIFI_PW_CREDENTIALS_BK1
+    wifiCred.wifiPSSWs[1]=WIFI_PW_CREDENTIALS_BK1;
+  #endif
+  #ifdef WIFI_SSID_CREDENTIALS_BK2
+    wifiCred.wifiSSIDs[2]=WIFI_SSID_CREDENTIALS_BK2;
+  #endif
+  #ifdef WIFI_PW_CREDENTIALS_BK2
+    wifiCred.wifiPSSWs[2]=WIFI_PW_CREDENTIALS_BK2;
+  #endif
+
   error_setup=wifiConnect();
   //Clean-up dots displayed after trying to get connected
   stext1.setCursor(cuX,cuY);
-  for (int counter2=0; counter2<MAX_CONNECTION_ATTEMPTS; counter2++) stext1.print(" ");
+  for (int counter2=0; counter2<MAX_CONNECTION_ATTEMPTS*(wifiCred.activeIndex+1); counter2++) stext1.print(" ");
   stext1.setCursor(cuX,cuY);
 
   //print Logs
@@ -569,7 +684,7 @@ void setup() {
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print(" [");
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("KO");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  SSID: ");stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print(WIFI_SSID_CREDENTIALS);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  SSID: ");stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("No SSID Available");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     wifiCurrentStatus=wifiOffStatus;
   }
 
@@ -638,41 +753,21 @@ void setup() {
   }
 
   //NTP Server
-  CloudClockCurrentStatus=CloudClockOffStatus;
-  if (error_setup != ERROR_WIFI_SETUP ) { 
-    if (logsOn) {
-      Serial.println("[setup - NTP] Connecting to NTP Server: ");
-      Serial.print("  NTP Server: ");Serial.println(NTP_SERVER);
-    }
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-
-    if(!getLocalTime(&startTimeInfo)){
-      if (logsOn) {
-        Serial.println("Time: Failed to get time");
-        Serial.print("[setup] - NTP: ");Serial.println("KO");
-      }
-      
-      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
-      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
-      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
-      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print(NTP_SERVER);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-
-      error_setup=ERROR_NTP_SERVER;
-    }
-    else {
-      if (logsOn) {
-        Serial.print("  Time: "); Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
-        Serial.print("[setup] - NTP: ");Serial.println("OK");
-      }
-      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
-      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
-      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK); stext1.print("  Date: ");stext1.print(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
-      stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(NTP_SERVER);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-      CloudClockCurrentStatus=CloudClockOnStatus;
-    }
+  setupNTPConfig(true);
+  if (error_setup==ERROR_NTP_SERVER) {
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print((String)(ntpServers[0]+" "+ntpServers[1]+" "+ntpServers[2]+" "+ntpServers[3]));if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  }
+  else {
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
+    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK); stext1.print("  Date: ");stext1.print(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
+    stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(ntpServers[ntpServerIndex]);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
   //-->>BLE init
@@ -687,6 +782,52 @@ void setup() {
   }
   stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   
+  //-->>Battery and ADC init
+  if (logsOn) Serial.print("[setup] - Bat. ADC: ");
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Bat. ADC [");
+  pinMode(POWER_ENABLE_PIN, OUTPUT);
+  digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE);
+  initVoltageArray(); //Init battery charge array
+  powerState=off;
+  attenuationDb=ADC_ATTEN_DB_11;
+  esp_adc_cal_characterize(ADC_UNIT_1, attenuationDb, (adc_bits_width_t) ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
+  if (0!=adc1_config_channel_atten(ADC1_CHANNEL_6, attenuationDb)) error_setup=ERROR_BAT_ADC;
+  if (error_setup != ERROR_BAT_ADC ) { 
+    if (logsOn) {
+      Serial.println("OK");
+      Serial.print(" - adc_num=");Serial.println(adc1_chars.adc_num);
+      Serial.print(" - atten=");Serial.println(adc1_chars.atten);
+      Serial.print(" - bit_width=");Serial.println(adc1_chars.bit_width);
+      Serial.print(" - coeff_a=");Serial.println(adc1_chars.coeff_a);
+      Serial.print(" - coeff_b=");Serial.println(adc1_chars.coeff_b);
+      Serial.print(" - vref=");Serial.println(adc1_chars.vref);
+      Serial.print(" - version=");Serial.println(adc1_chars.version);
+    }
+
+    //Take BAT ADC for setup powerState
+    batCharge=0;lastBatCharge=0;
+    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+    batADCVolt=0; for (u8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE);
+
+    if (batADCVolt >= VOLTAGE_TH_STATE) {
+      timeUSBPower=nowTime;
+      powerState=chargingUSB; //check later if powerState is noChargingUSB instead
+      batteryStatus=batteryCharging000;
+    }
+    else {
+      powerState=onlyBattery;
+      batteryStatus=getBatteryStatus(batADCVolt,0);
+      timeUSBPower=0;
+    }
+    lastPowerState=powerState;
+    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
+  } else {
+    if (logsOn) Serial.println("KO");
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+  }
+  stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+
   if (error_setup != NO_ERROR) {
     if (logsOn) Serial.println("Ready to start but with limitations");
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
@@ -801,19 +942,16 @@ void loop() {
   gapTimeIconStatusRefresh = previousTimeIconStatusRefresh!=0 ? nowTime-previousTimeIconStatusRefresh: ICON_STATUS_REFRESH_PERIOD;
   gapTurnOffBacklight = previousTurnOffBacklightTime!=0 ? nowTime-previousTurnOffBacklightTime: TIME_TURN_OFF_BACKLIGHT;
   gapTimeNTPCheck = previousTimeNTPCheck!=0 ? nowTime-previousTimeNTPCheck: NTP_KO_CHECK;
+  gapTimeVOLTCheck = previousTimeVOLTCheck!=0 ? nowTime-previousTimeVOLTCheck: VOLTAGE_CHECK_PERIOD;
   
-  //Cheking if NTP if off or should be checked
+  //Cheking if NTP is off or should be checked
   if (gapTimeNTPCheck>=NTP_KO_CHECK && lastDisplayMode!=bootup) {
     previousTimeNTPCheck=nowTime;
-    if (CloudClockCurrentStatus==CloudClockOffStatus ||
-        (startTimeInfo.tm_hour==NTP_OK_CHECK_HOUR && startTimeInfo.tm_min==NTP_OK_CHECK_MINUTE) ) {
-      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-      //NTP server recovered
-      if(getLocalTime(&startTimeInfo))
-        CloudClockCurrentStatus=CloudClockOnStatus;
-      else
-        CloudClockCurrentStatus=CloudClockOffStatus;
-    }
+    if (wifiCurrentStatus!=wifiOffStatus && 
+        (CloudClockCurrentStatus==CloudClockOffStatus ||
+         (startTimeInfo.tm_hour==NTP_OK_CHECK_HOUR && startTimeInfo.tm_min==NTP_OK_CHECK_MINUTE)) ) {
+          setupNTPConfig(false);
+    }      
   }
   
   //Cheking if BackLight should be turned off
@@ -888,6 +1026,37 @@ void loop() {
     }
   }
   
+  //Regular actions every VOLTAGE_CHECK_PERIOD seconds
+  //Checking out whether the voltage exceeds thresholds to detect energy source (bat or USB)
+  if (gapTimeVOLTCheck>=VOLTAGE_CHECK_PERIOD) {
+    previousTimeVOLTCheck=nowTime;gapTimeVOLTCheck=0;
+  
+    //Power state check
+    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+    batADCVolt=0; for (u8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+    
+    if (batADCVolt >= VOLTAGE_TH_STATE) {
+      //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds
+      if(noChargingUSB!=powerState) {
+        powerState=chargingUSB;
+        if ((nowTime-timeUSBPower)>=FULL_CHARGE_TIME)
+          powerState=noChargingUSB;
+      }
+      if (0==timeUSBPower) timeUSBPower=nowTime;
+    }
+    else {
+      powerState=onlyBattery;
+      timeUSBPower=0;
+    }
+
+    if (lastPowerState!=powerState) {
+      gapTimeBATCheck=BATTERY_CHECK_PERIOD; //Refresh display with the right battery icon
+      lastPowerState=powerState;
+    }
+  }
+  else gapTimeVOLTCheck=nowTime-previousTimeVOLTCheck;
+
   //Regular actions every SAMPLE_PERIOD seconds
   //  Taking CO2, Temp & Hum samples. Moving buffers at the right time
   if (gapTime>=SAMPLE_PERIOD) {
@@ -901,7 +1070,8 @@ void loop() {
     
     //tempMeasure=co2Sensor.getTemperature(true,true);
     tempHumSensor.read();
-    tempMeasure=tempHumSensor.getTemperature();
+    //tempMeasure=tempHumSensor.getTemperature();
+    tempMeasure=0.9944*tempHumSensor.getTemperature()-0.8073; //Calibrated value
     //valueHum=0;
     valueHum=tempHumSensor.getHumidityCompensated();
     
@@ -934,8 +1104,28 @@ void loop() {
     }
   }
 
+  //Regular actions every BATTERY_CHECK_PERIOD seconds - Update battery charge status
+  if (gapTimeBATCheck>=BATTERY_CHECK_PERIOD) {
+    previousTimeBATCheck=nowTime;gapTimeBATCheck=0;
+
+    //Getting bat voltage
+    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+    batADCVolt=0; for (u8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+
+    if (onlyBattery==powerState)
+      //Take battery charge when the Battery is plugged
+      batteryStatus=getBatteryStatus(batADCVolt,0);
+    else
+      //When USB is plugged, the Battery charge can be only guessed based on
+      // the time the USB is being plugged 
+      batteryStatus=getBatteryStatus(batADCVolt,nowTime-timeUSBPower);
+  }
+  else gapTimeBATCheck=nowTime-previousTimeBATCheck;
+  
   //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
-  if (gapUploadSampleTime>=UPLOAD_SAMPLES_PERIOD && uploadSamplesToServer && lastDisplayMode!=bootup) {
+  if (gapUploadSampleTime>=UPLOAD_SAMPLES_PERIOD && uploadSamplesToServer &&
+      lastDisplayMode!=bootup && wifiCurrentStatus!=wifiOffStatus) {
     String httpRequest=String(GET_REQUEST_TO_UPLOAD_SAMPLES);
     previousUploadSampleTime=nowTime;gapUploadSampleTime=0;
 

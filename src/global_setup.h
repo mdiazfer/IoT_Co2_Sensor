@@ -3,9 +3,13 @@
     No user modification is required in her
 */
 
+#define BUILD_TYPE_DEVELOPMENT  1
+#define BUILD_TYPE_SENSOR_CASE  2
+#define BUILD_TYPE_SENSOR_CASE_OFI  3
+
 #include "user_setup.h"
 
-#define VERSION "0.7.1"
+#define VERSION "0.7.2"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -86,6 +90,7 @@
 #define ERROR_SSID_CONNECTION   0x07
 #define ERROR_NTP_SERVER        0x08
 #define ERROR_WEB_SERVER        0x09
+#define ERROR_BAT_ADC           0x0A
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240
@@ -162,15 +167,37 @@
 
 //WiFi stuff
 #define MAX_CONNECTION_ATTEMPTS 16
-#define NTP_SERVER  "10.88.50.5"
+#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
+  #define NTP_SERVER  "10.88.50.5"
+  #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
+  #define NTP_SERVER3  "time4.google.com"  //216.239.35.12
+  #define NTP_SERVER4  "time.apple.com"
+#endif
+#if BUILD_ENV_NAME==BUILD_TYPE_DEVELOPMENT
+  #define NTP_SERVER  "10.88.50.5"
+  #define NTP_SERVER2  "time2.googles.com"  //216.239.35.4
+  #define NTP_SERVER3  "time4.google.com"  //216.239.35.12
+  #define NTP_SERVER4  "time.apple.com"
+#endif
+#ifndef NTP_SERVER
+  #define NTP_SERVER  "time.google.com"
+#endif
 #define NTP_KO_CHECK  60000 //Milliseconds. 1 minute
 #define NTP_OK_CHECK_HOUR 3
 #define NTP_OK_CHECK_MINUTE 1
 #define GMT_OFFSET_SEC 3600
-#define DAYLIGHT_OFFSET_SEC 3600
+#define DAYLIGHT_OFFSET_SEC 7200 //3600 for CEST
 #define HTTP_ANSWER_TIMEOUT 7000  //Millisenconds
 //GET /lar-co2/?device=co2-sensor-XXXXXX&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
-#define SERVER_UPLOAD_SAMPLES "10.88.50.5"
+#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
+  #define SERVER_UPLOAD_SAMPLES  "10.88.50.5"
+#endif
+#if BUILD_ENV_NAME==BUILD_TYPE_DEVELOPMENT
+  #define SERVER_UPLOAD_SAMPLES  "10.88.50.5"
+#endif
+#ifndef SERVER_UPLOAD_SAMPLES
+  #define SERVER_UPLOAD_SAMPLES "195.201.42.50"
+#endif
 #define SERVER_UPLOAD_PORT  80
 #define GET_REQUEST_TO_UPLOAD_SAMPLES  "GET /lar-co2/?"
 #define UPLOAD_SAMPLES_PERIOD 300000  //millisenconds
@@ -181,11 +208,24 @@
 #define WIFI_025_RSSI -90  //RSSI > -90 dBm Low - Consider 25% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 #define WIFI_000_RSSI -100 //RSSI < -100 dBm No Signal - Lower values mean no SSID visibiliy, 0% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 
+//Battery stuff
+#define BAT_ADC_PIN 34
+#define POWER_ENABLE_PIN  14
+#define POWER_ENABLE_DELAY 50 //250 //Milliseconds
+#define BAT_CHECK_ENABLE HIGH
+#define BAT_CHECK_DISABLE LOW
+#define VOLTAGE_TH_STATE  2100 //mv
+#define ADC_SAMPLES 20
+#define BAT_ADC_MAX 2100  //Max Battery voltage divide by 2 (there is a voltage divisor in the board) - mv
+#define BAT_ADC_MIN 1550  //Min Battery voltage divide by 2 (there is a voltage divisor in the board) - mv
+#define FULL_CHARGE_TIME 9000000 //Milliseconds for 100% charge 9000000=2h30m
+#define BATTERY_CHECK_PERIOD 60000  //Millisenconds
+#define VOLTAGE_CHECK_PERIOD 3000 //Milliseconds
+
 //Global stuff
 #define BOOTUP_TIMEOUT  7  //Seconds. Timeout to leave bootup screen
 #define BOOTUP_TIMEOUT2 50 //Seconds. Timeout to leave bootup screen after scrolling UP/DOWN
-#define BUILD_TYPE_DEVELOPMENT  1
-#define BUILD_TYPE_SENSOR_CASE  2
+
 #ifdef _DECLAREGLOBALPARAMETERS_
   bool logsOn = true;         //Whether enable or not logs on the seriaml line [TRUE | FALSE]
 
@@ -198,11 +238,21 @@
       uint8_t* BSSID;
       int32_t channel;
     } wifiNetworkInfo;  //Struct to store WiFi parameters
+
+    typedef struct {
+      String wifiSSIDs[3];
+      String wifiPSSWs[3];
+      uint8_t activeIndex;
+    } wifiCredentials;  //Struct to store user WiFi credentials    
     
     #define _WIFINETWORKINFO_ 
   #endif
 
   wifiNetworkInfo wifiNet;
+  wifiCredentials wifiCred;
+  String ntpServers[4];
+  uint8_t ntpServerIndex;
+  
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
     enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
@@ -212,9 +262,21 @@
                         batteryCharging75Status,batteryCharging100Status,battery100Status,battery75Status,
                         battery50Status,battery25Status,battery10Status,battery0Status} batteryCurrentStatus;
     enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus} BLEClurrentStatus;
-    enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus} CloudClockCurrentStatus;
+    enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus} CloudSyncCurrentStatus;
     #define _DISPLAYSUPPORTINFO_
+  #endif
+
+  #ifndef _BATTERYFRAMEWORK_
+    #include "esp_adc_cal.h"
+    float_t batADCVolt,lastBatCharge,batCharge;
+    adc_atten_t attenuationDb;
+    static esp_adc_cal_characteristics_t adc1_chars;
+    enum powerModes {off,chargingUSB,onlyBattery,noChargingUSB};
+    enum batteryChargingStatus {batteryCharging000,batteryCharging010,batteryCharging025,batteryCharging050,
+                                batteryCharging075,batteryCharging100,
+                                battery000,battery010,battery025,battery050,battery075,battery100};
+    #define _BATTERYFRAMEWORK_
   #endif
 
   #undef _DECLAREGLOBALPARAMETERS_

@@ -1,13 +1,10 @@
 To do list
 -----------
-- Bug fix:
-  + No wifi => error message in Serial; should force no ntp connection and no GET send
+- Battery charge info in General Info Menu
+- Switch off mode
 - REST API to get results
-- Battery monitoring
 - Get info about bluetooth & battery to update icons
-- Backup SSID
 - Web server to display results
-- Temperature calibration
 - Triger alarms
 - Web server for configuration
 - Save CO2 samples in cloud to not lose graph pictures when the battery runs out
@@ -21,6 +18,13 @@ To do list
 
 Done
 -------
++ Battery info in General Info menu
++ Backup NTP Server
++ Backup SSID
++ Temperature calibration
++ Battery monitoring
++ Bug fix:
+  + No wifi => error message in Serial; should force no ntp connection and no GET send
 + Bug fixing
   + Show fix samples -> Menu Gral -> Menu info -> Print sometning -> back -> back (v0.7.1)
   + Show Las 24h graph -> Menu Gral -> back doesn't work (v0.7.1)

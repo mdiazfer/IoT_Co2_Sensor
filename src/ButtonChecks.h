@@ -5,6 +5,7 @@
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
     enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential};
+    enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     
     #define _DISPLAYSUPPORTINFO_
   #endif

@@ -457,12 +457,25 @@ void printInfoGral() {
   tft.fillScreen(MENU_INFO_BACK_COLOR);
   uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_INFO_BACK_COLOR;
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(60,10,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.println("Gral. Info");
+  tft.setCursor(54,10,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.print("Gral. Info - FW v");tft.print(VERSION);
   
   auxColorFore=MENU_INFO_FORE_COLOR,auxColorBack=MENU_INFO_BACK_COLOR;
   tft.setTextColor(auxColorFore,auxColorBack);
   tft.setCursor(15,30,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  tft.print("FW version: ");tft.print(VERSION);
+  switch (powerState) {
+    case(off):
+      //It's suppossed this case is no possible
+    break;
+    case(chargingUSB):
+      tft.print("USB charging: ");tft.print(batADCVolt/1000);tft.print("v, ");tft.print(batCharge);tft.print("%");
+    break;
+    case(onlyBattery):
+      tft.print("Battery: ");tft.print(batADCVolt/1000);tft.print("v, ");tft.print(batCharge);tft.print("%");
+    break;
+    case(noChargingUSB):
+      tft.print("USB no charging: ");tft.print(batADCVolt/1000);tft.print("v, ");tft.print(batCharge);tft.print("%");
+    break;
+  }
   tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*1,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
   tft.print("Date: ");
   if (ntpServerAvailable) tft.println(&timeinfo, "%d/%m/%Y - %H:%M:%S");
@@ -591,7 +604,7 @@ void printInfoNet() {
   tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*3,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
   tft.print("Default GW: ");tft.println(WiFi.gatewayIP().toString());
   tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*4,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  tft.print("NTP Server: ");tft.print(NTP_SERVER);
+  tft.print("NTP Server: "); if (CloudClockCurrentStatus==CloudClockOnStatus) tft.print(ntpServers[ntpServerIndex]); else tft.print("No Available");
   tft.setTextColor(MENU_INFO_BACK_COLOR,MENU_INFO_FORE_COLOR);
   tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*5,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
   tft.println("Back");

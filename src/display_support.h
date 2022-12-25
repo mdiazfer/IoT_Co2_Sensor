@@ -17,6 +17,7 @@
   #ifndef _DISPLAYSUPPORTINFO_
     enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential};
+    enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     
     #define _DISPLAYSUPPORTINFO_
   #endif
@@ -31,8 +32,25 @@
       int32_t channel;
     } wifiNetworkInfo;  //Struct to store WiFi parameters
 
+    typedef struct {
+      String wifiSSIDs[3];
+      String wifiPSSWs[3];
+      uint8_t activeIndex;
+    } wifiCredentials;  //Struct to store user WiFi credentials    
+
     extern wifiNetworkInfo wifiNet; //Struct to store WiFi parameters
+    extern wifiCredentials wifiCred;
+    extern String ntpServers[4];
+    extern uint8_t ntpServerIndex;
     #define _WIFINETWORKINFO_ 
+  #endif
+
+  #ifndef _BATTERYFRAMEWORK_
+    enum powerModes {off,chargingUSB,onlyBattery,noChargingUSB};
+    enum batteryChargingStatus {batteryCharging000,batteryCharging010,batteryCharging025,batteryCharging050,
+                                batteryCharging075,batteryCharging100,
+                                battery000,battery010,battery025,battery050,battery075,battery100};
+    #define _BATTERYFRAMEWORK_ 
   #endif
 #endif
 
@@ -41,6 +59,7 @@
 #endif
 
 extern TFT_eSPI tft;
+extern enum CloudClockStatus CloudClockCurrentStatus;
 extern enum availableStates stateSelected;
 extern enum availableStates currentState;
 extern const String tempHumSensorType,co2SensorType;
@@ -49,6 +68,9 @@ extern struct tm startTimeInfo;
 extern Button button2;
 extern IPAddress serverToUploadSamplesIPAddress;
 extern boolean uploadSamplesToServer;
+extern enum powerModes powerState,lastPowerState;
+extern enum batteryChargingStatus batteryStatus;
+extern float_t batADCVolt,lastBatCharge,batCharge;
 
 class HorizontalBar {
   public:
