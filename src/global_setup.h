@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.7.2"
+#define VERSION "0.8.0"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -38,7 +38,7 @@
   #define MH_Z19B_RX CO2_RX //RX pin in the ESP board (TX pin in the CO2 sensor)
   #define MH_Z19B_TX CO2_TX //TX pin in the ESP board (TX pin in the CO2 sensor)
   #define MH_Z19B_CO2_IN    37 //GPIO pin in the ESB board to connect the PWM CO2 sensor output
-  #define MH_Z19B_CO2_WARMING_TIME 40000  //Preheat time according to the datasheet
+  #define MH_Z19B_CO2_WARMING_TIME 90000  //Preheat time according to the datasheet
   #define MH_Z19B_CO2_RANGE 2000  //Range of CO2 measurments. 0-2000 is adviced for MHZ19B as per datasheet for better accuracy
   #define MH_Z19B_CO2_MIN   0
   #define MH_Z19B_CO2_MAX   MH_Z19B_CO2_RANGE
@@ -77,7 +77,7 @@
     #define CO2_SENSOR_TEMP_MIN _CO2_SENSOR_PARAMETER_(TEMP_MIN)
     #define CO2_SENSOR_HUM_MAX 100
     #define CO2_SENSOR_HUM_MIN 0
-    #define SAMPLE_PERIOD          5000  //milliseconds
+    #define SAMPLE_PERIOD          20000  //milliseconds
 
 //Error stuff
 #define NO_ERROR                0x00
@@ -114,8 +114,8 @@
 #define MENU_BACK_COLOR TFT_BLACK
 #define MENU_INFO_FORE_COLOR TFT_WHITE
 #define MENU_INFO_BACK_COLOR TFT_BLACK
-#define DISPLAY_REFRESH_PERIOD      1*SAMPLE_PERIOD //milliseconds
-#define DISPLAY_MODE_REFRESH_PERIOD 1*SAMPLE_PERIOD //milliseconds
+#define DISPLAY_REFRESH_PERIOD      5000 //milliseconds
+#define DISPLAY_MODE_REFRESH_PERIOD 5000 //milliseconds
 #define CO2_GAUGE_X      80
 #define CO2_GAUGE_Y      95
 #define CO2_GAUGE_R      70
@@ -144,7 +144,7 @@
 #define CO2_GRAPH_HEIGH 100 //HEIGH origin for co2 graph
 #define CO2_GRAPH_X_END CO2_GRAPH_X+CO2_GRAPH_WIDTH //X end for co2 graph
 #define CO2_GRAPH_Y_END CO2_GRAPH_Y+CO2_GRAPH_HEIGH //Y end for co2 graph
-#define ICON_STATUS_REFRESH_PERIOD  3*DISPLAY_REFRESH_PERIOD  //milliseconds
+#define ICON_STATUS_REFRESH_PERIOD  DISPLAY_REFRESH_PERIOD  //milliseconds
 #define TIME_TURN_OFF_BACKLIGHT 30000 //millisenconds
 #define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // 
 #define TFT_BLACK_4_BITS_PALETTE  0    //  0  ^
@@ -198,9 +198,11 @@
 #ifndef SERVER_UPLOAD_SAMPLES
   #define SERVER_UPLOAD_SAMPLES "195.201.42.50"
 #endif
+#define UPLOAD_SAMPLES_SITE "home"
+#define WIFI_RECONNECT  40000 //300000 //milliseconds - 5 min
 #define SERVER_UPLOAD_PORT  80
 #define GET_REQUEST_TO_UPLOAD_SAMPLES  "GET /lar-co2/?"
-#define UPLOAD_SAMPLES_PERIOD 300000  //millisenconds
+#define UPLOAD_SAMPLES_PERIOD 300000  //millisenconds - 5 min
 #define UPLOAD_SAMPLES_TO_SERVER  true
 #define WIFI_100_RSSI -60  //RSSI > -60 dBm Excellent - Consider 100% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 #define WIFI_075_RSSI -70  //RSSI > -70 dBm Very Good - Consider 75% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
@@ -214,13 +216,12 @@
 #define POWER_ENABLE_DELAY 50 //250 //Milliseconds
 #define BAT_CHECK_ENABLE HIGH
 #define BAT_CHECK_DISABLE LOW
-#define VOLTAGE_TH_STATE  2100 //mv
+#define VOLTAGE_TH_STATE  2200 //mv
 #define ADC_SAMPLES 20
 #define BAT_ADC_MAX 2100  //Max Battery voltage divide by 2 (there is a voltage divisor in the board) - mv
 #define BAT_ADC_MIN 1550  //Min Battery voltage divide by 2 (there is a voltage divisor in the board) - mv
 #define FULL_CHARGE_TIME 9000000 //Milliseconds for 100% charge 9000000=2h30m
-#define BATTERY_CHECK_PERIOD 60000  //Millisenconds
-#define VOLTAGE_CHECK_PERIOD 3000 //Milliseconds
+#define VOLTAGE_CHECK_PERIOD 30000 //Milliseconds
 
 //Global stuff
 #define BOOTUP_TIMEOUT  7  //Seconds. Timeout to leave bootup screen
@@ -242,6 +243,7 @@
     typedef struct {
       String wifiSSIDs[3];
       String wifiPSSWs[3];
+      String wifiSITEs[3];
       uint8_t activeIndex;
     } wifiCredentials;  //Struct to store user WiFi credentials    
     

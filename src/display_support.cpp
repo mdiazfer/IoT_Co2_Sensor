@@ -3,6 +3,7 @@
 */
 
 #include "display_support.h"
+#include "battery.h"
 
 HorizontalBar::HorizontalBar(float_t value, float_t valueMin, float_t valueMax, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color,
         float_t th1, uint32_t color1, float_t th2, uint32_t color2, uint32_t colorBar, uint32_t colorBackground) {
@@ -486,12 +487,13 @@ void printInfoGral() {
   tft.print("Report URL: ");
   if (uploadSamplesToServer) //URL shown only if setup
     tft.print("http://"+serverToUploadSamplesIPAddress.toString()+String(GET_REQUEST_TO_UPLOAD_SAMPLES).substring(4,String(GET_REQUEST_TO_UPLOAD_SAMPLES).length()-1));
-
+  else
+    tft.print("Not Available");
   tft.setTextColor(MENU_INFO_BACK_COLOR,MENU_INFO_FORE_COLOR);
   tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*5,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
   tft.println("Back");
 
-  boolean exitWhile=false;
+  boolean exitWhile=false,batFlag=true;
   while (!exitWhile) {
     //Loop to update the date/hour every second
     if(!getLocalTime(&timeinfo)){
@@ -512,6 +514,54 @@ void printInfoGral() {
     tft.print("Date: ");
     if (ntpServerAvailable) tft.println(&timeinfo, "%d/%m/%Y - %H:%M:%S");
     else tft.println("NTP server down");
+
+    //Update battery parameters also every 2 seconds
+    //Power state check
+    if (batFlag) {
+      digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+      batADCVolt=0; for (u8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+      digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+      
+      if (batADCVolt >= VOLTAGE_TH_STATE) {
+        //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds
+        if(noChargingUSB!=powerState) {
+          powerState=chargingUSB;
+          if ((nowTime-timeUSBPower)>=FULL_CHARGE_TIME)
+            powerState=noChargingUSB;
+        }
+        if (0==timeUSBPower) timeUSBPower=nowTime;
+      }
+      else {
+        powerState=onlyBattery;
+        timeUSBPower=0;
+      }
+
+      if (onlyBattery==powerState)
+        //Take battery charge when the Battery is plugged
+        batteryStatus=getBatteryStatus(batADCVolt,0);
+      else
+        //When USB is plugged, the Battery charge can be only guessed based on
+        // the time the USB is being plugged 
+        batteryStatus=getBatteryStatus(batADCVolt,nowTime-timeUSBPower);
+
+      //Print battery parameters
+      tft.setCursor(15,30,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+      switch (powerState) {
+        case(off):
+          //It's suppossed this case is no possible
+        break;
+        case(chargingUSB):
+          tft.print("USB charging: ");tft.print(batADCVolt/1000);tft.print("v, ");tft.print(batCharge);tft.print("%     ");
+        break;
+        case(onlyBattery):
+          tft.print("Battery: ");tft.print(batADCVolt/1000);tft.print("v, ");tft.print(batCharge);tft.print("%          ");
+        break;
+        case(noChargingUSB):
+          tft.print("USB no charging: ");tft.print(batADCVolt/1000);tft.print("v, ");tft.print(batCharge);tft.print("%");
+        break;
+      }
+    }
+    batFlag=!batFlag;
   }
 
   return;
@@ -556,7 +606,7 @@ void printInfoWifi() {
   tft.print("Wait while scanning");
   tft.setCursor(30,75,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
   tft.print("It might take a while.....");
-  printCurrentWiFi(false,&numberWiFiNetworks);
+  wifiNetworkInfo* auxWifiNet=printCurrentWiFi(false,&numberWiFiNetworks);
 
   //Priting results
   tft.fillScreen(MENU_INFO_BACK_COLOR);
@@ -567,20 +617,31 @@ void printInfoWifi() {
   auxColorFore=MENU_INFO_FORE_COLOR,auxColorBack=MENU_INFO_BACK_COLOR;
   tft.setTextColor(auxColorFore,auxColorBack);
   tft.setCursor(15,30,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  tft.print("SSID: ");tft.print(wifiNet.ssid);tft.print(" & detected: ");tft.print(numberWiFiNetworks);
-  uint8_t bssid[6];
-  memcpy(bssid, wifiNet.BSSID, 6);
-  tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*1,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  tft.print("BSSID: ");tft.print(bssid[5], HEX); tft.print(":");tft.print(bssid[4], HEX); tft.print(":");tft.print(bssid[3], HEX); tft.print(":");tft.print(bssid[2], HEX); tft.print(":");tft.print(bssid[1], HEX); tft.print(":");tft.println(bssid[0], HEX);
-  tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*2,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  tft.print("Signal strength (RSSI): ");tft.print(wifiNet.RSSI);
-  tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*3,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  tft.print("Encryption Type: ");tft.print(wifiNet.encryptionType, HEX);
-  tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*4,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  tft.print("WiFi Channel: ");tft.print(wifiNet.channel);
-  tft.setTextColor(MENU_INFO_BACK_COLOR,MENU_INFO_FORE_COLOR);
-  tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*5,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  tft.println("Back");
+  tft.print("SSID: ");
+
+  //If no SSID connected, tell
+  if (nullptr==auxWifiNet) {
+    tft.print("Not Connected");tft.print(" & detected: ");tft.print(numberWiFiNetworks);
+  }
+  else {
+    //If SSID connected, then show info
+    tft.print(wifiNet.ssid);
+    tft.print(" & detected: ");tft.print(numberWiFiNetworks);
+
+    uint8_t bssid[6];
+    memcpy(bssid, wifiNet.BSSID, 6);
+    tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*1,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+    tft.print("BSSID: ");tft.print(bssid[5], HEX); tft.print(":");tft.print(bssid[4], HEX); tft.print(":");tft.print(bssid[3], HEX); tft.print(":");tft.print(bssid[2], HEX); tft.print(":");tft.print(bssid[1], HEX); tft.print(":");tft.println(bssid[0], HEX);
+    tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*2,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+    tft.print("Signal strength (RSSI): ");tft.print(wifiNet.RSSI);
+    tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*3,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+    tft.print("Encryption Type: ");tft.print(wifiNet.encryptionType, HEX);
+    tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*4,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+    tft.print("WiFi Channel: ");tft.print(wifiNet.channel);
+    tft.setTextColor(MENU_INFO_BACK_COLOR,MENU_INFO_FORE_COLOR);
+    tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*5,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+    tft.println("Back");
+  }
   
   return;
 }

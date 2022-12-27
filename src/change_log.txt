@@ -3,6 +3,19 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.8.0 26/Dec/2022   - Fine tunning actions and periods to reduce energy consumption
+                        + Increase WiFi Scanning period and avoid scann if Display is OFF
+                        + Increase sample period
+                        + Merge Volt check and Battery check
+                        + Increase Volt check period and avoid scann if Display is OFF
+                        + Display black screen if the Display is OFF
+                        + Take samples once the Display is just ON back
+                      - Recover WiFi connection if lost 
+                      - Show real time sample in Info menus (bat vol, ntp, wifi, url)
+                      - Optimize code by using WiFi.status(), WiFi.RSSI(), WiFi.SSID()(?) for:
+                        + WIFI_RECONNECT
+                        + Get WiFi Signal strength
+                      - Modify httpRequest to send the battery charge
 - 0.7.2 25/Dec/2022   - Battery icons manually modified
                       - Battery voltage check for battery charge monitoring
                       - No NTP checks nor sample updates if no WiFi connection available

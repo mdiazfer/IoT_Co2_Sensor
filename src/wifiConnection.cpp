@@ -63,8 +63,8 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
 
   *numberWiFiNetworks=scanReturn;
 
-  uint8_t wifiNetworkNode=255;
-  for (uint8_t i=0; i<countWiFiNetworks; i++) {
+  int16_t wifiNetworkNode=-1;
+  for (int16_t i=0; i<countWiFiNetworks; i++) {
     //String mySSID=String(WIFI_SSID_CREDENTIALS);
     String mySSID=wifiCred.wifiSSIDs[wifiCred.activeIndex];
     wifiScan.getNetworkInfo(i, wifiNet.ssid, wifiNet.encryptionType, wifiNet.RSSI, wifiNet.BSSID, wifiNet.channel);
@@ -77,6 +77,14 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
     else {
       //if (logsOn) {Serial.print(mySSID);Serial.print(" is not equal than "); Serial.println(wifiNet.ssid);}
     }
+  }
+
+  if (-1==wifiNetworkNode) {
+    //WiFi SSID was lost
+    if (logsOn) {
+      Serial.print("  SSID: ");Serial.print(wifiCred.wifiSSIDs[wifiCred.activeIndex]);Serial.println(" lost");
+    }
+    return nullptr;
   }
 
   // print current network parameters
@@ -116,7 +124,8 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
  Function wifiConnect
  Target: to get connected to the WiFi
  *****************************************************/
-uint8_t wifiConnect() {
+uint8_t wifiConnect(boolean logsOn=true, boolean msgTFT=true) {
+  status = WL_IDLE_STATUS;
   int counter=0;
   boolean errorWifiConnection;
   // attempt to connect to Wifi network:
@@ -127,10 +136,12 @@ uint8_t wifiConnect() {
 
     while (status != WL_CONNECTED && counter < MAX_CONNECTION_ATTEMPTS) {
       if (logsOn) {Serial.print("[setup - wifi] Attempting to connect to WPA SSID: ");Serial.println(wifiCred.wifiSSIDs[loopCounter].c_str());}
-      #ifdef __TFT_DISPLAY_PRESENT__
-        stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print(".");
-        stext1.pushSprite(0,(LINES_PER_TEXT_SCROLL-LINES_PER_TEXT_SPRITE)/2*tft.fontHeight(TEXT_FONT_BOOT_SCREEN));
-      #endif
+      if (msgTFT) {
+        #ifdef __TFT_DISPLAY_PRESENT__
+          stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print(".");
+          stext1.pushSprite(0,(LINES_PER_TEXT_SCROLL-LINES_PER_TEXT_SPRITE)/2*tft.fontHeight(TEXT_FONT_BOOT_SCREEN));
+        #endif
+      }
       // Connect to WPA/WPA2 network:
       status = WiFi.status();
       delay(500);

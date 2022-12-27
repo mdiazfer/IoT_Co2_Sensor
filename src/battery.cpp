@@ -68,12 +68,12 @@ enum batteryChargingStatus getBatteryStatus(float_t batADCVolt, ulong timeLast) 
       batCharge=lastBatCharge+100*float_t (timeLast)/FULL_CHARGE_TIME; //lastBatCharge=last bat charge in onlyBAT mode
       if (batCharge>100) batCharge=100;
       if (batCharge<0) batCharge=0;
-      if (batCharge<10) batteryStatus=batteryCharging000;
-      else if (batCharge<25) batteryStatus=batteryCharging010;
-      else if (batCharge<50) batteryStatus=batteryCharging025;
-      else if (batCharge<75) batteryStatus=batteryCharging050;
-      else if (batCharge<100) batteryStatus=batteryCharging075;
-      else batteryStatus=batteryCharging100;
+      if (batCharge>87) batteryStatus=batteryCharging100;
+      else if (batCharge>62) batteryStatus=batteryCharging075;
+      else if (batCharge>37) batteryStatus=batteryCharging050;
+      else if (batCharge>12) batteryStatus=batteryCharging025;
+      else if (batCharge>6) batteryStatus=batteryCharging010;
+      else batteryStatus=batteryCharging000;
     break;
     case(onlyBattery):
       //batCharge=((batADCVolt-BAT_ADC_MIN)/(BAT_ADC_MAX-BAT_ADC_MIN))*100;
@@ -81,12 +81,12 @@ enum batteryChargingStatus getBatteryStatus(float_t batADCVolt, ulong timeLast) 
       if (batCharge>100) batCharge=100;
       if (batCharge<0) batCharge=0;
       lastBatCharge=batCharge;
-      if (batCharge<10) batteryStatus=battery000;
-      else if (batCharge<25) batteryStatus=battery010;
-      else if (batCharge<50) batteryStatus=battery025;
-      else if (batCharge<75) batteryStatus=battery050;
-      else if (batCharge<100) batteryStatus=battery075;
-      else batteryStatus=battery100;
+      if (batCharge>87) batteryStatus=battery100;
+      else if (batCharge>62) batteryStatus=battery075;
+      else if (batCharge>37) batteryStatus=battery050;
+      else if (batCharge>12) batteryStatus=battery025;
+      else if (batCharge>6) batteryStatus=battery010;
+      else batteryStatus=battery000;
     break;
     case(noChargingUSB):
       batCharge=100;
@@ -95,4 +95,39 @@ enum batteryChargingStatus getBatteryStatus(float_t batADCVolt, ulong timeLast) 
   }
 
   return batteryStatus;
+}
+
+void updateBatteryVoltageAndStatus(ulong nowTime, ulong *timeUSBPower) {
+  //batADCVolt update
+  //Power state check and powerState update
+  //batteryStatus update
+  //If USB is plugged, timeUSBPower is updated with nowTime, to estimate batteryCharge based on time
+  //If USB is unplugged, timeUSBPower is set to zero
+
+  //Power state check
+    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+    batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+    
+    if (batADCVolt >= VOLTAGE_TH_STATE) {
+      //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds
+      if(noChargingUSB!=powerState) {
+        powerState=chargingUSB;
+        if ((nowTime - *timeUSBPower)>=FULL_CHARGE_TIME)
+          powerState=noChargingUSB;
+      }
+      if (0 == *timeUSBPower) *timeUSBPower=nowTime;
+    }
+    else {
+      powerState=onlyBattery;
+      *timeUSBPower=0;
+    }
+
+    if (onlyBattery==powerState)
+      //Take battery charge when the Battery is plugged
+      batteryStatus=getBatteryStatus(batADCVolt,0);
+    else
+      //When USB is plugged, the Battery charge can be only guessed based on
+      // the time the USB is being plugged 
+      batteryStatus=getBatteryStatus(batADCVolt,nowTime - *timeUSBPower);
 }

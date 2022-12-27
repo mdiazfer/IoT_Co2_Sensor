@@ -1,6 +1,5 @@
 To do list
 -----------
-- Battery charge info in General Info Menu
 - Switch off mode
 - REST API to get results
 - Get info about bluetooth & battery to update icons
@@ -18,6 +17,16 @@ To do list
 
 Done
 -------
++ Show real time sample in Info menus (bat vol, ntp, wifi, url)
++ Review scale of battery icons (i.e. 97% => shows 75% icon)
++ Recover WiFi connection if lost 
++ Fine tunning actions and periods to reduce energy consumption
+  + Increase WiFi Scanning period and avoid scann if Display is OFF
+  + Increase sample period
+  + Merge Volt check and Battery check
+  + Increase Volt check period and avoid scann if Display is OFF
+  + Display black screen if the Display is OFF
+  + Take samples once the Display is just ON back
 + Battery info in General Info menu
 + Backup NTP Server
 + Backup SSID

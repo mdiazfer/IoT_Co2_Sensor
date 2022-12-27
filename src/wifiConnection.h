@@ -18,6 +18,7 @@
     typedef struct {
       String wifiSSIDs[3];
       String wifiPSSWs[3];
+      String wifiSITEs[3];
       uint8_t activeIndex;
     } wifiCredentials;  //Struct to store user WiFi credentials    
 
@@ -29,10 +30,6 @@
   extern uint8_t ntpServerIndex;
 #endif
 
-/*void printWifiData();
-void printCurrentNet();
-uint8_t wifiConnect();*/
-
 void printNetData();
 wifiNetworkInfo * printCurrentWiFi(boolean logsOn, int16_t *numberWiFiNetworks);
-uint8_t wifiConnect();
+uint8_t wifiConnect(boolean logsOn, boolean msgTFT);

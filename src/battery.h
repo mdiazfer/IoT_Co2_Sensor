@@ -20,6 +20,8 @@ extern enum powerModes powerState,lastPowerState;
 extern enum batteryChargingStatus batteryStatus;
 extern bool logsOn;
 
+//Function declarations
 enum batteryChargingStatus getBatteryStatus(float_t batADCVolt, ulong timeLast);
 void initVoltageArray();
 float_t getChargePercentage(double_t milliVolts);
+void updateBatteryVoltageAndStatus(ulong nowTime, ulong *timeUSBPower);

@@ -16,7 +16,14 @@ void checkButton1() {
 
       //Display samples when back to light if displaying in sequential mode
       gapTimeDisplay=DISPLAY_REFRESH_PERIOD;
-      if (currentState==displayingSequential) displayMode=sampleValue;
+      if (currentState==displayingSequential || currentState==displayingSampleFixed) {
+        //Tune time counter to take actions before diplaying the active screen
+        gapTimeVOLTCheck=VOLTAGE_CHECK_PERIOD; //Update battery charge
+        gapTime=SAMPLE_PERIOD;                //Take CO2, Temp, Hum sample
+        lastGapTime=SAMPLE_PERIOD;            //Refresh the circular graph for CO2 sample
+        displayMode=sampleValue;
+        lastDisplayMode=AutoSwitchOffMessage; //Force re-rendering CO2 values in the main screen
+      }
 
       return;
   }
@@ -115,7 +122,16 @@ void checkButton2() {
 
       //Display samples when back to light if displaying in sequential mode
       gapTimeDisplay=DISPLAY_REFRESH_PERIOD;
-      if (currentState==displayingSequential) displayMode=sampleValue;
+      if (currentState==displayingSequential || currentState==displayingSampleFixed) 
+      {
+        //Tune time counter to take actions before diplaying the active screen
+        gapTimeVOLTCheck=VOLTAGE_CHECK_PERIOD; //Update battery charge
+        gapTime=SAMPLE_PERIOD;                //Take CO2, Temp, Hum sample
+        lastGapTime=SAMPLE_PERIOD;            //Refresh the circular graph for CO2 sample
+        displayMode=sampleValue;
+        lastDisplayMode=AutoSwitchOffMessage; //Force re-rendering CO2 values in the main screen
+      }
+
       return;
   } else {
     previousTurnOffBacklightTime=nowTime;

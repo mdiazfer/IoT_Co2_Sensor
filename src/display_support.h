@@ -35,6 +35,7 @@
     typedef struct {
       String wifiSSIDs[3];
       String wifiPSSWs[3];
+      String wifiSITEs[3];
       uint8_t activeIndex;
     } wifiCredentials;  //Struct to store user WiFi credentials    
 
@@ -71,6 +72,7 @@ extern boolean uploadSamplesToServer;
 extern enum powerModes powerState,lastPowerState;
 extern enum batteryChargingStatus batteryStatus;
 extern float_t batADCVolt,lastBatCharge,batCharge;
+extern ulong timeUSBPower;
 
 class HorizontalBar {
   public:

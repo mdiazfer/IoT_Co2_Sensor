@@ -34,10 +34,10 @@ uint8_t error_setup=NO_ERROR,remainingBootupSeconds=0;
 int16_t cuX,cuY;
 TFT_eSPI tft = TFT_eSPI();  // Invoke library to manage the display
 TFT_eSprite stext1 = TFT_eSprite(&tft); // Sprite object stext1
-ulong nowTime=0,previousTime=0,previousTimeDisplay=0,previousTimeDisplayMode=0,previousTimeNTPCheck=0,previousTimeVOLTCheck=0,previousTimeBATCheck=0,
-      previousHourSampleTime=0,previousDaySampleTime=0,previousUploadSampleTime=0,previousTimeIconStatusRefresh=0,
-      gapTime,lastGapTime,gapTimeDisplay,gapTimeDisplayMode,gapHourSampleTime,gapDaySampleTime,gapTimeNTPCheck,gapTimeVOLTCheck,gapTimeBATCheck,
-      gapUploadSampleTime=0,gapTimeIconStatusRefresh=0,previousTurnOffBacklightTime=0,gapTurnOffBacklight=0,
+ulong nowTime=0,previousTime=0,previousTimeDisplay=0,previousTimeDisplayMode=0,previousTimeNTPCheck=0,previousTimeVOLTCheck=0,
+      previousHourSampleTime=0,previousDaySampleTime=0,previousUploadSampleTime=0,previousTimeIconStatusRefresh=0,previousTurnOffBacklightTime=0,previousWifiReconnectionTime=0,
+      gapTime,lastGapTime,gapTimeDisplay,gapTimeDisplayMode,gapHourSampleTime,gapDaySampleTime,gapTimeNTPCheck,gapTimeVOLTCheck,
+      gapUploadSampleTime=0,gapTimeIconStatusRefresh=0,gapTurnOffBacklight=0,gapTimeWifiReconnectionTime=0,
       timeUSBPower=0,timePressButton2,timeReleaseButton2,remainingBootupTime=BOOTUP_TIMEOUT*1000;
 CircularGauge circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
                                           CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
@@ -88,8 +88,9 @@ uint8_t pixelsPerLine,
     spLL,           //Sprite Last Line Window
     scFL,           //Scroll First Line Window
     scLL;           //Scroll Last Line Window
-enum powerModes powerState=off,lastPowerState=off;
+enum powerModes powerState=off;
 enum batteryChargingStatus batteryStatus=battery000;
+boolean firstWifiCheck=true;
 
 //Code
 void loadBootImage() {
@@ -643,11 +644,17 @@ void setup() {
   #ifdef WIFI_PW_CREDENTIALS
     wifiCred.wifiPSSWs[0]=WIFI_PW_CREDENTIALS;
   #endif
+  #ifdef WIFI_SITE
+    wifiCred.wifiSITEs[0]=WIFI_SITE;
+  #endif
   #ifdef WIFI_SSID_CREDENTIALS_BK1
     wifiCred.wifiSSIDs[1]=WIFI_SSID_CREDENTIALS_BK1;
   #endif
   #ifdef WIFI_PW_CREDENTIALS_BK1
     wifiCred.wifiPSSWs[1]=WIFI_PW_CREDENTIALS_BK1;
+  #endif
+  #ifdef WIFI_SITE_BK1
+    wifiCred.wifiSITEs[1]=WIFI_SITE_BK1;
   #endif
   #ifdef WIFI_SSID_CREDENTIALS_BK2
     wifiCred.wifiSSIDs[2]=WIFI_SSID_CREDENTIALS_BK2;
@@ -655,8 +662,11 @@ void setup() {
   #ifdef WIFI_PW_CREDENTIALS_BK2
     wifiCred.wifiPSSWs[2]=WIFI_PW_CREDENTIALS_BK2;
   #endif
+  #ifdef WIFI_SITE_BK2
+    wifiCred.wifiSITEs[2]=WIFI_SITE_BK2;
+  #endif
 
-  error_setup=wifiConnect();
+  error_setup=wifiConnect(true,true);
   //Clean-up dots displayed after trying to get connected
   stext1.setCursor(cuX,cuY);
   for (int counter2=0; counter2<MAX_CONNECTION_ATTEMPTS*(wifiCred.activeIndex+1); counter2++) stext1.print(" ");
@@ -674,6 +684,9 @@ void setup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  MASK: ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.subnetMask().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  DFGW: ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.gatewayIP().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
 
+    //WifiNet is updated in printCurrentWiFi(), which is called by wifiConnect(true,X);
+    //WiFi.RSSI() might be used instead. Doesn't hurt keeping wifiNet.RSSI as printCurrentWiFi() is required
+    // to print logs in init().
     if (wifiNet.RSSI>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
         else if (wifiNet.RSSI>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
         else if (wifiNet.RSSI>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
@@ -716,24 +729,26 @@ void setup() {
       String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
       String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
     
+    Serial.print("[setup] - URL: ");
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - URL: ");
+
     //Send HttpRequest to check the server status
     // The request updates CloudSyncCurrentStatus
     sendHttpRequest(serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1");
 
-    Serial.print("[setup] - URL: [");
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - URL: [");
-
     if (CloudSyncCurrentStatus==CloudSyncOnStatus) {
-      Serial.println("OK]");
+      Serial.println("[OK]");
       
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[");
       stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
       stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  URL: ");
       stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);
     }
     else {
-      Serial.println("KO]");
+      Serial.println("[KO]");
 
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[");
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
       stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  URL: ");
@@ -820,7 +835,13 @@ void setup() {
       batteryStatus=getBatteryStatus(batADCVolt,0);
       timeUSBPower=0;
     }
-    lastPowerState=powerState;
+    if (onlyBattery==powerState)
+      //Take battery charge when the Battery is plugged
+      batteryStatus=getBatteryStatus(batADCVolt,0);
+    else
+      //When USB is plugged, the Battery charge can be only guessed based on
+      // the time the USB is being plugged 
+      batteryStatus=getBatteryStatus(batADCVolt,nowTime-timeUSBPower);
     stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
   } else {
     if (logsOn) Serial.println("KO");
@@ -841,8 +862,6 @@ void setup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("Ready to start in ");cuX=stext1.getCursorX();cuY=stext1.getCursorY();
     stext1.print(BOOTUP_TIMEOUT);stext1.print(" sec.");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
-
-  /*-->*/randomSeed(analogRead(37));
 
   previousTime=millis();
   remainingBootupTime=BOOTUP_TIMEOUT*1000;
@@ -916,7 +935,7 @@ void loop() {
     return;
   }
   
-  //Show Warming screen
+  //Show Warming up screen
   while (nowTime<co2PreheatingTime) {
     //Waiting for the sensor to warmup before displaying value
     if (waitingMessage) {if (logsOn) Serial.println("Waiting for the warmup to finish");circularGauge.drawGauge2(0);waitingMessage=false;}
@@ -943,6 +962,7 @@ void loop() {
   gapTurnOffBacklight = previousTurnOffBacklightTime!=0 ? nowTime-previousTurnOffBacklightTime: TIME_TURN_OFF_BACKLIGHT;
   gapTimeNTPCheck = previousTimeNTPCheck!=0 ? nowTime-previousTimeNTPCheck: NTP_KO_CHECK;
   gapTimeVOLTCheck = previousTimeVOLTCheck!=0 ? nowTime-previousTimeVOLTCheck: VOLTAGE_CHECK_PERIOD;
+  gapTimeWifiReconnectionTime = previousWifiReconnectionTime!=0 ? nowTime-previousWifiReconnectionTime: WIFI_RECONNECT;
   
   //Cheking if NTP is off or should be checked
   if (gapTimeNTPCheck>=NTP_KO_CHECK && lastDisplayMode!=bootup) {
@@ -962,6 +982,9 @@ void loop() {
         if (lastDisplayMode==bootup)
           previousTurnOffBacklightTime=nowTime;
         else {
+          //Switch the Display OFF and print black screen to save energy consume
+          //(assuming black screen consumes less energy, even though the Display is OFF)
+          tft.fillScreen(TFT_BLACK);
           digitalWrite(PIN_TFT_BACKLIGHT,LOW);
           previousTurnOffBacklightTime=nowTime;
           gapTurnOffBacklight=0;
@@ -1028,32 +1051,16 @@ void loop() {
   
   //Regular actions every VOLTAGE_CHECK_PERIOD seconds
   //Checking out whether the voltage exceeds thresholds to detect energy source (bat or USB)
-  if (gapTimeVOLTCheck>=VOLTAGE_CHECK_PERIOD) {
+  // but only if display is ON (to save energy consume)
+  if (gapTimeVOLTCheck>=VOLTAGE_CHECK_PERIOD && digitalRead(PIN_TFT_BACKLIGHT)!=LOW) {
     previousTimeVOLTCheck=nowTime;gapTimeVOLTCheck=0;
   
-    //Power state check
-    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
-    batADCVolt=0; for (u8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
-    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
-    
-    if (batADCVolt >= VOLTAGE_TH_STATE) {
-      //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds
-      if(noChargingUSB!=powerState) {
-        powerState=chargingUSB;
-        if ((nowTime-timeUSBPower)>=FULL_CHARGE_TIME)
-          powerState=noChargingUSB;
-      }
-      if (0==timeUSBPower) timeUSBPower=nowTime;
-    }
-    else {
-      powerState=onlyBattery;
-      timeUSBPower=0;
-    }
-
-    if (lastPowerState!=powerState) {
-      gapTimeBATCheck=BATTERY_CHECK_PERIOD; //Refresh display with the right battery icon
-      lastPowerState=powerState;
-    }
+    //batADCVolt update
+    //Power state check and powerState update
+    //batteryStatus update
+    //If USB is plugged, timeUSBPower is updated with nowTime, to estimate batteryCharge based on time
+    //If USB is unplugged, timeUSBPower is set to zero
+    updateBatteryVoltageAndStatus(nowTime, &timeUSBPower);
   }
   else gapTimeVOLTCheck=nowTime-previousTimeVOLTCheck;
 
@@ -1063,9 +1070,6 @@ void loop() {
     previousTime=nowTime;lastGapTime=gapTime;gapTime=0;
 
     //Getting CO2 & Temp values
-    /*-->valueCO2=(float_t)random(0,2000);<--*/
-    /*-->valueT=(float_t)random(0,600)/10-10.0;<--*/
-    /*-->valueHum=(float_t)random(0,100);<--*/
     valueCO2=(float_t)co2Sensor.getCO2();
     
     //tempMeasure=co2Sensor.getTemperature(true,true);
@@ -1104,70 +1108,32 @@ void loop() {
     }
   }
 
-  //Regular actions every BATTERY_CHECK_PERIOD seconds - Update battery charge status
-  if (gapTimeBATCheck>=BATTERY_CHECK_PERIOD) {
-    previousTimeBATCheck=nowTime;gapTimeBATCheck=0;
-
-    //Getting bat voltage
-    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
-    batADCVolt=0; for (u8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
-    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
-
-    if (onlyBattery==powerState)
-      //Take battery charge when the Battery is plugged
-      batteryStatus=getBatteryStatus(batADCVolt,0);
-    else
-      //When USB is plugged, the Battery charge can be only guessed based on
-      // the time the USB is being plugged 
-      batteryStatus=getBatteryStatus(batADCVolt,nowTime-timeUSBPower);
-  }
-  else gapTimeBATCheck=nowTime-previousTimeBATCheck;
-  
-  //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
-  if (gapUploadSampleTime>=UPLOAD_SAMPLES_PERIOD && uploadSamplesToServer &&
-      lastDisplayMode!=bootup && wifiCurrentStatus!=wifiOffStatus) {
-    String httpRequest=String(GET_REQUEST_TO_UPLOAD_SAMPLES);
-    previousUploadSampleTime=nowTime;gapUploadSampleTime=0;
-
-    //GET /lar-co2/?device=co2-sensor&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
-    httpRequest=httpRequest+"device="+device+"&local_ip_address="+
-      IpAddress2String(WiFi.localIP())+"&co2="+valueCO2+"&temp_by_co2_sensor="+valueT+"&hum_by_co2_sensor="+
-      valueHum+"&temp_co2_sensor="+co2Sensor.getTemperature(true,true)+" HTTP/1.1";
-
-    sendHttpRequest(serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, httpRequest);
-  }
-  else gapUploadSampleTime=nowTime-previousUploadSampleTime;
-
   //Regular actions every ICON_STATUS_REFRESH_PERIOD seconds
-  // Refresh icon status
+  // Refresh WiFi status icon. It's supposed it doesn't consume too much energy and is inmediate
   if (gapTimeIconStatusRefresh>=ICON_STATUS_REFRESH_PERIOD && lastDisplayMode!=bootup) {
-    //Make sure scanning doesn't block display printing
-    if ((DISPLAY_REFRESH_PERIOD-gapTimeDisplay) <= 2500) {
-      previousTimeIconStatusRefresh=nowTime+DISPLAY_REFRESH_PERIOD+gapTimeDisplay+500-ICON_STATUS_REFRESH_PERIOD;
-      gapTimeIconStatusRefresh=nowTime-previousTimeIconStatusRefresh;
-    }
-    else {
-      previousTimeIconStatusRefresh=nowTime;gapTimeIconStatusRefresh=0;
+    previousTimeIconStatusRefresh=nowTime;gapTimeIconStatusRefresh=0;
 
-      if ((wifiCurrentStatus != wifiOffStatus) && 
-          (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
-           currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
-        int16_t numberWiFiNetworks=0;
-        printCurrentWiFi(false,&numberWiFiNetworks);
-        if (wifiNet.RSSI>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
-        else if (wifiNet.RSSI>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
-        else if (wifiNet.RSSI>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
-        else if (wifiNet.RSSI>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
-        else if (wifiNet.RSSI<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
-        
-        /*-->Serial.print("[Refresh Display] - nowTime=");Serial.print(nowTime);Serial.print(", previousTimeIconStatusRefresh=");Serial.print(previousTimeIconStatusRefresh);
-        Serial.print(", lasted time=");Serial.print((nowTime-previousTimeIconStatusRefresh)/1000);Serial.print(", wifiNet.ssid=");Serial.print(wifiNet.ssid);
-        Serial.print(", wifiCurrentStatus=");Serial.print(wifiCurrentStatus);Serial.print(", wifiNet.RSSI=");Serial.println(wifiNet.RSSI); 
-        /<--*/
+    if (WiFi.status()!=WL_CONNECTED) {
+      //WiFi is not connected. Update wifiCurrentStatus properly
+      if (wifiCurrentStatus!=wifiOffStatus) {
+        wifiCurrentStatus=wifiOffStatus;
+        gapTimeWifiReconnectionTime=0; //Don't wait next WIFI_RECONNECT interaction. Reconnect in this loop() interaction
+        previousWifiReconnectionTime=nowTime;
+      }
+      else {
+        //No need to update wifiCurrentStatus nor timers to avoid reconnection in this loop() interaction
+        //Just wait next WIFI_RECONNECT interaction to WiFi reconnection
       }
     }
+    else {
+      //Take RSSI to update the WiFi icon
+      if (WiFi.RSSI()>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
+      else if (WiFi.RSSI()>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
+      else if (WiFi.RSSI()>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
+      else if (WiFi.RSSI()>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
+      else if (WiFi.RSSI()<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+    }
   }
-  
   
   //Regular actions every DISPLAY_MODE_REFRESH_PERIOD seconds
   // Selecting what's the screen to display (active screen)
@@ -1188,8 +1154,9 @@ void loop() {
   }
   
   //Regular actions every DISPLAY_REFRESH_PERIOD seconds
-  // Display the active screen
-  if (gapTimeDisplay>=DISPLAY_REFRESH_PERIOD && (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
+  // Display the active screen, but only if the Display is ON (to save energy consume)
+  if (gapTimeDisplay>=DISPLAY_REFRESH_PERIOD && digitalRead(PIN_TFT_BACKLIGHT)!=LOW && 
+                                                (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
                                                  currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
     previousTimeDisplay=nowTime;gapTimeDisplay=0;
 
@@ -1272,6 +1239,63 @@ void loop() {
       
         lastDisplayMode=co2LastDayGraph;
       break;
+    }   
+  }
+
+  //Regular actions every WIFI_RECONNECT seconds to recover WiFi connection
+  // firstWifiCheck is a flag to avoid running this code the first time in loop()
+  if (gapTimeWifiReconnectionTime>=WIFI_RECONNECT && !firstWifiCheck &&
+      (wifiCurrentStatus==wifiOffStatus || WiFi.status()!=WL_CONNECTED) ) {
+    //If WiFi disconnected (wifiOffStatus), then re-connect
+    //Conditions for wifiCurrentStatus==wifiOffStatus
+    // - no found SSID in init()
+    // - no found SSID when ICON_STATUS_REFRESH_PERIOD
+    //WiFi.status() gets the WiFi status inmediatly. No need to scann WiFi networks
+    
+    previousWifiReconnectionTime=nowTime;gapTimeWifiReconnectionTime=0;
+
+    //WiFi Reconnection
+    if (ERROR_WIFI_SETUP != wifiConnect(false,false) ) { 
+      if (WiFi.RSSI()>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
+          else if (WiFi.RSSI()>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
+          else if (WiFi.RSSI()>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
+          else if (WiFi.RSSI()>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
+          else if (WiFi.RSSI()<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+    } else {
+      wifiCurrentStatus=wifiOffStatus;
     }
   }
+  else {
+    gapTimeWifiReconnectionTime=nowTime-previousWifiReconnectionTime;
+    if(firstWifiCheck) {previousWifiReconnectionTime=nowTime; firstWifiCheck=false;}
+  }
+
+  //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
+  //WiFi SITE must be UPLOAD_SAMPLES_SITE (case sensitive), otherwise sample is not uploaded
+  if (gapUploadSampleTime>=UPLOAD_SAMPLES_PERIOD && uploadSamplesToServer &&
+      lastDisplayMode!=bootup && wifiCurrentStatus!=wifiOffStatus &&
+      (0==wifiCred.wifiSITEs[wifiCred.activeIndex].compareTo(UPLOAD_SAMPLES_SITE)) ) {
+    String httpRequest=String(GET_REQUEST_TO_UPLOAD_SAMPLES);
+    previousUploadSampleTime=nowTime;gapUploadSampleTime=0;
+
+    //If Display is OFF, no battery updates to save energy consume, so let's update battery
+    // parameters before uploading the httpRequest
+    if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) {
+      //batADCVolt update
+      //Power state check and powerState update
+      //batteryStatus update
+      //If USB is plugged, timeUSBPower is updated with nowTime, to estimate batteryCharge based on time
+      //If USB is unplugged, timeUSBPower is set to zero
+      updateBatteryVoltageAndStatus(nowTime, &timeUSBPower);
+    }
+
+    //GET /lar-co2/?device=co2-sensor&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
+    httpRequest=httpRequest+"device="+device+"&local_ip_address="+
+      IpAddress2String(WiFi.localIP())+"&co2="+valueCO2+"&temp_by_co2_sensor="+valueT+"&hum_by_co2_sensor="+
+      valueHum+"&temp_co2_sensor="+co2Sensor.getTemperature(true,true)+"&powerState="+powerState+
+      "&batADCVolt="+batADCVolt+"&batCharge="+batCharge+"&batteryStatus="+batteryStatus+" HTTP/1.1";
+
+    sendHttpRequest(serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, httpRequest);
+  }
+  else gapUploadSampleTime=nowTime-previousUploadSampleTime;
 }
