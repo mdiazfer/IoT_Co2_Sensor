@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.8.0"
+#define VERSION "0.8.1"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -43,7 +43,8 @@
   #define MH_Z19B_CO2_MIN   0
   #define MH_Z19B_CO2_MAX   MH_Z19B_CO2_RANGE
   #define MH_Z19B_TEMP_MAX  50
-  #define MH_Z19B_TEMP_MIN  -10 
+  #define MH_Z19B_TEMP_MIN  -10
+  #define MH_Z19B_MIN_VOLT  1850  //Min voltage for right sample - millivolts
 #else
   //For other sensor models copy the parameters for __MHZ19B__ customized for the rith model
   #define CO2_SENSOR  "UNKNOWN"
@@ -222,6 +223,11 @@
 #define BAT_ADC_MIN 1550  //Min Battery voltage divide by 2 (there is a voltage divisor in the board) - mv
 #define FULL_CHARGE_TIME 9000000 //Milliseconds for 100% charge 9000000=2h30m
 #define VOLTAGE_CHECK_PERIOD 30000 //Milliseconds
+#define MIN_VOLT  1850  //Min voltage for getting right CO2 sample - millivolts
+#ifdef __MHZ19B__ 
+  #undef  MIN_VOLT
+  #define MIN_VOLT  MH_Z19B_MIN_VOLT
+#endif
 
 //Global stuff
 #define BOOTUP_TIMEOUT  7  //Seconds. Timeout to leave bootup screen

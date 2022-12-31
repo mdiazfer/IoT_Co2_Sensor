@@ -622,6 +622,10 @@ void printInfoWifi() {
   //If no SSID connected, tell
   if (nullptr==auxWifiNet) {
     tft.print("Not Connected");tft.print(" & detected: ");tft.print(numberWiFiNetworks);
+
+    tft.setTextColor(MENU_INFO_BACK_COLOR,MENU_INFO_FORE_COLOR);
+    tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*5,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+    tft.println("Back");
   }
   else {
     //If SSID connected, then show info

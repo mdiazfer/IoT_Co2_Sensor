@@ -1,8 +1,10 @@
 To do list
 -----------
+- Avoid getting CO2 sample if Volt<MIN_VOLT
+- Update icons during Warmup screen
 - Switch off mode
 - REST API to get results
-- Get info about bluetooth & battery to update icons
+- Get info about bluetooth to update icons
 - Web server to display results
 - Triger alarms
 - Web server for configuration

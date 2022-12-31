@@ -3,6 +3,7 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.8.1 28/Dec/2022   - 
 - 0.8.0 26/Dec/2022   - Fine tunning actions and periods to reduce energy consumption
                         + Increase WiFi Scanning period and avoid scann if Display is OFF
                         + Increase sample period
