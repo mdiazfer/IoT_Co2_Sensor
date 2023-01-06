@@ -3,7 +3,8 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
-- 0.8.1 28/Dec/2022   - 
+- 0.9.0  6/Ene/2023   - Deep Sleep mode implementation if BAT powered
+- 0.8.1 28/Dec/2022   - Review scale of battery icons (i.e. 97% => shows 75% icon)
 - 0.8.0 26/Dec/2022   - Fine tunning actions and periods to reduce energy consumption
                         + Increase WiFi Scanning period and avoid scann if Display is OFF
                         + Increase sample period

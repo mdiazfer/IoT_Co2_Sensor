@@ -5,7 +5,6 @@
 #include <Arduino.h>
 #include "battery.h"
 
-
 double_t chargeToVoltArray[101];
 
 void initVoltageArray() {
@@ -97,37 +96,73 @@ enum batteryChargingStatus getBatteryStatus(float_t batADCVolt, ulong timeLast) 
   return batteryStatus;
 }
 
-void updateBatteryVoltageAndStatus(ulong nowTime, ulong *timeUSBPower) {
+void updateBatteryVoltageAndStatus(ulong nowTimeGlobal, ulong *timeUSBPower) {
   //batADCVolt update
   //Power state check and powerState update
   //batteryStatus update
-  //If USB is plugged, timeUSBPower is updated with nowTime, to estimate batteryCharge based on time
+  //Saving energy Mode update (energyCurrentMode)
+  //Auto Display Switch Off update (autoBackLightOff)
+  //If USB is plugged, timeUSBPower is updated with nowTimeGlobal, to estimate batteryCharge based on time
   //If USB is unplugged, timeUSBPower is set to zero
 
   //Power state check
-    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
-    batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
-    digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
-    
-    if (batADCVolt >= VOLTAGE_TH_STATE) {
-      //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds
-      if(noChargingUSB!=powerState) {
-        powerState=chargingUSB;
-        if ((nowTime - *timeUSBPower)>=FULL_CHARGE_TIME)
-          powerState=noChargingUSB;
-      }
-      if (0 == *timeUSBPower) *timeUSBPower=nowTime;
-    }
-    else {
-      powerState=onlyBattery;
-      *timeUSBPower=0;
-    }
+  digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+  batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+  digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
 
-    if (onlyBattery==powerState)
-      //Take battery charge when the Battery is plugged
-      batteryStatus=getBatteryStatus(batADCVolt,0);
-    else
-      //When USB is plugged, the Battery charge can be only guessed based on
-      // the time the USB is being plugged 
-      batteryStatus=getBatteryStatus(batADCVolt,nowTime - *timeUSBPower);
+  if (batADCVolt >= VOLTAGE_TH_STATE) {
+    //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds
+
+    if (onlyBattery==powerState) { //Change BAT -> USB power
+      powerState=chargingUSB;
+      *timeUSBPower=nowTimeGlobal;
+
+      //Updates due to power change BAT -> USB
+      energyCurrentMode=fullEnergy; 
+      autoBackLightOff=false; //update autoBackLightOff if USB power
+
+      //If TFT is off, switch it on and and display samples
+      if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) {
+        //Init Display and Swich it on
+        tft.init();
+        tft.setRotation(1);
+        digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+        tft.fillScreen(TFT_BLACK);
+        lastTimeTurnOffBacklightCheck=nowTimeGlobal;
+        forceDisplayRefresh=true;
+        forceDisplayModeRefresh=true;
+        if (currentState==displayingSequential || currentState==displayingSampleFixed) {
+          //Tune time counter to take actions before diplaying the active screen
+          forceGetSample=true;                  //Take CO2, Temp, Hum sample
+          previousLastTimeSampleCheck=nowTimeGlobal-SAMPLE_PERIOD; //Refresh the circular graph for CO2 sample
+          displayMode=sampleValue;
+          lastDisplayMode=AutoSwitchOffMessage; //Force re-rendering CO2 values in the main screen
+        }
+      }
+    }
+    else { //USB power. Let's decide if chargingUSB or noChargingUSB based on USB power time
+      if ((nowTimeGlobal - *timeUSBPower)>=FULL_CHARGE_TIME) powerState=noChargingUSB;
+    }
+    
+    //When USB is plugged, the Battery charge can be only guessed based on
+    // the time the USB is being plugged 
+    batteryStatus=getBatteryStatus(batADCVolt,nowTimeGlobal - *timeUSBPower);
+  }
+  else {
+    powerState=onlyBattery;
+    *timeUSBPower=0;
+    //energyCurrentMode=reducedEnergy;
+
+    if (fullEnergy==energyCurrentMode) { //Updates if power charged USB -> BAT
+      autoBackLightOff=true; //update autoBackLightOff if BAT power
+      lastTimeTurnOffBacklightCheck=nowTimeGlobal; //force swiching the Display OFF next check 
+    }
+    
+    //Take battery charge when the Battery is plugged
+    batteryStatus=getBatteryStatus(batADCVolt,0);
+
+    //Updates based on BAT charge
+    if (batCharge>=BAT_CHG_THR_FOR_SAVE_ENERGY) energyCurrentMode=reducedEnergy;
+    else energyCurrentMode=saveEnergy;    
+  }
 }

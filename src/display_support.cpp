@@ -526,14 +526,14 @@ void printInfoGral() {
         //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds
         if(noChargingUSB!=powerState) {
           powerState=chargingUSB;
-          if ((nowTime-timeUSBPower)>=FULL_CHARGE_TIME)
+          if ((nowTimeGlobal-timeUSBPowerGlobal)>=FULL_CHARGE_TIME)
             powerState=noChargingUSB;
         }
-        if (0==timeUSBPower) timeUSBPower=nowTime;
+        if (0==timeUSBPowerGlobal) timeUSBPowerGlobal=nowTimeGlobal;
       }
       else {
         powerState=onlyBattery;
-        timeUSBPower=0;
+        timeUSBPowerGlobal=0;
       }
 
       if (onlyBattery==powerState)
@@ -542,7 +542,7 @@ void printInfoGral() {
       else
         //When USB is plugged, the Battery charge can be only guessed based on
         // the time the USB is being plugged 
-        batteryStatus=getBatteryStatus(batADCVolt,nowTime-timeUSBPower);
+        batteryStatus=getBatteryStatus(batADCVolt,nowTimeGlobal-timeUSBPowerGlobal);
 
       //Print battery parameters
       tft.setCursor(15,30,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);

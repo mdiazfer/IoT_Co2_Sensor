@@ -51,6 +51,7 @@
     enum batteryChargingStatus {batteryCharging000,batteryCharging010,batteryCharging025,batteryCharging050,
                                 batteryCharging075,batteryCharging100,
                                 battery000,battery010,battery025,battery050,battery075,battery100};
+    enum energyModes {fullEnergy, reducedEnergy, saveEnergy};
     #define _BATTERYFRAMEWORK_ 
   #endif
 #endif
@@ -60,19 +61,19 @@
 #endif
 
 extern TFT_eSPI tft;
-extern enum CloudClockStatus CloudClockCurrentStatus;
-extern enum availableStates stateSelected;
-extern enum availableStates currentState;
 extern const String tempHumSensorType,co2SensorType;
 extern char co2SensorVersion[];
 extern struct tm startTimeInfo;
 extern Button button2;
 extern IPAddress serverToUploadSamplesIPAddress;
 extern boolean uploadSamplesToServer;
-extern enum powerModes powerState,lastPowerState;
-extern enum batteryChargingStatus batteryStatus;
-extern float_t batADCVolt,lastBatCharge,batCharge;
-extern ulong timeUSBPower;
+extern RTC_DATA_ATTR ulong timeUSBPowerGlobal,nowTimeGlobal;
+extern RTC_DATA_ATTR enum availableStates stateSelected,currentState;
+extern RTC_DATA_ATTR  enum CloudClockStatus CloudClockCurrentStatus;
+extern RTC_DATA_ATTR enum powerModes powerState;
+extern RTC_DATA_ATTR enum batteryChargingStatus batteryStatus;
+extern RTC_DATA_ATTR enum energyModes energyCurrentMode;
+extern RTC_DATA_ATTR float_t batADCVolt,lastBatCharge,batCharge;
 
 class HorizontalBar {
   public:

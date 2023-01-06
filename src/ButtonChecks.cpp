@@ -3,29 +3,25 @@
 #include "display_support.h"
 
 void checkButton1() {
-  /*Serial.println("[B1] - Begin");
-  Serial.print("  - currentState="); Serial.println(currentState);
-  Serial.print("  - stateSelected="); Serial.println(stateSelected);
-  Serial.print("  - lastState="); Serial.println(lastState);*/
-
   //If TFT is off, turn it on and exit;
   if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) {
-      digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
-      previousTurnOffBacklightTime=nowTime;
-      gapTurnOffBacklight=0;
+    digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+    lastTimeTurnOffBacklightCheck=nowTimeGlobal;
 
-      //Display samples when back to light if displaying in sequential mode
-      gapTimeDisplay=DISPLAY_REFRESH_PERIOD;
-      if (currentState==displayingSequential || currentState==displayingSampleFixed) {
-        //Tune time counter to take actions before diplaying the active screen
-        gapTimeVOLTCheck=VOLTAGE_CHECK_PERIOD; //Update battery charge
-        gapTime=SAMPLE_PERIOD;                //Take CO2, Temp, Hum sample
-        lastGapTime=SAMPLE_PERIOD;            //Refresh the circular graph for CO2 sample
-        displayMode=sampleValue;
-        lastDisplayMode=AutoSwitchOffMessage; //Force re-rendering CO2 values in the main screen
-      }
+    //Display samples when back to light if displaying in sequential mode
+    forceDisplayRefresh=true;
+    forceDisplayModeRefresh=true;
+    if (currentState==displayingSequential || currentState==displayingSampleFixed) {
+      //Tune time counter to take actions before diplaying the active screen 
+      forceGetVolt=true;                    //Update battery charge
+      forceGetSample=true;                  //Take CO2, Temp, Hum sample
+      previousLastTimeSampleCheck=nowTimeGlobal-SAMPLE_PERIOD; //Refresh the circular graph for CO2 sample
+      displayMode=sampleValue;
+      lastDisplayMode=AutoSwitchOffMessage; //Force re-rendering CO2 values in the main screen
+      if (fullEnergy!=energyCurrentMode) forceWifiReconnect=true; //Force WiFi reconection after wakeup
+    }
 
-      return;
+    return;
   }
 
   //Actions are different based on the current state
@@ -101,41 +97,31 @@ void checkButton1() {
       printGlobalMenu();
     break;
   }
-
-  /*Serial.println("[B1] - End");
-  Serial.print("  - currentState="); Serial.println(currentState);
-  Serial.print("  - stateSelected="); Serial.println(stateSelected);
-  Serial.print("  - lastState="); Serial.println(lastState);*/
 }
 
 void checkButton2() {
-  /*Serial.println("[B2] - Begin");
-  Serial.print("  - currentState="); Serial.println(currentState);
-  Serial.print("  - stateSelected="); Serial.println(stateSelected);
-  Serial.print("  - lastState="); Serial.println(lastState);*/
-
   //If TFT is off, turn it on and exit;
   if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) {
       digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
-      previousTurnOffBacklightTime=nowTime;
-      gapTurnOffBacklight=0;
+      lastTimeTurnOffBacklightCheck=nowTimeGlobal;
 
       //Display samples when back to light if displaying in sequential mode
-      gapTimeDisplay=DISPLAY_REFRESH_PERIOD;
+      forceDisplayRefresh=true;
+      forceDisplayModeRefresh=true;
       if (currentState==displayingSequential || currentState==displayingSampleFixed) 
       {
         //Tune time counter to take actions before diplaying the active screen
-        gapTimeVOLTCheck=VOLTAGE_CHECK_PERIOD; //Update battery charge
-        gapTime=SAMPLE_PERIOD;                //Take CO2, Temp, Hum sample
-        lastGapTime=SAMPLE_PERIOD;            //Refresh the circular graph for CO2 sample
+        forceGetVolt=true; //Update battery charge
+        forceGetSample=true;                //Take CO2, Temp, Hum sample
+        previousLastTimeSampleCheck=nowTimeGlobal-SAMPLE_PERIOD; //Refresh the circular graph for CO2 sample
         displayMode=sampleValue;
         lastDisplayMode=AutoSwitchOffMessage; //Force re-rendering CO2 values in the main screen
+        if (fullEnergy!=energyCurrentMode) forceWifiReconnect=true; //Force WiFi reconection after wakeup
       }
 
       return;
   } else {
-    previousTurnOffBacklightTime=nowTime;
-    gapTurnOffBacklight=0;
+    lastTimeTurnOffBacklightCheck=nowTimeGlobal;
   }
 
   
@@ -145,17 +131,17 @@ void checkButton2() {
       currentState=stateSelected;
       if (currentState==menuWhatToDisplay) {stateSelected=lastState; printMenuWhatToDisplay();}
       else if (currentState==displayInfo) {stateSelected=displayInfo1; printInfoMenu();}
-      else if (currentState==displayingSampleFixed){gapTimeDisplay=DISPLAY_REFRESH_PERIOD;lastDisplayMode=menu;}
-      else if (currentState==displayingCo2LastHourGraphFixed){gapTimeDisplay=DISPLAY_REFRESH_PERIOD;updateHourGraph=true;}
-      else if (currentState==displayingCo2LastDayGraphFixed){gapTimeDisplay=DISPLAY_REFRESH_PERIOD;updateDayGraph=true;}
-      else if (currentState==displayingSequential){gapTimeDisplay=DISPLAY_REFRESH_PERIOD;lastDisplayMode=menu;displayMode=sampleValue;}
+      else if (currentState==displayingSampleFixed){forceDisplayRefresh=true;lastDisplayMode=menu;}
+      else if (currentState==displayingCo2LastHourGraphFixed){forceDisplayRefresh=true;updateHourGraph=true;}
+      else if (currentState==displayingCo2LastDayGraphFixed){forceDisplayRefresh=true;updateDayGraph=true;}
+      else if (currentState==displayingSequential){forceDisplayRefresh=true;lastDisplayMode=menu;displayMode=sampleValue;}
     break;
     case menuWhatToDisplay:
       currentState=stateSelected;
-      gapTimeDisplay=DISPLAY_REFRESH_PERIOD;
-      gapTimeDisplayMode=DISPLAY_MODE_REFRESH_PERIOD;
+      forceDisplayRefresh=true;
+      forceDisplayModeRefresh=true;
       lastDisplayMode=menu;
-      lastGapTime=SAMPLE_PERIOD;
+      previousLastTimeSampleCheck=nowTimeGlobal-SAMPLE_PERIOD; //Refresh the circular graph for CO2 sample
       //tft.fillScreen(MENU_BACK_COLOR);
     break;
     case displayInfo:
@@ -190,9 +176,4 @@ void checkButton2() {
     default:
     break;
   }
-
-  /*Serial.println("[B2] - End");
-  Serial.print("  - currentState="); Serial.println(currentState);
-  Serial.print("  - stateSelected="); Serial.println(stateSelected);
-  Serial.print("  - lastState="); Serial.println(lastState);*/
 }

@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.8.1"
+#define VERSION "0.9.0"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -28,7 +28,7 @@
 #define CO2_TX 27 //TX pin in the ESP board (TX pin in the CO2 sensor)
 #define I2C_SDA 21 //I2C - SDA pin in the ESP board (SDA pin in the sensor)
 #define I2C_SCL 22 //I2C - SCL pin in the ESP board (SCL pin in the sensor)
-#define DEVICE_NAME "co2-sensor"
+#define DEVICE_NAME_PREFIX "co2-sensor"
 #define PIN_TFT_BACKLIGHT 4
 
 //Co2 Sensor stuff
@@ -38,7 +38,7 @@
   #define MH_Z19B_RX CO2_RX //RX pin in the ESP board (TX pin in the CO2 sensor)
   #define MH_Z19B_TX CO2_TX //TX pin in the ESP board (TX pin in the CO2 sensor)
   #define MH_Z19B_CO2_IN    37 //GPIO pin in the ESB board to connect the PWM CO2 sensor output
-  #define MH_Z19B_CO2_WARMING_TIME 90000  //Preheat time according to the datasheet
+  #define MH_Z19B_CO2_WARMING_TIME 0//30000 //90000  //Preheat time according to the datasheet
   #define MH_Z19B_CO2_RANGE 2000  //Range of CO2 measurments. 0-2000 is adviced for MHZ19B as per datasheet for better accuracy
   #define MH_Z19B_CO2_MIN   0
   #define MH_Z19B_CO2_MAX   MH_Z19B_CO2_RANGE
@@ -78,7 +78,6 @@
     #define CO2_SENSOR_TEMP_MIN _CO2_SENSOR_PARAMETER_(TEMP_MIN)
     #define CO2_SENSOR_HUM_MAX 100
     #define CO2_SENSOR_HUM_MIN 0
-    #define SAMPLE_PERIOD          20000  //milliseconds
 
 //Error stuff
 #define NO_ERROR                0x00
@@ -115,8 +114,6 @@
 #define MENU_BACK_COLOR TFT_BLACK
 #define MENU_INFO_FORE_COLOR TFT_WHITE
 #define MENU_INFO_BACK_COLOR TFT_BLACK
-#define DISPLAY_REFRESH_PERIOD      5000 //milliseconds
-#define DISPLAY_MODE_REFRESH_PERIOD 5000 //milliseconds
 #define CO2_GAUGE_X      80
 #define CO2_GAUGE_Y      95
 #define CO2_GAUGE_R      70
@@ -137,17 +134,12 @@
 #define TEMP_BAR_MAX     CO2_SENSOR_TEMP_MAX //Parameter sensor model independant
 #define GRAPH_WIDTH     200 //Width of the area for drawing the evolution graph
 #define GRAPH_HEIGH     100 //Heigh of the area for drawing the evolution graph
-#define SAMPLE_T_LAST_HOUR  20 //Seconds - Period of last hour samples to be recorded
-#define SAMPLE_T_LAST_DAY   450 //Seconds - Period of last day samples to be recorded
 #define CO2_GRAPH_X     25  //X origin for co2 graph
 #define CO2_GRAPH_Y     12  //Y origin for co2 graph
 #define CO2_GRAPH_WIDTH 200 //WIDTH origin for co2 graph
 #define CO2_GRAPH_HEIGH 100 //HEIGH origin for co2 graph
 #define CO2_GRAPH_X_END CO2_GRAPH_X+CO2_GRAPH_WIDTH //X end for co2 graph
 #define CO2_GRAPH_Y_END CO2_GRAPH_Y+CO2_GRAPH_HEIGH //Y end for co2 graph
-#define ICON_STATUS_REFRESH_PERIOD  DISPLAY_REFRESH_PERIOD  //milliseconds
-#define TIME_TURN_OFF_BACKLIGHT 30000 //millisenconds
-#define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // 
 #define TFT_BLACK_4_BITS_PALETTE  0    //  0  ^
 #define TFT_BROWN_4_BITS_PALETTE  1  //  1  |
 #define TFT_RED_4_BITS_PALETTE    2  //  2  |
@@ -183,12 +175,10 @@
 #ifndef NTP_SERVER
   #define NTP_SERVER  "time.google.com"
 #endif
-#define NTP_KO_CHECK  60000 //Milliseconds. 1 minute
 #define NTP_OK_CHECK_HOUR 3
 #define NTP_OK_CHECK_MINUTE 1
 #define GMT_OFFSET_SEC 3600
 #define DAYLIGHT_OFFSET_SEC 7200 //3600 for CEST
-#define HTTP_ANSWER_TIMEOUT 7000  //Millisenconds
 //GET /lar-co2/?device=co2-sensor-XXXXXX&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
 #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
   #define SERVER_UPLOAD_SAMPLES  "10.88.50.5"
@@ -200,10 +190,8 @@
   #define SERVER_UPLOAD_SAMPLES "195.201.42.50"
 #endif
 #define UPLOAD_SAMPLES_SITE "home"
-#define WIFI_RECONNECT  40000 //300000 //milliseconds - 5 min
 #define SERVER_UPLOAD_PORT  80
 #define GET_REQUEST_TO_UPLOAD_SAMPLES  "GET /lar-co2/?"
-#define UPLOAD_SAMPLES_PERIOD 300000  //millisenconds - 5 min
 #define UPLOAD_SAMPLES_TO_SERVER  true
 #define WIFI_100_RSSI -60  //RSSI > -60 dBm Excellent - Consider 100% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 #define WIFI_075_RSSI -70  //RSSI > -70 dBm Very Good - Consider 75% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
@@ -214,24 +202,51 @@
 //Battery stuff
 #define BAT_ADC_PIN 34
 #define POWER_ENABLE_PIN  14
-#define POWER_ENABLE_DELAY 50 //250 //Milliseconds
 #define BAT_CHECK_ENABLE HIGH
 #define BAT_CHECK_DISABLE LOW
 #define VOLTAGE_TH_STATE  2200 //mv
 #define ADC_SAMPLES 20
 #define BAT_ADC_MAX 2100  //Max Battery voltage divide by 2 (there is a voltage divisor in the board) - mv
 #define BAT_ADC_MIN 1550  //Min Battery voltage divide by 2 (there is a voltage divisor in the board) - mv
-#define FULL_CHARGE_TIME 9000000 //Milliseconds for 100% charge 9000000=2h30m
-#define VOLTAGE_CHECK_PERIOD 30000 //Milliseconds
-#define MIN_VOLT  1850  //Min voltage for getting right CO2 sample - millivolts
 #ifdef __MHZ19B__ 
   #undef  MIN_VOLT
   #define MIN_VOLT  MH_Z19B_MIN_VOLT
 #endif
+#ifndef MIN_VOLT
+  #define MIN_VOLT  1850  //Min voltage for getting right CO2 sample - millivolts
+#endif
+#define BAT_CHG_THR_FOR_SAVE_ENERGY 25  //Bat. charge threshold to enter in saving energy mode
 
-//Global stuff
+//Timers and Global stuff
+#define uS_TO_S_FACTOR  1000000
 #define BOOTUP_TIMEOUT  7  //Seconds. Timeout to leave bootup screen
 #define BOOTUP_TIMEOUT2 50 //Seconds. Timeout to leave bootup screen after scrolling UP/DOWN
+#define DISPLAY_MODE_REFRESH_PERIOD 5000 //milliseconds
+#define DISPLAY_REFRESH_PERIOD      5000 //milliseconds
+#define FULL_CHARGE_TIME 9000000 //Milliseconds for 100% charge 9000000=2h30m
+#define HTTP_ANSWER_TIMEOUT 7000  //Millisenconds
+#define ICON_STATUS_REFRESH_PERIOD  DISPLAY_REFRESH_PERIOD  //milliseconds
+#define NTP_KO_CHECK_PERIOD  60000 //Milliseconds. 1 minute
+#define POWER_ENABLE_DELAY 50 //250 //Milliseconds
+#define SAMPLE_PERIOD          20000  //milliseconds - Full Energy Mode (USB powered)
+#define SAMPLE_PERIOD_RE       60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
+#define SAMPLE_PERIOD_SE      300000  //milliseconds - 5 mim in Saving Energy Mode
+#define SAMPLE_T_LAST_HOUR     20 //Seconds - Period of last hour samples to be recorded
+#define SAMPLE_T_LAST_HOUR_RE  60 //Seconds - Period of last hour samples to be recorded in Reduced Energy Mode (BAT powered)
+#define SAMPLE_T_LAST_HOUR_SE  300 //Seconds - Period of last hour samples to be recorded in Save Energy Mode (BAT powered)
+#define SAMPLE_T_LAST_DAY  450 //Seconds - Period of last day samples to be recorded
+#define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // 
+#define TIME_TO_SLEEP_FULL_ENERGY 5*uS_TO_S_FACTOR 
+#define TIME_TO_SLEEP_REDUCED_ENERGY 60*uS_TO_S_FACTOR 
+#define TIME_TO_SLEEP_SAVE_ENERGY 300*uS_TO_S_FACTOR 
+#define TIME_TURN_OFF_BACKLIGHT 30000 //millisenconds
+#define UPLOAD_SAMPLES_PERIOD 300000  //millisenconds - 5 min
+#define UPLOAD_SAMPLES_PERIOD_RE UPLOAD_SAMPLES_PERIOD  //millisenconds - 5 min in Reduce Energy Mode
+#define UPLOAD_SAMPLES_PERIOD_SE UPLOAD_SAMPLES_PERIOD  //millisenconds - 5 min in Save Energy Mode
+#define VOLTAGE_CHECK_PERIOD 30000 //Milliseconds - 30 s
+#define VOLTAGE_CHECK_PERIOD_RE 300000 //Milliseconds - 5 min in Reduced Energy Mode
+#define VOLTAGE_CHECK_PERIOD_SE 300000 //Milliseconds - 5 min in Save Energy Mode
+#define WIFI_RECONNECT_PERIOD  300000 //milliseconds - 5 min
 
 #ifdef _DECLAREGLOBALPARAMETERS_
   bool logsOn = true;         //Whether enable or not logs on the seriaml line [TRUE | FALSE]
@@ -265,25 +280,23 @@
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
     enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential};
-    enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
-    enum batteryStatus {batteryCharging10Status,batteryCharging25Status,batteryCharging50Status,
-                        batteryCharging75Status,batteryCharging100Status,battery100Status,battery75Status,
-                        battery50Status,battery25Status,battery10Status,battery0Status} batteryCurrentStatus;
-    enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus} BLEClurrentStatus;
+    RTC_DATA_ATTR enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
+    RTC_DATA_ATTR enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus} BLEClurrentStatus;
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
-    enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus} CloudSyncCurrentStatus;
+    RTC_DATA_ATTR enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus} CloudSyncCurrentStatus;
     #define _DISPLAYSUPPORTINFO_
   #endif
 
   #ifndef _BATTERYFRAMEWORK_
     #include "esp_adc_cal.h"
-    float_t batADCVolt,lastBatCharge,batCharge;
+    RTC_DATA_ATTR float_t batADCVolt,lastBatCharge,batCharge; //3*4=12 B
     adc_atten_t attenuationDb;
     static esp_adc_cal_characteristics_t adc1_chars;
     enum powerModes {off,chargingUSB,onlyBattery,noChargingUSB};
     enum batteryChargingStatus {batteryCharging000,batteryCharging010,batteryCharging025,batteryCharging050,
                                 batteryCharging075,batteryCharging100,
                                 battery000,battery010,battery025,battery050,battery075,battery100};
+    enum energyModes {fullEnergy, reducedEnergy, saveEnergy};
     #define _BATTERYFRAMEWORK_
   #endif
 
