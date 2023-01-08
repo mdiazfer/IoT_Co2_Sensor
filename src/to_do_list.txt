@@ -3,10 +3,8 @@ To do list
 - Check scaling last_hour buffer works when changing the sample period (changing saving energy mode) 
 - Check NTP_KO_CHECK_PERIOD works after code modification
 - change nowTimeGlobal=lastNowTimeGlobal+… by nowTimeGlobal=nowTimeGlobal+…and delete lastNowTimeGlobal
-- Remove 
-- Avoid getting CO2 sample if Volt<MIN_VOLT
-- Update icons during Warmup screen
-- Switch off mode
+- Config Menu for simple things: WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF
+- Troubleshoot WiFi connection failures
 - REST API to get results
 - Get info about bluetooth to update icons
 - Web server to display results
@@ -28,8 +26,13 @@ To do list
 
 Done
 -------
-+ Deep Sleep mode implementation if BAT powered
-+ Show real time sample in Info menus (bat vol, ntp, wifi, url)
++ Bug fixing (v0.9.1)
+  + Timer updates when power changes
++ Update icons during Warmup screen (v0.9.1)
++ Switch off mode (v0.9.1)
++ Avoid getting CO2 sample if Volt<MIN_VOLT (v0.9.1)
++ Deep Sleep mode implementation if BAT powered (v0.9.0) 
++ Show real time sample in Info menus (bat vol, ntp, wifi, url) (v0.8.1)
 + Review scale of battery icons (i.e. 97% => shows 75% icon)
 + Recover WiFi connection if lost 
 + Fine tunning actions and periods to reduce energy consumption

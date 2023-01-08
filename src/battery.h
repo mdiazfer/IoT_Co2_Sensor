@@ -35,6 +35,7 @@ extern RTC_DATA_ATTR boolean autoBackLightOff,forceDisplayModeRefresh,forceDispl
 extern RTC_DATA_ATTR enum availableStates stateSelected,currentState;
 extern RTC_DATA_ATTR ulong nowTimeGlobal,previousLastTimeSampleCheck,lastTimeTurnOffBacklightCheck;
 extern RTC_DATA_ATTR enum displayModes displayMode,lastDisplayMode;
+extern RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod; //3*4=12B
 
 
 //Function declarations

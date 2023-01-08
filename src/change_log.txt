@@ -3,6 +3,12 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.9.1  8/Ene/2023   - Avoid getting CO2 sample if Volt<MIN_VOLT (v0.9.1)
+                      - Switch off mode (v0.9.1)  
+                      - Icons updates during Warmup screen (v0.9.1)
+                      - Bug fixing (v0.9.1)
+                        + Timer updates when power changes
+                      - Voltage checks period to 5 sec in Full Energy Mode
 - 0.9.0  6/Ene/2023   - Deep Sleep mode implementation if BAT powered
 - 0.8.1 28/Dec/2022   - Review scale of battery icons (i.e. 97% => shows 75% icon)
 - 0.8.0 26/Dec/2022   - Fine tunning actions and periods to reduce energy consumption

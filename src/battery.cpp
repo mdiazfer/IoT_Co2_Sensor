@@ -118,7 +118,10 @@ void updateBatteryVoltageAndStatus(ulong nowTimeGlobal, ulong *timeUSBPower) {
       *timeUSBPower=nowTimeGlobal;
 
       //Updates due to power change BAT -> USB
-      energyCurrentMode=fullEnergy; 
+      energyCurrentMode=fullEnergy;
+      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
+      samplePeriod=SAMPLE_PERIOD;
+      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
       autoBackLightOff=false; //update autoBackLightOff if USB power
 
       //If TFT is off, switch it on and and display samples
@@ -162,7 +165,17 @@ void updateBatteryVoltageAndStatus(ulong nowTimeGlobal, ulong *timeUSBPower) {
     batteryStatus=getBatteryStatus(batADCVolt,0);
 
     //Updates based on BAT charge
-    if (batCharge>=BAT_CHG_THR_FOR_SAVE_ENERGY) energyCurrentMode=reducedEnergy;
-    else energyCurrentMode=saveEnergy;    
+    if (batCharge>=BAT_CHG_THR_FOR_SAVE_ENERGY) {
+      energyCurrentMode=reducedEnergy;
+      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //Keeping it for future. In this version No BAT checks in Reduce Engergy Mode to save energy
+      samplePeriod=SAMPLE_PERIOD_RE;
+      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+    }
+    else {
+      energyCurrentMode=saveEnergy;    
+      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //Keeping it for future. In this version No BAT checks in Save Engergy Mode to save energy
+      samplePeriod=SAMPLE_PERIOD_SE;
+      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+    }
   }
 }

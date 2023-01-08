@@ -32,10 +32,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   643 B
+// RTC memory variables:                   644 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     3723 B
-// RTC memory left:     8000 B - 3723 B = 4277 B
+// RTC memorty TOTAL:                     3724 B
+// RTC memory left:     8000 B - 3724 B = 4276 B
 RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour C02 values
 RTC_DATA_ATTR float_t lastHourTempSamples[3600/SAMPLE_T_LAST_HOUR];  //4*(3600/60)=240 B - Buffer to record last-hour Temp values
 RTC_DATA_ATTR float_t lastHourHumSamples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour Hum values
@@ -53,7 +53,7 @@ RTC_DATA_ATTR enum displayModes displayMode=bootup,lastDisplayMode=bootup; //2*4
 RTC_DATA_ATTR enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState; //3*4=12 B
 RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus; //4 B
 RTC_DATA_ATTR boolean updateHourSample=true,updateDaySample=true,updateHourGraph=true,updateDayGraph=true,
-              autoBackLightOff=true,button2Pressed=false,uploadSamplesToServer=UPLOAD_SAMPLES_TO_SERVER; //7*1=7 B 
+              autoBackLightOff=true,button1Pressed=false,button2Pressed=false,uploadSamplesToServer=UPLOAD_SAMPLES_TO_SERVER; //8*1=8 B 
 RTC_DATA_ATTR enum powerModes powerState=off; //1*4=4 B
 RTC_DATA_ATTR enum batteryChargingStatus batteryStatus=battery000; //1*4=4 B
 RTC_DATA_ATTR enum energyModes energyCurrentMode; //1*4=4 B
@@ -69,8 +69,10 @@ RTC_DATA_ATTR HorizontalBar horizontalBar=HorizontalBar(0,TEMP_BAR_MIN,TEMP_BAR_
                                           TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);  //92 B
 RTC_DATA_ATTR Button  button1(BUTTON1); //16 B
 RTC_DATA_ATTR Button  button2(BUTTON2); //16 B
-RTC_DATA_ATTR const long gmtOffset_sec=GMT_OFFSET_SEC; //4 B
-RTC_DATA_ATTR const int daylightOffset_sec=DAYLIGHT_OFFSET_SEC; //4 B
+#ifndef NTP_TZ_ENV_VARIABLE
+  RTC_DATA_ATTR const long gmtOffset_sec=GMT_OFFSET_SEC; //4 B
+  RTC_DATA_ATTR const int daylightOffset_sec=DAYLIGHT_OFFSET_SEC; //4 B
+#endif
 RTC_DATA_ATTR char TZEnvVar[50]="\0"; //50 B Should be enough - To back Time Zone Variable up
 RTC_DATA_ATTR struct tm startTimeInfo; //36 B
 RTC_DATA_ATTR boolean firstWifiCheck=true,forceWifiReconnect=false,forceGetSample=false,forceGetVolt=false,
@@ -93,7 +95,7 @@ SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX); //136 B
 uint8_t error_setup=NO_ERROR,remainingBootupSeconds=0;
 int16_t cuX,cuY;
 TFT_eSprite stext1 = TFT_eSprite(&tft); // Sprite object stext1
-ulong lastNowTime=0,nowTime=0,previousTime=0,timePressButton2,timeReleaseButton2,
+ulong lastNowTime=0,nowTime=0,previousTime=0,timePressButton1,timeReleaseButton1,timePressButton2,timeReleaseButton2,
       remainingBootupTime=BOOTUP_TIMEOUT*1000;
 String valueString;
 String serverToUploadSamplesString(SERVER_UPLOAD_SAMPLES);
@@ -442,7 +444,11 @@ void setupNTPConfig(boolean fromSetup) {
           Serial.println("[setup - NTP] Connecting to NTP Server: ");
           Serial.print("  NTP Server: ");Serial.println(ntpServers[loopCounter].c_str());
         }
-        configTime(gmtOffset_sec, daylightOffset_sec, ntpServers[loopCounter].c_str());
+        #ifdef NTP_TZ_ENV_VARIABLE
+          configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
+        #else
+          configTime(gmtOffset_sec, daylightOffset_sec, ntpServers[loopCounter].c_str());
+        #endif
 
         if (!getLocalTime(&startTimeInfo)) {
           if (logsOn && fromSetup) {
@@ -465,6 +471,30 @@ void setupNTPConfig(boolean fromSetup) {
       }
     }
   }
+}
+
+void go_to_hibernate(void) {
+  //Going to hibernate (switch the device off)
+  //if (debugModeOn) {Serial.println("  - [go_to_hibernate] - Time: "); getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println("    - Setting up Power Domains OFF before going into Deep Sleep");}
+  if (debugModeOn) {Serial.println("  - [go_to_hibernate] - Time: ");Serial.println("    - Setting up Power Domains OFF before going into Deep Sleep");}
+    
+  //Set all the power domains OFF
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH,   ESP_PD_OPTION_OFF);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL,         ESP_PD_OPTION_OFF);
+  #if SOC_PM_SUPPORT_CPU_PD
+    esp_sleep_pd_config(ESP_PD_DOMAIN_CPU,         ESP_PD_OPTION_OFF);
+  #endif
+  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC8M,         ESP_PD_OPTION_OFF);
+  esp_sleep_pd_config(ESP_PD_DOMAIN_VDDSDIO,       ESP_PD_OPTION_OFF);
+
+  //Set ext1 trigger to wake up.
+  if (debugModeOn) {Serial.println("    - Setup ESP32 to wake up when ext1 GPIO "+String(GPIO_NUM_35)+" is LOW");}
+  esp_sleep_enable_ext1_wakeup(0x800000000, ESP_EXT1_WAKEUP_ALL_LOW); //GPIO_NUM_35=2^35 mask //Button1
+  
+  if (debugModeOn) {Serial.println("    - Going to sleep now");}
+  esp_deep_sleep_start();
 }
 
 void go_to_sleep(void) {
@@ -517,7 +547,7 @@ void firstSetup() {
   currentState=bootupScreen;lastState=currentState;
   displayMode=bootup;lastDisplayMode=bootup;
 
-  if (logsOn) {Serial.begin(115200);Serial.print("\nCO2 bootup v");Serial.print(VERSION);Serial.println(" ..........");Serial.println("[setup] - Serial: OK");}
+  if (logsOn) {Serial.begin(115200);Serial.print("\n[SETUP] - Doing regular CO2 bootup v");Serial.print(VERSION);Serial.println(" ..........");Serial.println("[setup] - Serial: OK");}
 
   //Display init
   pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
@@ -952,17 +982,76 @@ void firstSetup() {
 void setup() {
   lastNowTime=millis();
   bootCount++;
+
+  Serial.begin(115200);
+  if (debugModeOn) {Serial.println("\n[SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}
+
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  switch(wakeup_reason)
+  {
+    case ESP_SLEEP_WAKEUP_EXT1: //Wake from Hibernate Mode by pressing Button1
+      if (debugModeOn) {Serial.println("  - Wakeup caused by external signal using RTC_CNT - Ext1");}
+      //To wake from hibernate, Button1 must be preseed TIME_LONG_PRESS_BUTTON1_HIBERNATE seconds
+      button1.begin();
+      boolean stopCheck;
+      stopCheck=false;
+      if (!button1.pressed()) stopCheck=true;
+      while (!stopCheck) { //Wait till the button is released
+        if (button1.released()) stopCheck=true;
+        else delay(100);
+      } //Wait to release button1
+      
+      if (debugModeOn) {Serial.println("    - Time elapsed: "+String(millis()-lastNowTime)+" ms");}
+      if ((millis()-lastNowTime) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) {firstSetup(); return;}  //Hard bootup - Run global setup from scratch
+      else {if (debugModeOn) {Serial.println("    - hibernate");delay(1000);go_to_hibernate();}} //Going back to hibernate
+    break;
+    case ESP_SLEEP_WAKEUP_EXT0: //Wake from Deep Sleep Mode by pressing Button1
+      if (debugModeOn) {
+        Serial.println("  - Wakeup caused by external signal using RTC_IO - Ext0");
+        Serial.println("    - setting things up back again after deep sleep specific for ad-hod wakeup");
+        Serial.println("      - TFT init");
+      }
+      //Display init
+      pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
+      tft.init();
+      digitalWrite(PIN_TFT_BACKLIGHT,LOW); //To force checkButton1() function to setup things
+      tft.setRotation(1);
+      tft.fillScreen(TFT_BLACK);
+      if (debugModeOn) {Serial.println("      - checkButton1() & buttonWakeUp=true");}
+      checkButton1();
+      buttonWakeUp=true;
+      lastTimeTurnOffBacklightCheck=nowTimeGlobal; //To avoid TIME_TURN_OFF_BACKLIGHT 
+      displayMode=sampleValue;  //To force refresh TFT with the sample value Screen
+      lastDisplayMode=bootup;   //To force rendering the value graph
+      if (debugModeOn) {Serial.println("    - end");}
+    break;
+    case ESP_SLEEP_WAKEUP_TIMER : 
+      if (debugModeOn) {
+        Serial.println("  - Wakeup caused by timer");
+        Serial.println("    - setting things up back again after deep sleep specific for periodic wakeup");
+        Serial.println("      - timers init");
+      }
+      nowTimeGlobal=lastNowTimeGlobal+(ulong) sleepTimer/1000; //Adding sleepTimer to nowTimeGlobal
+      lastNowTimeGlobal=nowTimeGlobal;
+      if (debugModeOn) {Serial.println("    - end");}
+    break;
+    default:
+      if (debugModeOn) {Serial.println("  - Wakeup was not caused by deep sleep: "+String(wakeup_reason)+" (0=POWERON_RESET, including HW Reset)");}
+      firstSetup(); //Hard bootup - Run global setup during the first boot (HW reset or power ON)
+      return;
+    break;
+  }
   
   //Run global setup during the first boot (HW reset or power ON)
-  if (firstBoot) firstSetup();
-  else {
+  /*if (firstBoot) firstSetup();
+  else {*/
     nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
     lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
 
-    Serial.begin(115200);
-    if (debugModeOn) {Serial.println("[SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}
+    /*Serial.begin(115200);
+    if (debugModeOn) {Serial.println("[SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}*/
 
-    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    /*esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
     switch(wakeup_reason)
     {
       case ESP_SLEEP_WAKEUP_EXT0 :
@@ -996,7 +1085,7 @@ void setup() {
         Serial.println("    - end");
         break;
       default : Serial.printf("  - Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
-    }
+    }*/
 
     if (debugModeOn) {
       Serial.println("  - Setting common things up back again after deep sleep");
@@ -1055,7 +1144,7 @@ void setup() {
 
     if (debugModeOn) {Serial.println("      - Restoring TZEnvVar="+String(TZEnvVar));}
     setenv("TZ",TZEnvVar,1); tzset(); //Restore TZ enviroment variable to show the right time
-  }
+  /*}*/
   
   if (debugModeOn) {Serial.println("[SETUP] - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
 }
@@ -1134,19 +1223,42 @@ void loop() {
     }
     
     //Show Warming up screen
+    uint auxCounter=0;
     while (nowTime<co2PreheatingTime) {
+      auxCounter++;
       //Waiting for the sensor to warmup before displaying value
       if (waitingMessage) {if (logsOn) Serial.println("Waiting for the warmup to finish");circularGauge.drawGauge2(0);waitingMessage=false;}
       circularGauge.cleanValueTextGauge();
       circularGauge.cleanUnitsTextGauge();
       circularGauge.setValue((int)(co2PreheatingTime-millis())/1000);
       circularGauge.drawTextGauge("warmup",TEXT_SIZE,true,TEXT_SIZE_UNITS_CO2,TEXT_FONT,TEXT_FONT_UNITS_CO2,TFT_GREENYELLOW);
+
+      //Update icons every 5 seconds
+      if (5==auxCounter) {
+        //Update WiFi icon
+        if (WiFi.status()!=WL_CONNECTED) {
+          //WiFi is not connected. Update wifiCurrentStatus properly
+          wifiCurrentStatus=wifiOffStatus;
+        }
+        else {
+          //Take RSSI to update the WiFi icon
+          if (WiFi.RSSI()>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
+          else if (WiFi.RSSI()>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
+          else if (WiFi.RSSI()>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
+          else if (WiFi.RSSI()>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
+          else if (WiFi.RSSI()<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+        }
+        //Update BAT icon
+        updateBatteryVoltageAndStatus(millis(), &timeUSBPowerGlobal);
+        
+        auxCounter=0;
+      }
       
       showIcons();
       delay(1000);
+      nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
+      lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
     }
-    nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
-    lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
     lastTimeTurnOffBacklightCheck=nowTimeGlobal;
     if (runningMessage) {if (logsOn) Serial.println("Running.... :-)");runningMessage=false;}
   }
@@ -1177,7 +1289,40 @@ void loop() {
   
   //Actions if button1 is pushed. It depens on the current state
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
-  if (button1.pressed() && !buttonWakeUp) {if (debugModeOn) {Serial.println("  - button1.pressed");} checkButton1();}
+  if (button1.pressed() && !buttonWakeUp && !button1Pressed) {
+    if (debugModeOn) {Serial.println("  - button1.pressed");}
+
+    //Take time to check if it is long press
+    button1Pressed=true;
+    if (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
+        currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential)
+      timePressButton1=millis();
+    else
+      timePressButton1=0;
+  }
+
+  if (button1.released() && !buttonWakeUp) {button1Pressed=false;checkButton1();}
+
+  //Check if Button1 was long pressed
+  //Avoid this action the first loop interaction just right after wakeup by pressing a button
+  if (button1Pressed && timePressButton1!=0 && !buttonWakeUp) { 
+
+    if ((millis()-timePressButton1) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) {
+      //Long press, so toggle going to hibernate
+      //Preparing to display message in the screen
+      tft.fillScreen(TFT_BLACK);
+      tft.setTextSize(TEXT_SIZE_MENU);
+      tft.setTextColor(TFT_RED,TFT_BLACK);
+      tft.setCursor(0,tft.height()/2-2*(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println  ("       Device");
+      tft.setCursor(0,tft.height()/2-(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println("     Switch OFF");
+      tft.setTextColor(TFT_GOLD,TFT_BLACK);
+      tft.setCursor(0,tft.height()/2+10,TEXT_FONT_MENU);tft.println("  Button1 Switch ON");
+      delay(3000);
+
+      tft.fillScreen(TFT_BLACK);
+      go_to_hibernate();
+    } 
+  }
 
   //Actions if button2 is pushed. It depens on the current state
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
@@ -1258,8 +1403,9 @@ void loop() {
   if (((nowTimeGlobal-lastTimeSampleCheck) >= samplePeriod) || forceGetSample || firstBoot) {  
     if (debugModeOn) {Serial.println("  - SAMPLE_PERIOD");}
     
-    //Getting CO2 & Temp values
-    valueCO2=(float_t)co2Sensor.getCO2();
+    //Getting CO2 & Temp values. VDC below MIN_VOLT, the measure is not realiable
+    if (batADCVolt<=MIN_VOLT) valueCO2=-1;
+    else valueCO2=(float_t)co2Sensor.getCO2();
     if (debugModeOn) {Serial.println("    - valueCO2="+String(valueCO2));}
     
     //tempMeasure=co2Sensor.getTemperature(true,true);
@@ -1281,7 +1427,7 @@ void loop() {
       lastHourHumSamples[i]=lastHourHumSamples[i+1];
       }
 
-      //In Reduced Energy Mode, there are lower number of samples (greater period)
+      //In Reduced or Save Energy Modes, there are lower number of samples (greater period)
       //so the last hour buffer is fillied by repeating the same sample
       int lastHourPeriodRatio;
       if (fullEnergy==energyCurrentMode) lastHourPeriodRatio=1;

@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.0"
+#define VERSION "0.9.1"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -38,7 +38,7 @@
   #define MH_Z19B_RX CO2_RX //RX pin in the ESP board (TX pin in the CO2 sensor)
   #define MH_Z19B_TX CO2_TX //TX pin in the ESP board (TX pin in the CO2 sensor)
   #define MH_Z19B_CO2_IN    37 //GPIO pin in the ESB board to connect the PWM CO2 sensor output
-  #define MH_Z19B_CO2_WARMING_TIME 0//30000 //90000  //Preheat time according to the datasheet
+  #define MH_Z19B_CO2_WARMING_TIME 0 //30000 //90000  //Preheat time according to the datasheet
   #define MH_Z19B_CO2_RANGE 2000  //Range of CO2 measurments. 0-2000 is adviced for MHZ19B as per datasheet for better accuracy
   #define MH_Z19B_CO2_MIN   0
   #define MH_Z19B_CO2_MAX   MH_Z19B_CO2_RANGE
@@ -157,9 +157,8 @@
 #define TFT_NAVY_4_BITS_PALETTE   14  // 14  Darker blue colour
 #define TFT_PINK_4_BITS_PALETTE   15   // 15
 
-
 //WiFi stuff
-#define MAX_CONNECTION_ATTEMPTS 16
+#define MAX_CONNECTION_ATTEMPTS 20
 #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
   #define NTP_SERVER  "10.88.50.5"
   #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
@@ -177,8 +176,11 @@
 #endif
 #define NTP_OK_CHECK_HOUR 3
 #define NTP_OK_CHECK_MINUTE 1
-#define GMT_OFFSET_SEC 3600
-#define DAYLIGHT_OFFSET_SEC 7200 //3600 for CEST
+#define NTP_TZ_ENV_VARIABLE "CET-1CEST,M3.5.0,M10.5.0/3"  //POSIX.1 format for Europe/Madrid TZ env variable
+#ifndef NTP_TZ_ENV_VARIABLE //Use GNUB Time Zone format if not POSI.1 one is provided with
+  #define GMT_OFFSET_SEC 3600
+  #define DAYLIGHT_OFFSET_SEC 7200 //3600 for CEST
+#endif
 //GET /lar-co2/?device=co2-sensor-XXXXXX&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
 #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
   #define SERVER_UPLOAD_SAMPLES  "10.88.50.5"
@@ -204,7 +206,7 @@
 #define POWER_ENABLE_PIN  14
 #define BAT_CHECK_ENABLE HIGH
 #define BAT_CHECK_DISABLE LOW
-#define VOLTAGE_TH_STATE  2200 //mv
+#define VOLTAGE_TH_STATE  2150 //mv - Threshold to consider USB or BAT power
 #define ADC_SAMPLES 20
 #define BAT_ADC_MAX 2100  //Max Battery voltage divide by 2 (there is a voltage divisor in the board) - mv
 #define BAT_ADC_MIN 1550  //Min Battery voltage divide by 2 (there is a voltage divisor in the board) - mv
@@ -235,6 +237,7 @@
 #define SAMPLE_T_LAST_HOUR_RE  60 //Seconds - Period of last hour samples to be recorded in Reduced Energy Mode (BAT powered)
 #define SAMPLE_T_LAST_HOUR_SE  300 //Seconds - Period of last hour samples to be recorded in Save Energy Mode (BAT powered)
 #define SAMPLE_T_LAST_DAY  450 //Seconds - Period of last day samples to be recorded
+#define TIME_LONG_PRESS_BUTTON1_HIBERNATE  5000 // 
 #define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // 
 #define TIME_TO_SLEEP_FULL_ENERGY 5*uS_TO_S_FACTOR 
 #define TIME_TO_SLEEP_REDUCED_ENERGY 60*uS_TO_S_FACTOR 
@@ -243,7 +246,7 @@
 #define UPLOAD_SAMPLES_PERIOD 300000  //millisenconds - 5 min
 #define UPLOAD_SAMPLES_PERIOD_RE UPLOAD_SAMPLES_PERIOD  //millisenconds - 5 min in Reduce Energy Mode
 #define UPLOAD_SAMPLES_PERIOD_SE UPLOAD_SAMPLES_PERIOD  //millisenconds - 5 min in Save Energy Mode
-#define VOLTAGE_CHECK_PERIOD 30000 //Milliseconds - 30 s
+#define VOLTAGE_CHECK_PERIOD 5000 //Milliseconds - 5 s
 #define VOLTAGE_CHECK_PERIOD_RE 300000 //Milliseconds - 5 min in Reduced Energy Mode
 #define VOLTAGE_CHECK_PERIOD_SE 300000 //Milliseconds - 5 min in Save Energy Mode
 #define WIFI_RECONNECT_PERIOD  300000 //milliseconds - 5 min
@@ -275,6 +278,9 @@
   wifiCredentials wifiCred;
   String ntpServers[4];
   uint8_t ntpServerIndex;
+  #ifdef NTP_TZ_ENV_VARIABLE
+    String TZEnvVariable=String(NTP_TZ_ENV_VARIABLE);
+  #endif
   
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
