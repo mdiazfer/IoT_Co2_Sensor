@@ -156,6 +156,7 @@ uint8_t wifiConnect(boolean logsOn=true, boolean msgTFT=true) {
         Serial.print(counter);Serial.print(">");Serial.println(MAX_CONNECTION_ATTEMPTS);
       }
       errorWifiConnection=true;
+      errorsWiFiCnt++; //Something went wrong. Update error counter for stats
     }
     else {
       wifiCred.activeIndex=loopCounter;

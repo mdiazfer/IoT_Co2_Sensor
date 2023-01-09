@@ -2,6 +2,7 @@ To do list
 -----------
 - Check scaling last_hour buffer works when changing the sample period (changing saving energy mode) 
 - Check NTP_KO_CHECK_PERIOD works after code modification
+- Fix NTP KO message in boot screen
 - change nowTimeGlobal=lastNowTimeGlobal+… by nowTimeGlobal=nowTimeGlobal+…and delete lastNowTimeGlobal
 - Config Menu for simple things: WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF
 - Troubleshoot WiFi connection failures
@@ -16,12 +17,6 @@ To do list
 - Icon for the bootup screen
 - Adding Bootup info Option to the Display Info Menu
 - Firmware upgrade OTA (?)
-- Setup Time Zone based on TZ environment variable instead of GMT_OFFSET_SEC & DAYLIGHT_OFFSET_SEC
-  + TZ values based on Cities: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
-  + Example for Madrid Time Zone:
-    setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1); tzset();
-    getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");
-
 
 
 Done
@@ -31,6 +26,11 @@ Done
 + Update icons during Warmup screen (v0.9.1)
 + Switch off mode (v0.9.1)
 + Avoid getting CO2 sample if Volt<MIN_VOLT (v0.9.1)
++ Setup Time Zone based on TZ environment variable instead of GMT_OFFSET_SEC & DAYLIGHT_OFFSET_SEC (v0.9.0)
+  + TZ values based on Cities: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
+  + Example for Madrid Time Zone:
+    setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1); tzset();
+    getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");
 + Deep Sleep mode implementation if BAT powered (v0.9.0) 
 + Show real time sample in Info menus (bat vol, ntp, wifi, url) (v0.8.1)
 + Review scale of battery icons (i.e. 97% => shows 75% icon)

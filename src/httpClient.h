@@ -7,6 +7,7 @@ extern boolean logsOn;
   enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus} ;
 #endif
 extern RTC_DATA_ATTR CloudSyncStatus CloudSyncCurrentStatus; //Struct to store WiFi parameters
+extern RTC_DATA_ATTR int errorsSampleUpts;
 
 String IpAddress2String(const IPAddress& ipAddress);
 uint8_t sendHttpRequest (IPAddress server, uint16_t port, String httpRequest);

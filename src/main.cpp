@@ -32,10 +32,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   644 B
+// RTC memory variables:                   652 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     3724 B
-// RTC memory left:     8000 B - 3724 B = 4276 B
+// RTC memorty TOTAL:                     3732 B
+// RTC memory left:     8000 B - 3732 B = 4268 B
 RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour C02 values
 RTC_DATA_ATTR float_t lastHourTempSamples[3600/SAMPLE_T_LAST_HOUR];  //4*(3600/60)=240 B - Buffer to record last-hour Temp values
 RTC_DATA_ATTR float_t lastHourHumSamples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour Hum values
@@ -81,6 +81,7 @@ RTC_DATA_ATTR int uploadServerIPAddressOctectArray[4]; // 4*4B = 16B - To store 
 RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
 RTC_DATA_ATTR boolean debugModeOn=true; //1*1=1B
+RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0; //2*4=8B - Error stats
 
 //Global variable definitions stored in regular RAM. 520 KB Max
 TFT_eSPI tft = TFT_eSPI();  // 292 B - Invoke library to manage the display
@@ -418,6 +419,8 @@ String roundFloattoString(float_t number, uint8_t decimals) {
 void setupNTPConfig(boolean fromSetup) {
   //If function called fron firstSetup(), then logs are displayed
 
+  if (debugModeOn) {Serial.println("  - [setupNTPConfig] - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", errorsNTPCnt="+String(errorsNTPCnt));}
+  
   CloudClockCurrentStatus=CloudClockOffStatus;
   //User credentials definition
   ntpServers[0]="\0";ntpServers[1]="\0";ntpServers[2]="\0";ntpServers[3]="\0";
@@ -434,7 +437,7 @@ void setupNTPConfig(boolean fromSetup) {
     ntpServers[3]=NTP_SERVER4;
   #endif
 
-  if (error_setup != ERROR_WIFI_SETUP ) {
+  if (wifiCurrentStatus!=wifiOffStatus) {
     uint8_t previousError_Setup=error_setup;
     for (uint8_t loopCounter=0; loopCounter<(uint8_t)sizeof(ntpServers)/sizeof(String); loopCounter++) {
       error_setup=ERROR_NTP_SERVER;
@@ -454,7 +457,7 @@ void setupNTPConfig(boolean fromSetup) {
           if (logsOn && fromSetup) {
             Serial.println("  Time: Failed to get time");
             Serial.print("[setup] - NTP: ");Serial.println("KO");
-          }          
+          }
         }
         else {
           if (logsOn && fromSetup) {
@@ -470,6 +473,15 @@ void setupNTPConfig(boolean fromSetup) {
         }
       }
     }
+  }
+
+  if (CloudClockCurrentStatus==CloudClockOffStatus) {
+    errorsNTPCnt++; //Something went wrong. Update error counter for stats          
+  }
+
+  if (debugModeOn) {
+      Serial.println("    - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck)+", errorsNTPCnt="+String(errorsNTPCnt));
+      Serial.print("  - [setupNTPConfig] - Exit - Time:");Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
   }
 }
 
@@ -829,7 +841,7 @@ void firstSetup() {
       stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  URL: ");
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);
 
-      error_setup != ERROR_WEB_SERVER;
+      error_setup = ERROR_WEB_SERVER;
     }
 
     if (logsOn) {Serial.print("  - URL: ");Serial.println("http://"+serverToUploadSamplesIPAddress.toString()+
@@ -979,12 +991,124 @@ void firstSetup() {
   lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
 }
 
+boolean warmingUp() {
+  //Run this code only after first bootup
+  
+  if ((int)remainingBootupTime>0) {
+    //Only while showing bootup screen
+    remainingBootupTime-=(nowTime-previousTime);
+    previousTime=nowTime;
+  }
+
+  //Keep showing bootup screen for a while
+  if (currentState==bootupScreen) {
+      if (remainingBootupSeconds!=(uint8_t)(remainingBootupTime/1000)) {
+      remainingBootupSeconds=(uint8_t)(remainingBootupTime/1000);
+      
+      //Update screen if last line is visible in the scroll window
+      if (pLL-1>=scFL && pLL-1<=scLL) {
+        stext1.setCursor(cuX,(pLL-2)*pixelsPerLine);stext1.print(remainingBootupSeconds);
+        stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      }
+    }
+
+    //Scroll DOWN
+    if (button1.pressed()) { 
+      if (pFL<scFL) {
+        pFL++;
+        if (pLL-1<spLL) pLL++;
+        stext1.scroll(0,pixelsPerLine);
+        stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      }
+      //Reset timeout to give more time to read while scrolling the screen 
+      if (pLL-1>=scFL && pLL-1<=scLL)
+        remainingBootupTime=BOOTUP_TIMEOUT*1000;
+      else
+        remainingBootupTime=BOOTUP_TIMEOUT2*1000; //If last line is not in scroll windows, wait a bit more
+    }
+
+    //Scroll UP
+    if (button2.pressed()) {
+      if (pLL-1>scLL) {
+        pLL--;
+        if (pFL>spFL) pFL--;
+        stext1.scroll(0,-pixelsPerLine);
+        stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      }
+      //Reset timeout to give more time to read while scrolling the screen 
+      if (pLL-1>=scFL && pLL-1<=scLL)
+        remainingBootupTime=BOOTUP_TIMEOUT*1000;
+      else
+        remainingBootupTime=BOOTUP_TIMEOUT2*1000; //If last line is not in scroll windows, wait a bit more
+    }
+    
+    if (ERROR_DISPLAY_SETUP==error_setup || ERROR_SENSOR_CO2_SETUP==error_setup || 
+        ERROR_SENSOR_TEMP_HUM_SETUP==error_setup || ERROR_BUTTONS_SETUP==error_setup)
+          remainingBootupTime=BOOTUP_TIMEOUT*1000;
+          
+    if ((int)remainingBootupTime<=0) {
+      //After BOOTUP_TIMEOUT secons with no activity leaves bootupScreen and continue
+      tft.setCursor(0,0,TEXT_FONT);
+      tft.fillScreen(TFT_BLACK);
+      tft.setTextSize(TEXT_SIZE);
+      displayMode=sampleValue;lastDisplayMode=bootup; //Will make starting in sampleValue      
+      lastState=currentState;currentState=displayingSequential;  //Transition to the next state
+      previousTime=0;
+    }
+  
+    return (true);
+  }
+  
+  //Show Warming up screen
+  uint auxCounter=0;
+  while (nowTime<co2PreheatingTime) {
+    auxCounter++;
+    //Waiting for the sensor to warmup before displaying value
+    if (waitingMessage) {if (logsOn) Serial.println("Waiting for the warmup to finish");circularGauge.drawGauge2(0);waitingMessage=false;}
+    circularGauge.cleanValueTextGauge();
+    circularGauge.cleanUnitsTextGauge();
+    circularGauge.setValue((int)(co2PreheatingTime-millis())/1000);
+    circularGauge.drawTextGauge("warmup",TEXT_SIZE,true,TEXT_SIZE_UNITS_CO2,TEXT_FONT,TEXT_FONT_UNITS_CO2,TFT_GREENYELLOW);
+
+    //Update icons every 5 seconds
+    if (5==auxCounter) {
+      //Update WiFi icon
+      if (WiFi.status()!=WL_CONNECTED) {
+        //WiFi is not connected. Update wifiCurrentStatus properly
+        wifiCurrentStatus=wifiOffStatus;
+      }
+      else {
+        //Take RSSI to update the WiFi icon
+        if (WiFi.RSSI()>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
+        else if (WiFi.RSSI()>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
+        else if (WiFi.RSSI()>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
+        else if (WiFi.RSSI()>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
+        else if (WiFi.RSSI()<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+      }
+      //Update BAT icon
+      updateBatteryVoltageAndStatus(millis(), &timeUSBPowerGlobal);
+      
+      auxCounter=0;
+    }
+    
+    showIcons();
+    delay(1000);
+    nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
+    lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
+  }
+  lastTimeTurnOffBacklightCheck=nowTimeGlobal;
+  if (runningMessage) {if (logsOn) Serial.println("Running.... :-)");runningMessage=false;}
+
+  return (false);
+}
+
 void setup() {
   lastNowTime=millis();
   bootCount++;
 
   Serial.begin(115200);
   if (debugModeOn) {Serial.println("\n[SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}
+  randomSeed(analogRead(GPIO_NUM_32));
 
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   switch(wakeup_reason)
@@ -1002,8 +1126,14 @@ void setup() {
       } //Wait to release button1
       
       if (debugModeOn) {Serial.println("    - Time elapsed: "+String(millis()-lastNowTime)+" ms");}
-      if ((millis()-lastNowTime) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) {firstSetup(); return;}  //Hard bootup - Run global setup from scratch
-      else {if (debugModeOn) {Serial.println("    - hibernate");delay(1000);go_to_hibernate();}} //Going back to hibernate
+      if ((millis()-lastNowTime) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) { //Hard bootup - Run global setup from scratch
+        firstSetup();
+        return;
+      }  
+      else { //Going back to hibernate - Button1 wasn't pressed time enough
+        if (debugModeOn) {Serial.println("    - hibernate");delay(1000);}
+        go_to_hibernate();
+      } 
     break;
     case ESP_SLEEP_WAKEUP_EXT0: //Wake from Deep Sleep Mode by pressing Button1
       if (debugModeOn) {
@@ -1042,110 +1172,69 @@ void setup() {
     break;
   }
   
-  //Run global setup during the first boot (HW reset or power ON)
-  /*if (firstBoot) firstSetup();
-  else {*/
-    nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
-    lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
+  //This piece os code is run after wakeup from Deep Sleep (neither HW reset nor Hibernate)
+  //Run global setup after wakeup
+  nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
+  lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
 
-    /*Serial.begin(115200);
-    if (debugModeOn) {Serial.println("[SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}*/
+  if (debugModeOn) {
+    Serial.println("  - Setting common things up back again after deep sleep");
+    Serial.println("      - pinMode(POWER_ENABLE_PIN, OUTPUT) & initVoltageArray() Init battery charge array");
+  }
+  pinMode(POWER_ENABLE_PIN, OUTPUT);
+  initVoltageArray(); //Init battery charge array
+  pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
 
-    /*esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-    switch(wakeup_reason)
-    {
-      case ESP_SLEEP_WAKEUP_EXT0 :
-        if (debugModeOn) {
-          Serial.println("  - Wakeup caused by external signal using RTC_IO");
-          Serial.println("    - setting things up back again after deep sleep specific for ad-hod wakeup");
-          Serial.println("      - TFT init");
-        }
-        //Display init
-        pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
-        tft.init();
-        digitalWrite(PIN_TFT_BACKLIGHT,LOW); //To force checkButton1() function to setup things
-        tft.setRotation(1);
-        tft.fillScreen(TFT_BLACK);
-        if (debugModeOn) {Serial.println("      - checkButton1() & buttonWakeUp=true");}
-        checkButton1();
-        buttonWakeUp=true;
-        lastTimeTurnOffBacklightCheck=nowTimeGlobal; //To avoid TIME_TURN_OFF_BACKLIGHT 
-        displayMode=sampleValue;  //To force refresh TFT with the sample value Screen
-        lastDisplayMode=bootup;   //To force rendering the value graph
-        if (debugModeOn) {Serial.println("    - end");}
-        break;
-      case ESP_SLEEP_WAKEUP_TIMER : 
-        if (debugModeOn) {
-          Serial.println("  - Wakeup caused by timer");
-          Serial.println("    - setting things up back again after deep sleep specific for periodic wakeup");
-          Serial.println("      - timers init");
-        }
-        nowTimeGlobal=lastNowTimeGlobal+(ulong) sleepTimer/1000; //Adding sleepTimer to nowTimeGlobal
-        lastNowTimeGlobal=nowTimeGlobal;
-        Serial.println("    - end");
-        break;
-      default : Serial.printf("  - Wakeup was not caused by deep sleep: %d\n",wakeup_reason); break;
-    }*/
-
-    if (debugModeOn) {
-      Serial.println("  - Setting common things up back again after deep sleep");
-      Serial.println("      - pinMode(POWER_ENABLE_PIN, OUTPUT) & initVoltageArray() Init battery charge array");
-    }
-    pinMode(POWER_ENABLE_PIN, OUTPUT);
-    initVoltageArray(); //Init battery charge array
-    pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
-
-    if (debugModeOn) {Serial.println("      - co2SensorSerialPort.begin() and  co2Sensor.begin() again after deep sleep");}
-    co2SensorSerialPort.begin(9600);      // (Uno example) device to MH-Z19 serial start   
-    co2Sensor.begin(co2SensorSerialPort); // *Serial(Stream) refence must be passed to library begin(). 
-    co2Sensor.setRange(CO2_SENSOR_CO2_RANGE);             // It's aviced to setup range to 2000. Better accuracy
-    
-    if (debugModeOn) {Serial.println("      - tempHumSensor.begin() again after deep sleep");}
-    tempHumSensor.begin(SI7021_SDA,SI7021_SCL); //Needed again after deep sleep
-
-    if (debugModeOn) {Serial.println("      - wifiCred variables");}
-    //User credentials definition
-    #ifdef WIFI_SSID_CREDENTIALS
-      wifiCred.wifiSSIDs[0]=WIFI_SSID_CREDENTIALS;
-    #endif
-    #ifdef WIFI_PW_CREDENTIALS
-      wifiCred.wifiPSSWs[0]=WIFI_PW_CREDENTIALS;
-    #endif
-    #ifdef WIFI_SITE
-      wifiCred.wifiSITEs[0]=WIFI_SITE;
-    #endif
-    #ifdef WIFI_SSID_CREDENTIALS_BK1
-      wifiCred.wifiSSIDs[1]=WIFI_SSID_CREDENTIALS_BK1;
-    #endif
-    #ifdef WIFI_PW_CREDENTIALS_BK1
-      wifiCred.wifiPSSWs[1]=WIFI_PW_CREDENTIALS_BK1;
-    #endif
-    #ifdef WIFI_SITE_BK1
-      wifiCred.wifiSITEs[1]=WIFI_SITE_BK1;
-    #endif
-    #ifdef WIFI_SSID_CREDENTIALS_BK2
-      wifiCred.wifiSSIDs[2]=WIFI_SSID_CREDENTIALS_BK2;
-    #endif
-    #ifdef WIFI_PW_CREDENTIALS_BK2
-      wifiCred.wifiPSSWs[2]=WIFI_PW_CREDENTIALS_BK2;
-    #endif
-    #ifdef WIFI_SITE_BK2
-      wifiCred.wifiSITEs[2]=WIFI_SITE_BK2;
-    #endif
-
-    if (debugModeOn) {Serial.println("      - wifiCurrentStatus=wifiOffStatus till WiFi reconnection");}
-    wifiCurrentStatus=wifiOffStatus;
-
-    if (debugModeOn) {Serial.println("      - serverToUploadSamplesIPAddress & device");}
-    serverToUploadSamplesIPAddress=IPAddress(uploadServerIPAddressOctectArray[0],uploadServerIPAddressOctectArray[1],uploadServerIPAddressOctectArray[2],uploadServerIPAddressOctectArray[3]);
-    device=device+"-"+String((char)hex_digits[mac[3]>>4])+String((char)hex_digits[mac[3]&15])+
-      String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
-      String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
-
-    if (debugModeOn) {Serial.println("      - Restoring TZEnvVar="+String(TZEnvVar));}
-    setenv("TZ",TZEnvVar,1); tzset(); //Restore TZ enviroment variable to show the right time
-  /*}*/
+  if (debugModeOn) {Serial.println("      - co2SensorSerialPort.begin() and  co2Sensor.begin() again after deep sleep");}
+  co2SensorSerialPort.begin(9600);      // (Uno example) device to MH-Z19 serial start   
+  co2Sensor.begin(co2SensorSerialPort); // *Serial(Stream) refence must be passed to library begin(). 
+  co2Sensor.setRange(CO2_SENSOR_CO2_RANGE);             // It's aviced to setup range to 2000. Better accuracy
   
+  if (debugModeOn) {Serial.println("      - tempHumSensor.begin() again after deep sleep");}
+  tempHumSensor.begin(SI7021_SDA,SI7021_SCL); //Needed again after deep sleep
+
+  if (debugModeOn) {Serial.println("      - wifiCred variables");}
+  //User credentials definition
+  #ifdef WIFI_SSID_CREDENTIALS
+    wifiCred.wifiSSIDs[0]=WIFI_SSID_CREDENTIALS;
+  #endif
+  #ifdef WIFI_PW_CREDENTIALS
+    wifiCred.wifiPSSWs[0]=WIFI_PW_CREDENTIALS;
+  #endif
+  #ifdef WIFI_SITE
+    wifiCred.wifiSITEs[0]=WIFI_SITE;
+  #endif
+  #ifdef WIFI_SSID_CREDENTIALS_BK1
+    wifiCred.wifiSSIDs[1]=WIFI_SSID_CREDENTIALS_BK1;
+  #endif
+  #ifdef WIFI_PW_CREDENTIALS_BK1
+    wifiCred.wifiPSSWs[1]=WIFI_PW_CREDENTIALS_BK1;
+  #endif
+  #ifdef WIFI_SITE_BK1
+    wifiCred.wifiSITEs[1]=WIFI_SITE_BK1;
+  #endif
+  #ifdef WIFI_SSID_CREDENTIALS_BK2
+    wifiCred.wifiSSIDs[2]=WIFI_SSID_CREDENTIALS_BK2;
+  #endif
+  #ifdef WIFI_PW_CREDENTIALS_BK2
+    wifiCred.wifiPSSWs[2]=WIFI_PW_CREDENTIALS_BK2;
+  #endif
+  #ifdef WIFI_SITE_BK2
+    wifiCred.wifiSITEs[2]=WIFI_SITE_BK2;
+  #endif
+
+  if (debugModeOn) {Serial.println("      - wifiCurrentStatus=wifiOffStatus till WiFi reconnection");}
+  wifiCurrentStatus=wifiOffStatus;
+
+  if (debugModeOn) {Serial.println("      - serverToUploadSamplesIPAddress & device");}
+  serverToUploadSamplesIPAddress=IPAddress(uploadServerIPAddressOctectArray[0],uploadServerIPAddressOctectArray[1],uploadServerIPAddressOctectArray[2],uploadServerIPAddressOctectArray[3]);
+  device=device+"-"+String((char)hex_digits[mac[3]>>4])+String((char)hex_digits[mac[3]&15])+
+    String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
+    String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
+
+  if (debugModeOn) {Serial.println("      - Restoring TZEnvVar="+String(TZEnvVar));}
+  setenv("TZ",TZEnvVar,1); tzset(); //Restore TZ enviroment variable to show the right time
+
   if (debugModeOn) {Serial.println("[SETUP] - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
 }
 
@@ -1153,119 +1242,18 @@ void setup() {
 void loop() {
   nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
   lastNowTime=nowTime;
-
-  //Run this code only after first bootup
-  if (firstBoot) {
-
-    if ((int)remainingBootupTime>0) {
-      //Only while showing bootup screen
-      remainingBootupTime-=(nowTime-previousTime);
-      previousTime=nowTime;
-    }
-
-    //Keep showing bootup screen for a while
-    if (currentState==bootupScreen) {
-        if (remainingBootupSeconds!=(uint8_t)(remainingBootupTime/1000)) {
-        remainingBootupSeconds=(uint8_t)(remainingBootupTime/1000);
-        
-        //Update screen if last line is visible in the scroll window
-        if (pLL-1>=scFL && pLL-1<=scLL) {
-          stext1.setCursor(cuX,(pLL-2)*pixelsPerLine);stext1.print(remainingBootupSeconds);
-          stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-        }
-      }
-
-      //Scroll DOWN
-      if (button1.pressed()) {
-        if (pFL<scFL) {
-          pFL++;
-          if (pLL-1<spLL) pLL++;
-          stext1.scroll(0,pixelsPerLine);
-          stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-        }
-        //Reset timeout to give more time to read while scrolling the screen 
-        if (pLL-1>=scFL && pLL-1<=scLL)
-          remainingBootupTime=BOOTUP_TIMEOUT*1000;
-        else
-          remainingBootupTime=BOOTUP_TIMEOUT2*1000; //If last line is not in scroll windows, wait a bit more
-      }
-
-      //Scroll UP
-      if (button2.pressed()) {
-        if (pLL-1>scLL) {
-          pLL--;
-          if (pFL>spFL) pFL--;
-          stext1.scroll(0,-pixelsPerLine);
-          stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-        }
-        //Reset timeout to give more time to read while scrolling the screen 
-        if (pLL-1>=scFL && pLL-1<=scLL)
-          remainingBootupTime=BOOTUP_TIMEOUT*1000;
-        else
-          remainingBootupTime=BOOTUP_TIMEOUT2*1000; //If last line is not in scroll windows, wait a bit more
-      }
-      
-      if (ERROR_DISPLAY_SETUP==error_setup || ERROR_SENSOR_CO2_SETUP==error_setup || 
-          ERROR_SENSOR_TEMP_HUM_SETUP==error_setup || ERROR_BUTTONS_SETUP==error_setup)
-            remainingBootupTime=BOOTUP_TIMEOUT*1000;
-            
-      if ((int)remainingBootupTime<=0) {
-        //After BOOTUP_TIMEOUT secons with no activity leaves bootupScreen and continue
-        tft.setCursor(0,0,TEXT_FONT);
-        tft.fillScreen(TFT_BLACK);
-        tft.setTextSize(TEXT_SIZE);
-        displayMode=sampleValue;lastDisplayMode=bootup; //Will make starting in sampleValue      
-        lastState=currentState;currentState=displayingSequential;  //Transition to the next state
-        previousTime=0;
-      }
-    
-      return;
-    }
-    
-    //Show Warming up screen
-    uint auxCounter=0;
-    while (nowTime<co2PreheatingTime) {
-      auxCounter++;
-      //Waiting for the sensor to warmup before displaying value
-      if (waitingMessage) {if (logsOn) Serial.println("Waiting for the warmup to finish");circularGauge.drawGauge2(0);waitingMessage=false;}
-      circularGauge.cleanValueTextGauge();
-      circularGauge.cleanUnitsTextGauge();
-      circularGauge.setValue((int)(co2PreheatingTime-millis())/1000);
-      circularGauge.drawTextGauge("warmup",TEXT_SIZE,true,TEXT_SIZE_UNITS_CO2,TEXT_FONT,TEXT_FONT_UNITS_CO2,TFT_GREENYELLOW);
-
-      //Update icons every 5 seconds
-      if (5==auxCounter) {
-        //Update WiFi icon
-        if (WiFi.status()!=WL_CONNECTED) {
-          //WiFi is not connected. Update wifiCurrentStatus properly
-          wifiCurrentStatus=wifiOffStatus;
-        }
-        else {
-          //Take RSSI to update the WiFi icon
-          if (WiFi.RSSI()>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
-          else if (WiFi.RSSI()>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
-          else if (WiFi.RSSI()>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
-          else if (WiFi.RSSI()>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
-          else if (WiFi.RSSI()<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
-        }
-        //Update BAT icon
-        updateBatteryVoltageAndStatus(millis(), &timeUSBPowerGlobal);
-        
-        auxCounter=0;
-      }
-      
-      showIcons();
-      delay(1000);
-      nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
-      lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
-    }
-    lastTimeTurnOffBacklightCheck=nowTimeGlobal;
-    if (runningMessage) {if (logsOn) Serial.println("Running.... :-)");runningMessage=false;}
-  }
-
   loopCount++;
 
-  //Take actions based on TIMEOUTS and PERIODS
+  //After firstSetup, the CO2 sensor must warmup before starting to take samples
+  // Bootup messages review and WarmUp screen is displayied before the CO2 sensor is 
+  // ready to work
+  if (firstBoot) if(warmingUp()) return;
+
+  //********************************************************************
+  //                     MAIN LOOP START HERE
+  //********************************************************************
+  
+  //Do periodic actions based on TIMEOUTS and PERIODS
 
   //Cheking if BackLight should be turned off
   if (((nowTimeGlobal-lastTimeTurnOffBacklightCheck) >= TIME_TURN_OFF_BACKLIGHT) && !firstBoot && 
@@ -1301,7 +1289,7 @@ void loop() {
       timePressButton1=0;
   }
 
-  if (button1.released() && !buttonWakeUp) {button1Pressed=false;checkButton1();}
+  if (button1.released() && !buttonWakeUp && !firstBoot) {button1Pressed=false;checkButton1();}
 
   //Check if Button1 was long pressed
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
@@ -1660,13 +1648,26 @@ void loop() {
   }
 
   //Regular actions every NTP_KO_CHECK_PERIOD seconds. Cheking if NTP is off or should be checked
-  if (((nowTimeGlobal-lastTimeNTPCheck) >= NTP_KO_CHECK_PERIOD) && wifiCurrentStatus!=wifiOffStatus && 
-        (CloudClockCurrentStatus==CloudClockOffStatus ||
-         (startTimeInfo.tm_hour==NTP_OK_CHECK_HOUR && startTimeInfo.tm_min==NTP_OK_CHECK_MINUTE)) ) {
-    if (debugModeOn) {Serial.println("  - NTP_KO_CHECK_PERIOD");}
+  if ((nowTimeGlobal-lastTimeNTPCheck) >= NTP_KO_CHECK_PERIOD ) {
     
-    setupNTPConfig(false);
+    if (debugModeOn) {Serial.println("  - NTP_KO_CHECK_PERIOD");}
+
+    //NTPConfig if either
+    // - Last NTP check failed (currently there is no NTP sycn)
+    // - Every 4 hours (in avarage ~17% day) to avoid time drift due to Deep Sleep
+    //   (random(1,6)<2) ~17%
+    
+    if( (CloudClockCurrentStatus==CloudClockOffStatus || (random(1,6)<2)) && 
+        wifiCurrentStatus!=wifiOffStatus ) {
+      if (debugModeOn) {Serial.println("      - setupNTPConfig() for NTP Sync");}
+      setupNTPConfig(false); //NTP Sync and CloudClockCurrentStatus update
+    }
+    nowTime=millis();
+    nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
+    lastNowTime=nowTime; lastNowTimeGlobal=nowTimeGlobal;
     lastTimeNTPCheck=nowTimeGlobal;
+
+    if (debugModeOn) {Serial.println("      - errorsNTPCnt="+String(errorsNTPCnt)+", CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck));getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");}
   }
   
   //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
@@ -1697,7 +1698,8 @@ void loop() {
       IpAddress2String(WiFi.localIP())+"&co2="+valueCO2+"&temp_by_co2_sensor="+valueT+"&hum_by_co2_sensor="+
       valueHum+"&temp_co2_sensor="+co2Sensor.getTemperature(true,true)+"&powerState="+powerState+
       "&batADCVolt="+batADCVolt+"&batCharge="+batCharge+"&batteryStatus="+batteryStatus+
-      "&energyCurrentMode="+energyCurrentMode+" HTTP/1.1";
+      "&energyCurrentMode="+energyCurrentMode+"&errorsWiFiCnt="+errorsWiFiCnt+
+      "&errorsSampleUpts="+errorsSampleUpts+"&errorsNTPCnt="+errorsNTPCnt+" HTTP/1.1";
 
     if (debugModeOn) {Serial.println("    - serverToUploadSamplesIPAddress="+String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
                    ", httpRequest="+String(httpRequest));}

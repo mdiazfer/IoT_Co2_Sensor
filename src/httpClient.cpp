@@ -28,6 +28,7 @@ uint8_t sendHttpRequest(IPAddress server, uint16_t port, String httpRequest) {
     client.println("Connection: close");
     client.println();
   }
+  else errorsSampleUpts++;  //Something went wrong. Update error counter for stats
   
   // if there are incoming bytes available
   // from the server, read them and print them:
@@ -51,6 +52,7 @@ uint8_t sendHttpRequest(IPAddress server, uint16_t port, String httpRequest) {
     }
     if (logsOn) {Serial.println("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
   }
+  else errorsSampleUpts++;  //Something went wrong. Update error counter for stats
 
   // if the server's disconnected, stop the client:
   if (!client.connected()) {
