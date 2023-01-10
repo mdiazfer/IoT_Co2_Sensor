@@ -177,3 +177,135 @@ void checkButton2() {
     break;
   }
 }
+
+uint8_t checkButtonsActions(enum callingAction fromAction) {
+
+  //Actions if button1 is pushed. It depens on the current state
+  //Avoid this action the first loop interaction just right after wakeup by pressing a button
+  if (button1.pressed() && !buttonWakeUp && !button1Pressed) {
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - button1.pressed");}
+
+    //Take time to check if it is long press
+    button1Pressed=true;
+    if (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
+        currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential)
+      timePressButton1=millis();
+    else
+      timePressButton1=0;
+  }
+
+  if (button1.released() && !buttonWakeUp && !firstBoot) {
+    button1Pressed=false;
+
+    checkButton1();
+    //Specific action based on where this functions has been called from
+    switch (fromAction) {
+      case mainloop:
+        //Do nothing else
+      break;
+      case ntpcheck:
+        return(1);
+      break;
+    }
+  }
+
+  //Check if Button1 was long pressed
+  //Avoid this action the first loop interaction just right after wakeup by pressing a button
+  if (button1Pressed && timePressButton1!=0 && !buttonWakeUp) { 
+
+    if ((millis()-timePressButton1) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) {
+      //Long press, so toggle going to hibernate
+      //Preparing to display message in the screen
+      tft.fillScreen(TFT_BLACK);
+      tft.setTextSize(TEXT_SIZE_MENU);
+      tft.setTextColor(TFT_RED,TFT_BLACK);
+      tft.setCursor(0,tft.height()/2-2*(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println  ("       Device");
+      tft.setCursor(0,tft.height()/2-(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println("     Switch OFF");
+      tft.setTextColor(TFT_GOLD,TFT_BLACK);
+      tft.setCursor(0,tft.height()/2+10,TEXT_FONT_MENU);tft.println("  Button1 Switch ON");
+      delay(3000);
+
+      tft.fillScreen(TFT_BLACK);
+      go_to_hibernate();
+    } 
+  }
+
+  //Actions if button2 is pushed. It depens on the current state
+  //Avoid this action the first loop interaction just right after wakeup by pressing a button
+  //nowTimeGlobal=loopStartTime+millis();
+  if (button2.pressed() && !buttonWakeUp) {
+    if (debugModeOn) {String(loopStartTime+millis())+Serial.println("  - button2.pressed");}
+
+    //Take time to check if it is long press
+    button2Pressed=true;
+    if (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
+        currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential)
+      timePressButton2=millis();
+    else
+      timePressButton2=0;
+    checkButton2();
+
+    //Specific actions based on where this functions has been called from
+    switch (fromAction) {
+      case mainloop:
+        //Do nothing else
+      break;
+      case ntpcheck:
+        return(2);
+      break;
+    }
+  }
+
+  if (button2.released() && !buttonWakeUp) {
+    button2Pressed=false;
+
+    //Specific actions based on where this functions has been called from
+    switch (fromAction) {
+      case mainloop:
+        //Do nothing else
+      break;
+      case ntpcheck:
+        return(3);
+      break;
+    }
+  }
+
+  //Check if Button2 was long pressed
+  //Avoid this action the first loop interaction just right after wakeup by pressing a button
+  if (button2Pressed && timePressButton2!=0 && !buttonWakeUp) { 
+    if ((millis()-timePressButton2) > TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT) {
+      //Long press, so toggle autoBackLightOff and display message
+      autoBackLightOff=!autoBackLightOff;
+      timePressButton2=0;
+      lastDisplayMode=AutoSwitchOffMessage;
+
+      //Preparing to display message in the screen
+      tft.fillScreen(TFT_BLACK);
+      tft.setTextSize(TEXT_SIZE_MENU);
+      tft.setTextColor(TFT_GOLD,TFT_BLACK);
+      tft.setCursor(0,tft.height()/2-2*(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println("      Display");
+      tft.setCursor(0,tft.height()/2-(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println("  Auto switch off");
+      
+      if (autoBackLightOff) {
+        //Display message in the screen
+        tft.setTextColor(TFT_GREEN,TFT_BLACK);
+        tft.setCursor(0,tft.height()/2+2,TEXT_FONT_MENU);tft.println("      Enabled");
+        delay(2500);
+        tft.fillScreen(TFT_BLACK);
+
+        //Turn off back light
+        digitalWrite(PIN_TFT_BACKLIGHT,LOW);
+        lastTimeTurnOffBacklightCheck=loopStartTime+millis();
+      }
+      else {
+        //Display message in the screen
+        tft.setTextColor(TFT_RED,TFT_BLACK);
+        tft.setCursor(0,tft.height()/2+2,TEXT_FONT_MENU);tft.println("     Disabled");
+        delay(2500);
+        tft.fillScreen(TFT_BLACK);
+      }
+    }
+  }
+
+  return(0);
+}

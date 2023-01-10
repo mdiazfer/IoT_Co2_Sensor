@@ -3,6 +3,7 @@
   #include <WiFi.h>
   #include "global_setup.h"
   #include "user_setup.h"
+  #include "ButtonChecks.h"
 
   extern bool logsOn;
   #ifndef _WIFINETWORKINFO_

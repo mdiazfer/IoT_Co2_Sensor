@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.2"
+#define VERSION "0.9.3"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -218,6 +218,7 @@
 #define BAT_CHG_THR_FOR_SAVE_ENERGY 25  //Bat. charge threshold to enter in saving energy mode
 
 //Timers and Global stuff
+#define INITIAL_BOOTIME 25  //milliseconds - Time to bootup as per board measurements
 #define uS_TO_S_FACTOR  1000000
 #define BOOTUP_TIMEOUT  7  //Seconds. Timeout to leave bootup screen
 #define BOOTUP_TIMEOUT2 50 //Seconds. Timeout to leave bootup screen after scrolling UP/DOWN
@@ -227,6 +228,7 @@
 #define HTTP_ANSWER_TIMEOUT 7000  //Millisenconds
 #define ICON_STATUS_REFRESH_PERIOD  DISPLAY_REFRESH_PERIOD  //milliseconds
 #define NTP_KO_CHECK_PERIOD  60000 //Milliseconds. 1 minute
+#define NTP_CHECK_TIMEOUT     5000  //Millisecons. Should have NTP anser within 2 sc.
 #define POWER_ENABLE_DELAY 50 //250 //Milliseconds
 #define SAMPLE_PERIOD          20000  //milliseconds - Full Energy Mode (USB powered)
 #define SAMPLE_PERIOD_RE       60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
@@ -302,6 +304,11 @@
                                 battery000,battery010,battery025,battery050,battery075,battery100};
     enum energyModes {fullEnergy, reducedEnergy, saveEnergy};
     #define _BATTERYFRAMEWORK_
+  #endif
+
+  #ifndef _BUTTONSFRAMEWORK_
+    enum callingAction {mainloop,ntpcheck};
+    #define _BUTTONSFRAMEWORK_
   #endif
 
   #undef _DECLAREGLOBALPARAMETERS_

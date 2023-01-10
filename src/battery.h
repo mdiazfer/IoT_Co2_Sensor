@@ -33,7 +33,7 @@ extern RTC_DATA_ATTR enum batteryChargingStatus batteryStatus;
 extern RTC_DATA_ATTR enum energyModes energyCurrentMode;
 extern RTC_DATA_ATTR boolean autoBackLightOff,forceDisplayModeRefresh,forceDisplayRefresh,forceGetSample;
 extern RTC_DATA_ATTR enum availableStates stateSelected,currentState;
-extern RTC_DATA_ATTR ulong nowTimeGlobal,previousLastTimeSampleCheck,lastTimeTurnOffBacklightCheck;
+extern RTC_DATA_ATTR uint64_t nowTimeGlobal,previousLastTimeSampleCheck,lastTimeTurnOffBacklightCheck;
 extern RTC_DATA_ATTR enum displayModes displayMode,lastDisplayMode;
 extern RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod; //3*4=12B
 
@@ -42,4 +42,4 @@ extern RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod; 
 enum batteryChargingStatus getBatteryStatus(float_t batADCVolt, ulong timeLast);
 void initVoltageArray();
 float_t getChargePercentage(double_t milliVolts);
-void updateBatteryVoltageAndStatus(ulong nowTime, ulong *timeUSBPower);
+void updateBatteryVoltageAndStatus(uint64_t nowTime, uint64_t *timeUSBPower);

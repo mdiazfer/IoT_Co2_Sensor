@@ -521,6 +521,8 @@ void printInfoGral() {
       digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
       batADCVolt=0; for (u8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
       digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+
+      /*--><--*///batADCVolt=1900;
       
       if (batADCVolt >= VOLTAGE_TH_STATE) {
         //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds

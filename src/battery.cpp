@@ -96,7 +96,7 @@ enum batteryChargingStatus getBatteryStatus(float_t batADCVolt, ulong timeLast) 
   return batteryStatus;
 }
 
-void updateBatteryVoltageAndStatus(ulong nowTimeGlobal, ulong *timeUSBPower) {
+void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPower) {
   //batADCVolt update
   //Power state check and powerState update
   //batteryStatus update
@@ -109,6 +109,8 @@ void updateBatteryVoltageAndStatus(ulong nowTimeGlobal, ulong *timeUSBPower) {
   digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
   batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
   digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+
+  /*--><--*///batADCVolt=1900;
 
   if (batADCVolt >= VOLTAGE_TH_STATE) {
     //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds

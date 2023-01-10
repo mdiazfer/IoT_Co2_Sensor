@@ -67,7 +67,7 @@ extern struct tm startTimeInfo;
 extern Button button2;
 extern IPAddress serverToUploadSamplesIPAddress;
 extern boolean uploadSamplesToServer;
-extern RTC_DATA_ATTR ulong timeUSBPowerGlobal,nowTimeGlobal;
+extern RTC_DATA_ATTR uint64_t timeUSBPowerGlobal,nowTimeGlobal;
 extern RTC_DATA_ATTR enum availableStates stateSelected,currentState;
 extern RTC_DATA_ATTR  enum CloudClockStatus CloudClockCurrentStatus;
 extern RTC_DATA_ATTR enum powerModes powerState;

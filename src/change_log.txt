@@ -3,6 +3,11 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.9.3 10/Ene/2023   - Major code optimization (timers clean up, etc.)
+                        + Periodical NTP checks to minimize clock drift due to Deep Mode
+                        + Buttons checks code carved out from loop() to ButtonChecks.cpp
+                        + NTP Sync avoids getting blocked while trying to sync with NTP server (button actions allowed)
+                      - lastTime<ACTION> flag alligned with the begining of the function/action for better reliability of period
 - 0.9.2  8/Ene/2023   - Loop Code cleanup for optimization (warmUP())
                       - added error counters for stats
                       - Deleted daily NTP Syncs at NTP_OK_CHECK_HOUR and NTP_OK_CHECK_MINUTE. Now it's randomly

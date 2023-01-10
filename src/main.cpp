@@ -22,6 +22,8 @@
 #include "icons.h"
 #include "battery.h"
 //#include "esp_wifi.h"
+#include "esp_sntp.h"
+#include <ESP32Time.h>
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -32,10 +34,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   652 B
+// RTC memory variables:                   741 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     3732 B
-// RTC memory left:     8000 B - 3732 B = 4268 B
+// RTC memorty TOTAL:                     3801 B
+// RTC memory left:     8000 B - 3801 B = 4199 B
 RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour C02 values
 RTC_DATA_ATTR float_t lastHourTempSamples[3600/SAMPLE_T_LAST_HOUR];  //4*(3600/60)=240 B - Buffer to record last-hour Temp values
 RTC_DATA_ATTR float_t lastHourHumSamples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour Hum values
@@ -43,12 +45,12 @@ RTC_DATA_ATTR float_t lastDayCo2Samples[24*3600/SAMPLE_T_LAST_DAY];  //4*(24*360
 RTC_DATA_ATTR float_t lastDayTempSamples[24*3600/SAMPLE_T_LAST_DAY]; //4*(24*3600/450)=768 B - Buffer to record last-day Temp values
 RTC_DATA_ATTR float_t lastDayHumSamples[24*3600/SAMPLE_T_LAST_DAY];  //4*(24*3600/450)=768 B - Buffer to record last-day Hum values
 RTC_DATA_ATTR boolean firstBoot=true;  //1B - First boot flag.
-RTC_DATA_ATTR ulong nowTimeGlobal=0,lastNowTimeGlobal=0,timeUSBPowerGlobal=0,
-                    lastTimeSampleCheck=0,previousLastTimeSampleCheck=0, lastTimeDisplayCheck=0,lastTimeDisplayModeCheck=0,lastTimeNTPCheck=0,lastTimeVOLTCheck=0,
-                    lastTimeHourSampleCheck=0,lastTimeDaySampleCheck=0,lastTimeUploadSampleCheck=0,lastTimeIconStatusRefreshCheck=0,
-                    lastTimeTurnOffBacklightCheck=0,lastTimeWifiReconnectionCheck=0; //15*4=60 B
+RTC_DATA_ATTR uint64_t nowTimeGlobal=0,timeUSBPowerGlobal=0,loopStartTime=0,loopEndTime=0,
+                        lastTimeSampleCheck=0,previousLastTimeSampleCheck=0, lastTimeDisplayCheck=0,lastTimeDisplayModeCheck=0,lastTimeNTPCheck=0,lastTimeVOLTCheck=0,
+                        lastTimeHourSampleCheck=0,lastTimeDaySampleCheck=0,lastTimeUploadSampleCheck=0,lastTimeIconStatusRefreshCheck=0,
+                        lastTimeTurnOffBacklightCheck=0,lastTimeWifiReconnectionCheck=0; //16*8=128 B
 RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod; //3*4=12B
-RTC_DATA_ATTR uint64_t sleepTimer; //8 B
+RTC_DATA_ATTR uint64_t sleepTimer=0; //8 B
 RTC_DATA_ATTR enum displayModes displayMode=bootup,lastDisplayMode=bootup; //2*4=8 B
 RTC_DATA_ATTR enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState; //3*4=12 B
 RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus; //4 B
@@ -76,7 +78,7 @@ RTC_DATA_ATTR Button  button2(BUTTON2); //16 B
 RTC_DATA_ATTR char TZEnvVar[50]="\0"; //50 B Should be enough - To back Time Zone Variable up
 RTC_DATA_ATTR struct tm startTimeInfo; //36 B
 RTC_DATA_ATTR boolean firstWifiCheck=true,forceWifiReconnect=false,forceGetSample=false,forceGetVolt=false,
-        forceDisplayRefresh=false,forceDisplayModeRefresh=false,buttonWakeUp=false; // 7*1=7 B
+        forceDisplayRefresh=false,forceDisplayModeRefresh=false,forceNTPCheck=false,buttonWakeUp=false; // 8*1=8 B
 RTC_DATA_ATTR int uploadServerIPAddressOctectArray[4]; // 4*4B = 16B - To store upload server's @IP
 RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
@@ -96,7 +98,7 @@ SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX); //136 B
 uint8_t error_setup=NO_ERROR,remainingBootupSeconds=0;
 int16_t cuX,cuY;
 TFT_eSprite stext1 = TFT_eSprite(&tft); // Sprite object stext1
-ulong lastNowTime=0,nowTime=0,previousTime=0,timePressButton1,timeReleaseButton1,timePressButton2,timeReleaseButton2,
+ulong previousTime=0,timePressButton1,timeReleaseButton1,timePressButton2,timeReleaseButton2,
       remainingBootupTime=BOOTUP_TIMEOUT*1000;
 String valueString;
 String serverToUploadSamplesString(SERVER_UPLOAD_SAMPLES);
@@ -416,79 +418,9 @@ String roundFloattoString(float_t number, uint8_t decimals) {
   return myString;
 }
 
-void setupNTPConfig(boolean fromSetup) {
-  //If function called fron firstSetup(), then logs are displayed
-
-  if (debugModeOn) {Serial.println("  - [setupNTPConfig] - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", errorsNTPCnt="+String(errorsNTPCnt));}
-  
-  CloudClockCurrentStatus=CloudClockOffStatus;
-  //User credentials definition
-  ntpServers[0]="\0";ntpServers[1]="\0";ntpServers[2]="\0";ntpServers[3]="\0";
-  #ifdef NTP_SERVER
-    ntpServers[0]=NTP_SERVER;
-  #endif
-  #ifdef NTP_SERVER2
-    ntpServers[1]=NTP_SERVER2;
-  #endif
-  #ifdef NTP_SERVER3
-    ntpServers[2]=NTP_SERVER3;
-  #endif
-  #ifdef NTP_SERVER4
-    ntpServers[3]=NTP_SERVER4;
-  #endif
-
-  if (wifiCurrentStatus!=wifiOffStatus) {
-    uint8_t previousError_Setup=error_setup;
-    for (uint8_t loopCounter=0; loopCounter<(uint8_t)sizeof(ntpServers)/sizeof(String); loopCounter++) {
-      error_setup=ERROR_NTP_SERVER;
-      if (ntpServers[loopCounter].charAt(0)=='\0') loopCounter++;
-      else {
-        if (logsOn && fromSetup) {
-          Serial.println("[setup - NTP] Connecting to NTP Server: ");
-          Serial.print("  NTP Server: ");Serial.println(ntpServers[loopCounter].c_str());
-        }
-        #ifdef NTP_TZ_ENV_VARIABLE
-          configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
-        #else
-          configTime(gmtOffset_sec, daylightOffset_sec, ntpServers[loopCounter].c_str());
-        #endif
-
-        if (!getLocalTime(&startTimeInfo)) {
-          if (logsOn && fromSetup) {
-            Serial.println("  Time: Failed to get time");
-            Serial.print("[setup] - NTP: ");Serial.println("KO");
-          }
-        }
-        else {
-          if (logsOn && fromSetup) {
-            Serial.print("  Time: "); Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
-            Serial.print("[setup] - NTP: ");Serial.println("OK");
-          }
-          CloudClockCurrentStatus=CloudClockOnStatus;
-          ntpServerIndex=loopCounter;
-          error_setup=previousError_Setup;
-          loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String);
-          lastTimeNTPCheck=millis();
-          memcpy(TZEnvVar,getenv("TZ"),String(getenv("TZ")).length()); //Back Time Zone up to restore it after wakeup
-        }
-      }
-    }
-  }
-
-  if (CloudClockCurrentStatus==CloudClockOffStatus) {
-    errorsNTPCnt++; //Something went wrong. Update error counter for stats          
-  }
-
-  if (debugModeOn) {
-      Serial.println("    - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck)+", errorsNTPCnt="+String(errorsNTPCnt));
-      Serial.print("  - [setupNTPConfig] - Exit - Time:");Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
-  }
-}
-
-void go_to_hibernate(void) {
+void go_to_hibernate() {
   //Going to hibernate (switch the device off)
-  //if (debugModeOn) {Serial.println("  - [go_to_hibernate] - Time: "); getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println("    - Setting up Power Domains OFF before going into Deep Sleep");}
-  if (debugModeOn) {Serial.println("  - [go_to_hibernate] - Time: ");Serial.println("    - Setting up Power Domains OFF before going into Deep Sleep");}
+  if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - [go_to_hibernate] - Time: ");Serial.println("    - Setting up Power Domains OFF before going into Deep Sleep");}
     
   //Set all the power domains OFF
   esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH,   ESP_PD_OPTION_OFF);
@@ -505,7 +437,8 @@ void go_to_hibernate(void) {
   if (debugModeOn) {Serial.println("    - Setup ESP32 to wake up when ext1 GPIO "+String(GPIO_NUM_35)+" is LOW");}
   esp_sleep_enable_ext1_wakeup(0x800000000, ESP_EXT1_WAKEUP_ALL_LOW); //GPIO_NUM_35=2^35 mask //Button1
   
-  if (debugModeOn) {Serial.println("    - Going to sleep now");}
+  loopEndTime=loopStartTime+millis();
+  if (debugModeOn) {Serial.println(String(loopEndTime)+"    - Going to sleep now");}
   esp_deep_sleep_start();
 }
 
@@ -513,36 +446,41 @@ void go_to_sleep(void) {
   //Timer is a wake up source. We set our ESP32 to wake up periodically
   //Firts let's set the timer based on the Saving Energy Mode
   //and also the period variable to take actions next wakeup period
+  loopEndTime=loopStartTime+millis();
+
+  if (debugModeOn) {Serial.println(String(loopEndTime)+"  - [go_to_sleep] - loopStartTime="+String(loopStartTime));}
+  
   switch (energyCurrentMode) {
     case fullEnergy:
-      sleepTimer=TIME_TO_SLEEP_FULL_ENERGY;
+      sleepTimer=TIME_TO_SLEEP_FULL_ENERGY>(loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000?TIME_TO_SLEEP_FULL_ENERGY-(loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000:TIME_TO_SLEEP_FULL_ENERGY;
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
     break;
     case reducedEnergy:
-      sleepTimer=TIME_TO_SLEEP_REDUCED_ENERGY;
+      sleepTimer=TIME_TO_SLEEP_REDUCED_ENERGY>((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000)?TIME_TO_SLEEP_REDUCED_ENERGY-((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000):TIME_TO_SLEEP_REDUCED_ENERGY;
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //Keeping it for future. In this verstion No BAT checks in Reduce Engergy Mode to save energy
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
     break;
     case saveEnergy:
-      sleepTimer=TIME_TO_SLEEP_SAVE_ENERGY;
+      sleepTimer=TIME_TO_SLEEP_SAVE_ENERGY>((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000)?TIME_TO_SLEEP_SAVE_ENERGY-((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000):TIME_TO_SLEEP_SAVE_ENERGY;
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //Keeping in for future. In this version No BAT checks in Save Engergy Mode to save energy
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
     break;
   }
   
+  //Going to sleep
   esp_sleep_enable_timer_wakeup(sleepTimer);
-  if (debugModeOn) {Serial.println("  - [go_to_sleep] - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println("    - Setup ESP32 to wake up every "+String(sleepTimer/uS_TO_S_FACTOR)+" Seconds");}
+  if (debugModeOn) {
+    Serial.print(String(loopEndTime)+"  - [go_to_sleep] - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");
+    Serial.println("    - Setup ESP32 to wake up in "+String(sleepTimer/uS_TO_S_FACTOR)+" Seconds");
+    }
+  
   //We set our ESP32 to wake up for an external ext0 trigger.
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_35,0); //1 = High, 0 = Low
   if (debugModeOn) {Serial.println("    - Setup ESP32 to wake up when ext0 GPIO "+String(GPIO_NUM_35)+" is LOW");}
-
-  //Going to sleep
-  nowTimeGlobal=lastNowTimeGlobal+(millis()-lastNowTime);
-  lastNowTimeGlobal=nowTimeGlobal;
   esp_deep_sleep_start();
 
   /*esp_err_t err = esp_wifi_stop();
@@ -553,6 +491,111 @@ void go_to_sleep(void) {
   */
 }
 
+void setupNTPConfig(boolean fromSetup) {
+  //If function called fron firstSetup(), then logs are displayed
+  // and buttons are checked during NTP Sync handshake
+
+  if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - [setupNTPConfig] - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", errorsNTPCnt="+String(errorsNTPCnt));}
+  
+  CloudClockStatus previousCloudClockCurrentStatus=CloudClockCurrentStatus;
+  CloudClockCurrentStatus=CloudClockOffStatus;
+  //User credentials definition
+  ntpServers[0]="\0";ntpServers[1]="\0";ntpServers[2]="\0";ntpServers[3]="\0";
+  #ifdef NTP_SERVER
+    ntpServers[0]=NTP_SERVER;
+  #endif
+  #ifdef NTP_SERVER2
+    ntpServers[1]=NTP_SERVER2;
+  #endif
+  #ifdef NTP_SERVER3
+    ntpServers[2]=NTP_SERVER3;
+  #endif
+  #ifdef NTP_SERVER4
+    ntpServers[3]=NTP_SERVER4;
+  #endif
+
+  boolean whileFlagOn=true;
+  if (wifiCurrentStatus!=wifiOffStatus) {
+    uint8_t previousError_Setup=error_setup;
+    for (uint8_t loopCounter=0; loopCounter<(uint8_t)sizeof(ntpServers)/sizeof(String); loopCounter++) {
+      error_setup=ERROR_NTP_SERVER;
+      if (ntpServers[loopCounter].charAt(0)=='\0') loopCounter++;
+      else {
+        if ((logsOn && fromSetup) || debugModeOn) {Serial.println("[setup - NTP] Connecting to NTP Server: "+ntpServers[loopCounter]);}
+        #ifdef NTP_TZ_ENV_VARIABLE
+          configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
+        #else
+          configTime(gmtOffset_sec, daylightOffset_sec, ntpServers[loopCounter].c_str());
+        #endif
+
+        uint64_t whileStartTime=loopStartTime+millis(),auxTime=whileStartTime;        
+        if (debugModeOn) {Serial.println("    - whileStartTime="+String(whileStartTime)+", waiting for NTPStatus=SNTP_SYNC_STATUS_COMPLETED");}
+        while ( sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED &&
+               (auxTime-whileStartTime)<NTP_CHECK_TIMEOUT && whileFlagOn) {
+          auxTime=loopStartTime+millis();
+
+          //Check if buttons are pressed during NTP sync handshake if not in the first Setup
+          if (!fromSetup) {
+            switch (checkButtonsActions(ntpcheck)) {
+              case 1:
+              case 2:
+              case 3:
+                //Button1 or Button2 pressed or released. NTP Sync process aborted if not Sync is completed
+                if (sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED) { //Actions required as the process is aborted
+                  forceNTPCheck=true; //Let's grant NTP check again in the next loop interaction
+                  CloudClockCurrentStatus=previousCloudClockCurrentStatus; //Restore Cloud Clock status 
+                  error_setup=previousError_Setup;                         //Restore previous error - Mainly for firstSetup()
+                  loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String); //Ends the for loop
+                  whileFlagOn=false; //Breaks the while loop and continue to the regular loop() flow
+                }
+              break;
+              default:
+                //Regular exit. Do nothing
+              break;
+            }
+          }
+        }
+
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - End of wait - Elapsed Time: "+String(auxTime-whileStartTime));}
+        
+        if (!whileFlagOn) {  //Process aborted due to buttons
+          if (debugModeOn) {
+            Serial.println("  Time: Button pressed - Abort to get time");
+          }
+        }
+        else {
+          if ((auxTime-whileStartTime)>=NTP_CHECK_TIMEOUT) {
+            if ((logsOn && fromSetup) || debugModeOn) {
+              Serial.println("  Time: Failed to get time");
+              Serial.print("[setup] - NTP: ");Serial.println("KO");
+            }
+          }
+          else {
+            if ((logsOn && fromSetup) || debugModeOn) {
+              Serial.print("  Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
+              Serial.print("[setup] - NTP: ");Serial.println("OK");
+            }
+            CloudClockCurrentStatus=CloudClockOnStatus;
+            ntpServerIndex=loopCounter;
+            error_setup=previousError_Setup;
+            loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String);
+            memcpy(TZEnvVar,getenv("TZ"),String(getenv("TZ")).length()); //Back Time Zone up to restore it after wakeup
+          }
+        }
+      }
+    }
+  }
+
+  if (CloudClockCurrentStatus==CloudClockOffStatus && whileFlagOn) {
+    errorsNTPCnt++; //Something went wrong. Update error counter for stats          
+  }
+
+  if (debugModeOn) {
+      Serial.println("    - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck)+", errorsNTPCnt="+String(errorsNTPCnt));
+      Serial.print(String(loopStartTime+millis())+"  - [setupNTPConfig] - Exit - Time:");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
+  }
+}
+
 void firstSetup() {
   static uint32_t wr = 1;
   static uint32_t rd = 0xFFFFFFFF;
@@ -560,6 +603,13 @@ void firstSetup() {
   displayMode=bootup;lastDisplayMode=bootup;
 
   if (logsOn) {Serial.begin(115200);Serial.print("\n[SETUP] - Doing regular CO2 bootup v");Serial.print(VERSION);Serial.println(" ..........");Serial.println("[setup] - Serial: OK");}
+
+  //Date initialization to 1-Jan-2022 00:00:00
+  // Necessary to avoid get frozen when getLocalTime() is called if NTP is not synced.
+  // https://stackoverflow.com/questions/72940013/why-getlocaltime-implementation-needs-delay
+  ESP32Time timeTest(0);
+  timeTest.setTime(0,0,0,1,1,2022);  // 1st Jan 2022 00:00:00
+  if (logsOn) {Serial.println("[setup] - Initial date set to 1st Jan 2022 00:00:00");}
 
   //Display init
   pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
@@ -857,6 +907,7 @@ void firstSetup() {
 
   //NTP Server
   setupNTPConfig(true);
+  lastTimeNTPCheck=loopStartTime+millis();  //loopStartTime=0 just right after bootup
   if (error_setup==ERROR_NTP_SERVER) {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
@@ -912,6 +963,8 @@ void firstSetup() {
     digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
     batADCVolt=0; for (u8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
     digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE);
+    
+    /*--><--*///batADCVolt=1900;
 
     if (batADCVolt >= VOLTAGE_TH_STATE) {
       timeUSBPowerGlobal=nowTimeGlobal;
@@ -984,20 +1037,22 @@ void firstSetup() {
   }
   
   //Updating timers after first setup
-  previousTime=millis();
+  nowTimeGlobal=loopStartTime+millis();
+  previousTime=nowTimeGlobal;
   remainingBootupTime=BOOTUP_TIMEOUT*1000;
   remainingBootupSeconds=(uint8_t)(remainingBootupTime/1000);
-  nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
-  lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
+  
+  if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [setup] - exit");}
 }
 
 boolean warmingUp() {
   //Run this code only after first bootup
-  
+
+  nowTimeGlobal=loopStartTime+millis();
   if ((int)remainingBootupTime>0) {
     //Only while showing bootup screen
-    remainingBootupTime-=(nowTime-previousTime);
-    previousTime=nowTime;
+    remainingBootupTime-=(nowTimeGlobal-previousTime);
+    previousTime=nowTimeGlobal;
   }
 
   //Keep showing bootup screen for a while
@@ -1061,7 +1116,7 @@ boolean warmingUp() {
   
   //Show Warming up screen
   uint auxCounter=0;
-  while (nowTime<co2PreheatingTime) {
+  while (nowTimeGlobal<co2PreheatingTime) {
     auxCounter++;
     //Waiting for the sensor to warmup before displaying value
     if (waitingMessage) {if (logsOn) Serial.println("Waiting for the warmup to finish");circularGauge.drawGauge2(0);waitingMessage=false;}
@@ -1093,8 +1148,7 @@ boolean warmingUp() {
     
     showIcons();
     delay(1000);
-    nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
-    lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
+    nowTimeGlobal=loopStartTime+millis();
   }
   lastTimeTurnOffBacklightCheck=nowTimeGlobal;
   if (runningMessage) {if (logsOn) Serial.println("Running.... :-)");runningMessage=false;}
@@ -1102,19 +1156,57 @@ boolean warmingUp() {
   return (false);
 }
 
+void initVariable() {
+  //Global variables init. Needed as they have random values after wakeup from hiberte mode
+  firstBoot=true;
+  nowTimeGlobal=0;timeUSBPowerGlobal=0;loopStartTime=0;loopEndTime=0;
+  lastTimeSampleCheck=0;previousLastTimeSampleCheck=0; lastTimeDisplayCheck=0;lastTimeDisplayModeCheck=0;
+  lastTimeNTPCheck=0;lastTimeVOLTCheck=0;lastTimeHourSampleCheck=0;lastTimeDaySampleCheck=0;
+  lastTimeUploadSampleCheck=0;lastTimeIconStatusRefreshCheck=0;lastTimeTurnOffBacklightCheck=0;
+  lastTimeWifiReconnectionCheck=0;
+  sleepTimer=0;
+  displayMode=bootup;lastDisplayMode=bootup;
+  stateSelected=displayingSampleFixed;currentState=bootupScreen;lastState=currentState;
+  updateHourSample=true;updateDaySample=true;updateHourGraph=true;updateDayGraph=true;
+  autoBackLightOff=true;button1Pressed=false;button2Pressed=false;uploadSamplesToServer=UPLOAD_SAMPLES_TO_SERVER;
+  powerState=off;
+  batteryStatus=battery000;
+  bootCount=0;loopCount=0;
+  circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
+                            CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
+                            CO2_GAUGE_TH1,TFT_YELLOW,CO2_GAUGE_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
+  horizontalBar=HorizontalBar(0,TEMP_BAR_MIN,TEMP_BAR_MAX,TEMP_BAR_X,TEMP_BAR_Y,
+                              TEMP_BAR_LENGTH,TEMP_BAR_HEIGH,TFT_GREEN,TEMP_BAR_TH1,
+                              TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
+  firstWifiCheck=true;forceWifiReconnect=false;forceGetSample=false;forceGetVolt=false;
+  forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;
+  valueCO2=0,valueT=0,valueHum=0,lastValueCO2=-1,tempMeasure=0;
+  debugModeOn=true;
+  errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0;
+
+  error_setup=NO_ERROR,remainingBootupSeconds=0;
+  previousTime=0;remainingBootupTime=BOOTUP_TIMEOUT*1000;
+  static const char hex_digits[] = "0123456789ABCDEF";
+  waitingMessage=true;runningMessage=true;
+}
+
 void setup() {
-  lastNowTime=millis();
+  loopStartTime=loopEndTime+millis()+sleepTimer/1000;
+  nowTimeGlobal=loopStartTime;
   bootCount++;
 
   Serial.begin(115200);
-  if (debugModeOn) {Serial.println("\n[SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}
+  if (debugModeOn) {Serial.println("\n"+String(nowTimeGlobal)+" [SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}
   randomSeed(analogRead(GPIO_NUM_32));
 
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   switch(wakeup_reason)
   {
     case ESP_SLEEP_WAKEUP_EXT1: //Wake from Hibernate Mode by pressing Button1
-      if (debugModeOn) {Serial.println("  - Wakeup caused by external signal using RTC_CNT - Ext1");}
+      initVariable(); //Init Global variables after hibernate mode
+      loopStartTime=millis();loopEndTime=0;sleepTimer=0;nowTimeGlobal=loopStartTime;
+      bootCount=0;
+      if (debugModeOn) {Serial.println("  - Wakeup caused by external signal using RTC_CNT - Ext1");Serial.println("   - loopEndTime="+String(loopEndTime)+", sleepTimer="+String(sleepTimer/1000)+", loopStartTime="+String(loopStartTime)+", nowTimeGlobal="+String(nowTimeGlobal));}
       //To wake from hibernate, Button1 must be preseed TIME_LONG_PRESS_BUTTON1_HIBERNATE seconds
       button1.begin();
       boolean stopCheck;
@@ -1125,13 +1217,14 @@ void setup() {
         else delay(100);
       } //Wait to release button1
       
-      if (debugModeOn) {Serial.println("    - Time elapsed: "+String(millis()-lastNowTime)+" ms");}
-      if ((millis()-lastNowTime) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) { //Hard bootup - Run global setup from scratch
+      if (debugModeOn) {Serial.println("    - Time elapsed: "+String(millis()-nowTimeGlobal)+" ms");}
+      if ((millis()-nowTimeGlobal) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) { //Hard bootup - Run global setup from scratch
         firstSetup();
+        nowTimeGlobal=loopStartTime+millis();
         return;
       }  
       else { //Going back to hibernate - Button1 wasn't pressed time enough
-        if (debugModeOn) {Serial.println("    - hibernate");delay(1000);}
+        if (debugModeOn) {Serial.println("    - Going back to hibernate");delay(1000);}
         go_to_hibernate();
       } 
     break;
@@ -1150,6 +1243,7 @@ void setup() {
       if (debugModeOn) {Serial.println("      - checkButton1() & buttonWakeUp=true");}
       checkButton1();
       buttonWakeUp=true;
+      nowTimeGlobal=loopStartTime+millis();
       lastTimeTurnOffBacklightCheck=nowTimeGlobal; //To avoid TIME_TURN_OFF_BACKLIGHT 
       displayMode=sampleValue;  //To force refresh TFT with the sample value Screen
       lastDisplayMode=bootup;   //To force rendering the value graph
@@ -1161,24 +1255,23 @@ void setup() {
         Serial.println("    - setting things up back again after deep sleep specific for periodic wakeup");
         Serial.println("      - timers init");
       }
-      nowTimeGlobal=lastNowTimeGlobal+(ulong) sleepTimer/1000; //Adding sleepTimer to nowTimeGlobal
-      lastNowTimeGlobal=nowTimeGlobal;
+      nowTimeGlobal=loopStartTime+millis();
       if (debugModeOn) {Serial.println("    - end");}
     break;
     default:
       if (debugModeOn) {Serial.println("  - Wakeup was not caused by deep sleep: "+String(wakeup_reason)+" (0=POWERON_RESET, including HW Reset)");}
       firstSetup(); //Hard bootup - Run global setup during the first boot (HW reset or power ON)
+      nowTimeGlobal=loopStartTime+millis();
       return;
     break;
   }
   
   //This piece os code is run after wakeup from Deep Sleep (neither HW reset nor Hibernate)
   //Run global setup after wakeup
-  nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
-  lastNowTime=nowTime;lastNowTimeGlobal=nowTimeGlobal;
+  nowTimeGlobal=loopStartTime+millis();
 
   if (debugModeOn) {
-    Serial.println("  - Setting common things up back again after deep sleep");
+    Serial.println(String(nowTimeGlobal)+"  - Setting common things up back again after deep sleep");
     Serial.println("      - pinMode(POWER_ENABLE_PIN, OUTPUT) & initVoltageArray() Init battery charge array");
   }
   pinMode(POWER_ENABLE_PIN, OUTPUT);
@@ -1235,13 +1328,13 @@ void setup() {
   if (debugModeOn) {Serial.println("      - Restoring TZEnvVar="+String(TZEnvVar));}
   setenv("TZ",TZEnvVar,1); tzset(); //Restore TZ enviroment variable to show the right time
 
-  if (debugModeOn) {Serial.println("[SETUP] - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+  nowTimeGlobal=loopStartTime+millis();
+  if (debugModeOn) {Serial.print(String(nowTimeGlobal)+" [SETUP] - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
 }
 
 
 void loop() {
-  nowTime=millis();nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
-  lastNowTime=nowTime;
+  nowTimeGlobal=loopStartTime+millis();
   loopCount++;
 
   //After firstSetup, the CO2 sensor must warmup before starting to take samples
@@ -1256,9 +1349,10 @@ void loop() {
   //Do periodic actions based on TIMEOUTS and PERIODS
 
   //Cheking if BackLight should be turned off
+  nowTimeGlobal=loopStartTime+millis();
   if (((nowTimeGlobal-lastTimeTurnOffBacklightCheck) >= TIME_TURN_OFF_BACKLIGHT) && !firstBoot && 
        digitalRead(PIN_TFT_BACKLIGHT)!=LOW && autoBackLightOff==true) {
-    if (debugModeOn) {Serial.println("  - TIME_TURN_OFF_BACKLIGHT");}
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - TIME_TURN_OFF_BACKLIGHT");}
     
     if (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
         currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) {
@@ -1272,105 +1366,22 @@ void loop() {
   }
   
   // Checking if sample buffers update is needed
+  nowTimeGlobal=loopStartTime+millis();
   if ((nowTimeGlobal-lastTimeHourSampleCheck) >= SAMPLE_T_LAST_HOUR*1000) {lastTimeHourSampleCheck=nowTimeGlobal; updateHourSample=true;updateHourGraph=true;}
   if ((nowTimeGlobal-lastTimeDaySampleCheck) >= SAMPLE_T_LAST_DAY*1000) {lastTimeDaySampleCheck=nowTimeGlobal; updateDaySample=true;updateDayGraph=true;}
   
   //Actions if button1 is pushed. It depens on the current state
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
-  if (button1.pressed() && !buttonWakeUp && !button1Pressed) {
-    if (debugModeOn) {Serial.println("  - button1.pressed");}
-
-    //Take time to check if it is long press
-    button1Pressed=true;
-    if (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
-        currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential)
-      timePressButton1=millis();
-    else
-      timePressButton1=0;
-  }
-
-  if (button1.released() && !buttonWakeUp && !firstBoot) {button1Pressed=false;checkButton1();}
-
-  //Check if Button1 was long pressed
-  //Avoid this action the first loop interaction just right after wakeup by pressing a button
-  if (button1Pressed && timePressButton1!=0 && !buttonWakeUp) { 
-
-    if ((millis()-timePressButton1) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) {
-      //Long press, so toggle going to hibernate
-      //Preparing to display message in the screen
-      tft.fillScreen(TFT_BLACK);
-      tft.setTextSize(TEXT_SIZE_MENU);
-      tft.setTextColor(TFT_RED,TFT_BLACK);
-      tft.setCursor(0,tft.height()/2-2*(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println  ("       Device");
-      tft.setCursor(0,tft.height()/2-(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println("     Switch OFF");
-      tft.setTextColor(TFT_GOLD,TFT_BLACK);
-      tft.setCursor(0,tft.height()/2+10,TEXT_FONT_MENU);tft.println("  Button1 Switch ON");
-      delay(3000);
-
-      tft.fillScreen(TFT_BLACK);
-      go_to_hibernate();
-    } 
-  }
-
-  //Actions if button2 is pushed. It depens on the current state
-  //Avoid this action the first loop interaction just right after wakeup by pressing a button
-  if (button2.pressed() && !buttonWakeUp) {
-    if (debugModeOn) {Serial.println("  - button2.pressed");}
-
-    //Take time to check if it is long press
-    button2Pressed=true;
-    if (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
-        currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential)
-      timePressButton2=millis();
-    else
-      timePressButton2=0;
-    checkButton2();
-  }
-
-  if (button2.released() && !buttonWakeUp) {button2Pressed=false;}
-  //Check if Button2 was long pressed
-  //Avoid this action the first loop interaction just right after wakeup by pressing a button
-  if (button2Pressed && timePressButton2!=0 && !buttonWakeUp) { 
-    if ((millis()-timePressButton2) > TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT) {
-      //Long press, so toggle autoBackLightOff and display message
-      autoBackLightOff=!autoBackLightOff;
-      timePressButton2=0;
-      lastDisplayMode=AutoSwitchOffMessage;
-
-      //Preparing to display message in the screen
-      tft.fillScreen(TFT_BLACK);
-      tft.setTextSize(TEXT_SIZE_MENU);
-      tft.setTextColor(TFT_GOLD,TFT_BLACK);
-      tft.setCursor(0,tft.height()/2-2*(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println("      Display");
-      tft.setCursor(0,tft.height()/2-(tft.fontHeight(TEXT_FONT_MENU)+3),TEXT_FONT_MENU);tft.println("  Auto switch off");
-      
-      if (autoBackLightOff) {
-        //Display message in the screen
-        tft.setTextColor(TFT_GREEN,TFT_BLACK);
-        tft.setCursor(0,tft.height()/2+2,TEXT_FONT_MENU);tft.println("      Enabled");
-        delay(2500);
-        tft.fillScreen(TFT_BLACK);
-
-        //Turn off back light
-        digitalWrite(PIN_TFT_BACKLIGHT,LOW);
-        lastTimeTurnOffBacklightCheck=nowTimeGlobal;
-      }
-      else {
-        //Display message in the screen
-        tft.setTextColor(TFT_RED,TFT_BLACK);
-        tft.setCursor(0,tft.height()/2+2,TEXT_FONT_MENU);tft.println("     Disabled");
-        delay(2500);
-        tft.fillScreen(TFT_BLACK);
-      }
-    }
-  }
+  nowTimeGlobal=loopStartTime+millis();
+  checkButtonsActions(mainloop);
   
   //Regular actions every VOLTAGE_CHECK_PERIOD seconds
   //Checking out whether the voltage exceeds thresholds to detect energy source (bat or USB)
   // but only if Full Energy Mode (USB power to save energy consume)
   //forceGetVolt==true if buttons are pressed to wakeup CPU
+  nowTimeGlobal=loopStartTime+millis();
   if ( (((nowTimeGlobal-lastTimeVOLTCheck) >= voltageCheckPeriod) && fullEnergy==energyCurrentMode) || forceGetVolt ) {
-    if (debugModeOn) {Serial.println("  - VOLTAGE_CHECK_PERIOD");}
+    if (debugModeOn) {Serial.println("-------------oooooOOOOOOoooooo------------");Serial.println(String(nowTimeGlobal)+"  - VOLTAGE_CHECK_PERIOD");}
     
     //batADCVolt update
     //Power state check and powerState update
@@ -1381,15 +1392,19 @@ void loop() {
     //If USB is unplugged, timeUSBPowerGlobal is set to zero
     updateBatteryVoltageAndStatus(nowTimeGlobal, &timeUSBPowerGlobal);
   
-    lastTimeVOLTCheck=nowTimeGlobal;
+    lastTimeVOLTCheck=nowTimeGlobal;  //There're no updates of lastTimeVOLTCheck in updateBatteryVoltageAndStatus()
     if (forceGetVolt) forceGetVolt=false;
   }
 
   //Regular actions every SAMPLE_PERIOD seconds.
   //Taking CO2, Temp & Hum samples. Moving buffers at the right time
   //forceGetSample==true if buttons are pressed
+  nowTimeGlobal=loopStartTime+millis();
   if (((nowTimeGlobal-lastTimeSampleCheck) >= samplePeriod) || forceGetSample || firstBoot) {  
-    if (debugModeOn) {Serial.println("  - SAMPLE_PERIOD");}
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - SAMPLE_PERIOD");}
+
+    previousLastTimeSampleCheck=lastTimeSampleCheck;
+    lastTimeSampleCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
     
     //Getting CO2 & Temp values. VDC below MIN_VOLT, the measure is not realiable
     if (batADCVolt<=MIN_VOLT) valueCO2=-1;
@@ -1443,19 +1458,20 @@ void loop() {
       updateDaySample=false;
     }
 
-    previousLastTimeSampleCheck=lastTimeSampleCheck;
-    lastTimeSampleCheck=nowTimeGlobal;
     if (forceGetSample) forceGetSample=false;
 
-    if (debugModeOn) {Serial.println("  - SAMPLE_PERIOD - exit");}
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - exit");}
   }
 
   //Regular actions every ICON_STATUS_REFRESH_PERIOD seconds.
   //Refresh WiFi status icon. It's supposed it doesn't consume too much energy and is inmediate
   //Only if the Display is ON, otherwise it doesn't make sense
+  nowTimeGlobal=loopStartTime+millis();
   if (((nowTimeGlobal-lastTimeIconStatusRefreshCheck) >= ICON_STATUS_REFRESH_PERIOD) && !firstBoot &&
       HIGH==digitalRead(PIN_TFT_BACKLIGHT) ) {
-    if (debugModeOn) {Serial.println("  - ICON_STATUS_REFRESH_PERIOD");}
+    if (debugModeOn) {String(nowTimeGlobal)+Serial.println(String(nowTimeGlobal)+"  - ICON_STATUS_REFRESH_PERIOD");}
+
+    lastTimeIconStatusRefreshCheck=nowTimeGlobal;  //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
 
     if (WiFi.status()!=WL_CONNECTED) {
       //WiFi is not connected. Update wifiCurrentStatus properly
@@ -1476,13 +1492,16 @@ void loop() {
       else if (WiFi.RSSI()>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
       else if (WiFi.RSSI()<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
     }
-    lastTimeIconStatusRefreshCheck=nowTimeGlobal;
   }
   
   //Regular actions every DISPLAY_MODE_REFRESH_PERIOD seconds. Selecting what's the screen to display (active screen)
+  nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeDisplayModeCheck) >= DISPLAY_MODE_REFRESH_PERIOD) || forceDisplayModeRefresh) && 
        currentState==displayingSequential && digitalRead(PIN_TFT_BACKLIGHT)!=LOW) {
-    if (debugModeOn) {Serial.println("  - DISPLAY_MODE_REFRESH_PERIOD");}
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - DISPLAY_MODE_REFRESH_PERIOD");}
+
+    lastTimeDisplayModeCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
+
     //forceDisplayModeRefresh=true if either:
     // 1) comming from menu WhatToDisplay, after change to displayingSequential mode
     // 2) comming from button1 to switch the Display ON
@@ -1500,28 +1519,18 @@ void loop() {
       break;
     }
   
-    lastTimeDisplayModeCheck=nowTimeGlobal;
     if (forceDisplayModeRefresh) forceDisplayModeRefresh=false;
   }
 
   //Regular actions every DISPLAY_REFRESH_PERIOD seconds. Display the active screen, but only if the Display is ON (to save energy consume)
+  nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeDisplayCheck) >= DISPLAY_REFRESH_PERIOD) || forceDisplayRefresh) && digitalRead(PIN_TFT_BACKLIGHT)!=LOW && 
       (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
         currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
     
-    if (debugModeOn) {
-      Serial.println("  - DISPLAY_REFRESH_PERIOD");
-      Serial.println("    - bootCount="+String(bootCount)+", loopCount="+String(loopCount)+", nowTime="+String(nowTime)+", lastNowTime="+String(lastNowTime)+", nowTimeGlobal="+String(nowTimeGlobal)+", lastNowTimeGlobal="+String(lastNowTimeGlobal)+
-                 ", energyCurrentMode="+String(energyCurrentMode)+" (fullEnergy=0), powerState="+String(powerState)+", batADCVolt="+String(batADCVolt)+
-                 ", lastTimeTurnOffBacklightCheck="+String(lastTimeTurnOffBacklightCheck)+", lastTimeDisplayModeCheck="+String(lastTimeDisplayModeCheck)+
-                 ", forceDisplayModeRefresh="+String(forceDisplayModeRefresh)+", lastTimeDisplayCheck="+String(lastTimeDisplayCheck)+", forceDisplayRefresh="+String(forceDisplayRefresh)+
-                 ", lastTimeUploadSampleCheck="+String(lastTimeUploadSampleCheck));
-      Serial.println("    - displayMode="+String(displayMode)+"\n        (bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage)\n"+
-                   "    - samplePeriod="+String(samplePeriod)+", nowTimeGlobal-previousLastTimeSampleCheck="+String(nowTimeGlobal-previousLastTimeSampleCheck)+"(>=samplePeriod\n"+
-                   "    - previousLastTimeSampleCheck="+String(previousLastTimeSampleCheck)+", lastTimeDisplayCheck="+String(lastTimeDisplayCheck)+
-                   "\n    - forceDisplayRefresh="+String(forceDisplayRefresh)+", firstBoot="+String(firstBoot)+
-                   "\n    - lastDisplayMode="+String(lastDisplayMode)+"\n        (bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage)");
-    }
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - DISPLAY_REFRESH_PERIOD");}
+    lastTimeDisplayCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
+
     switch (displayMode) {
       case  sampleValue:
         if (debugModeOn) {Serial.print("    - **** displayMode=sampleValue - Rendering only if new sample value - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
@@ -1604,18 +1613,18 @@ void loop() {
       break;
     }   
 
-    lastTimeDisplayCheck=nowTimeGlobal;
     if (forceDisplayRefresh) forceDisplayRefresh=false;
   }
 
   //Regular actions every WIFI_RECONNECT_PERIOD seconds to recover WiFi connection
   //forceWifiReconnect==true after ICON_STATUS_REFRESH_PERIOD or buttons are pressed
   //To avoid TFT gets frozen while WiFi reconnection, this code must be run after DISPLAY_REFRESH_PERIOD
+  nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeWifiReconnectionCheck) >= WIFI_RECONNECT_PERIOD) || forceWifiReconnect ) && 
       !firstBoot && (wifiCurrentStatus==wifiOffStatus || WiFi.status()!=WL_CONNECTED) ) {
-    
+     
     if (debugModeOn) {
-      Serial.println("  - WIFI_RECONNECT_PERIOD (40 s)");
+      Serial.println(String(nowTimeGlobal)+"  - WIFI_RECONNECT_PERIOD (40 s)");
       Serial.println("    - lastTimeWifiReconnectionCheck="+String(lastTimeWifiReconnectionCheck));
       Serial.println("    - nowTimeGlobal-lastTimeWifiReconnectionCheck="+String(nowTimeGlobal-lastTimeWifiReconnectionCheck));
       Serial.println("    - forceWifiReconnect="+String(forceWifiReconnect));
@@ -1623,6 +1632,7 @@ void loop() {
       Serial.println("    - wifiCurrentStatus="+String(wifiCurrentStatus)+", wifiOffStatus=0");
       Serial.println("    - WiFi.status()="+String(WiFi.status())+", WL_CONNECTED=3");
     }
+    lastTimeWifiReconnectionCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
     
     //If WiFi disconnected (wifiOffStatus), then re-connect
     //Conditions for wifiCurrentStatus==wifiOffStatus
@@ -1640,43 +1650,61 @@ void loop() {
     } else {
       wifiCurrentStatus=wifiOffStatus;
     }
-  
-    lastTimeWifiReconnectionCheck=nowTimeGlobal;
+   
     if(forceWifiReconnect) forceWifiReconnect=false;
 
-    if (debugModeOn) {Serial.println("  - WIFI_RECONNECT_PERIOD - exit");}
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - WIFI_RECONNECT_PERIOD - exit");}
   }
 
   //Regular actions every NTP_KO_CHECK_PERIOD seconds. Cheking if NTP is off or should be checked
-  if ((nowTimeGlobal-lastTimeNTPCheck) >= NTP_KO_CHECK_PERIOD ) {
-    
-    if (debugModeOn) {Serial.println("  - NTP_KO_CHECK_PERIOD");}
+  nowTimeGlobal=loopStartTime+millis();
+  if ((nowTimeGlobal-lastTimeNTPCheck) >= NTP_KO_CHECK_PERIOD || forceNTPCheck) {
+    lastTimeNTPCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
 
-    //NTPConfig if either
-    // - Last NTP check failed (currently there is no NTP sycn)
-    // - Every 4 hours (in avarage ~17% day) to avoid time drift due to Deep Sleep
-    //   (random(1,6)<2) ~17%
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - NTP_KO_CHECK_PERIOD");}
+
+    //setupNTPConfig if either
+    // - Last NTP check failed (and currently there is no NTP sycn) - It's done always (in any Energy Mode)
+    // - If in Full Energy Mode (USB power) and WiFI connected:
+    //   + Every 6 hours in avarage per day (probability ~ 17% ==> prob= random(1,7)<2) 
+    // - If in either Reduce or Save Energy Mode, everytime there's WiFi connecton to minimize the
+    //     time drift due to Deep Sleep (0,337 s per Deep Sleep min).
+    //   + In average, every WIFI_RECONNECT_PERIOD=300000 (5 min)
+    // - If the previous NTP check was aborted due to Button action (forceNTPCheck=true)
     
-    if( (CloudClockCurrentStatus==CloudClockOffStatus || (random(1,6)<2)) && 
-        wifiCurrentStatus!=wifiOffStatus ) {
-      if (debugModeOn) {Serial.println("      - setupNTPConfig() for NTP Sync");}
+    long auxRandom=random(1,7);
+    if( wifiCurrentStatus!=wifiOffStatus &&
+        ( CloudClockCurrentStatus==CloudClockOffStatus || forceNTPCheck ||
+          (fullEnergy==energyCurrentMode && (auxRandom<2)) ||
+           reducedEnergy==energyCurrentMode || 
+           saveEnergy==energyCurrentMode ) ) {
+      if (debugModeOn) {
+        Serial.println("      - setupNTPConfig() for NTP Sync");
+        if (CloudClockCurrentStatus==CloudClockOffStatus) Serial.println("        - Reason: CloudClockCurrentStatus==CloudClockOffStatus");
+        if (forceNTPCheck) Serial.println("        - Reason: forceNTPCheck");
+        if (fullEnergy==energyCurrentMode && (auxRandom<2)) Serial.println("        - Reason: fullEnergy==energyCurrentMode && (auxRandom(="+String(auxRandom)+")<2)");
+        if (reducedEnergy==energyCurrentMode) Serial.println("        - Reason: reducedEnergy==energyCurrentMode");
+        if (saveEnergy==energyCurrentMode) Serial.println("        - Reason: saveEnergy==energyCurrentMode");
+      }
+      forceNTPCheck=false;
       setupNTPConfig(false); //NTP Sync and CloudClockCurrentStatus update
     }
-    nowTime=millis();
-    nowTimeGlobal=lastNowTimeGlobal+(nowTime-lastNowTime);
-    lastNowTime=nowTime; lastNowTimeGlobal=nowTimeGlobal;
-    lastTimeNTPCheck=nowTimeGlobal;
-
-    if (debugModeOn) {Serial.println("      - errorsNTPCnt="+String(errorsNTPCnt)+", CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck));getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");}
+    
+    if (debugModeOn) {
+      Serial.println(String(loopStartTime+millis())+"      - errorsNTPCnt="+String(errorsNTPCnt)+", CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck));
+      getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"  - NTP_KO_CHECK_PERIOD - Exit - Time: %d/%m/%Y - %H:%M:%S");
+    }
   }
   
   //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
   //WiFi SITE must be UPLOAD_SAMPLES_SITE (case sensitive), otherwise sample is not uploaded
+  nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeUploadSampleCheck) >= uploadSamplesPeriod) || firstBoot) && uploadSamplesToServer &&
       wifiCurrentStatus!=wifiOffStatus &&
       (0==wifiCred.wifiSITEs[wifiCred.activeIndex].compareTo(UPLOAD_SAMPLES_SITE)) ) {
     
-    if (debugModeOn) {Serial.print("  - UPLOAD_SAMPLES_PERIOD - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - UPLOAD_SAMPLES_PERIOD - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+    lastTimeUploadSampleCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
     
     String httpRequest=String(GET_REQUEST_TO_UPLOAD_SAMPLES);
 
@@ -1701,18 +1729,15 @@ void loop() {
       "&energyCurrentMode="+energyCurrentMode+"&errorsWiFiCnt="+errorsWiFiCnt+
       "&errorsSampleUpts="+errorsSampleUpts+"&errorsNTPCnt="+errorsNTPCnt+" HTTP/1.1";
 
-    if (debugModeOn) {Serial.println("    - serverToUploadSamplesIPAddress="+String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - serverToUploadSamplesIPAddress="+String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
                    ", httpRequest="+String(httpRequest));}
 
     sendHttpRequest(serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, httpRequest);
   
-    lastTimeUploadSampleCheck=nowTimeGlobal;
-
-    if (debugModeOn) {Serial.print("  - UPLOAD_SAMPLES_PERIOD - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+    if (debugModeOn) {Serial.print(String(loopStartTime+millis())+"  - UPLOAD_SAMPLES_PERIOD - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
   }
 
   if (firstBoot) firstBoot=false;
-  lastNowTimeGlobal=nowTimeGlobal;
   if (buttonWakeUp) buttonWakeUp=false;
 
   //Going to sleep, but only if the display if OFF and not in Full Energy Mode (USB powered)
