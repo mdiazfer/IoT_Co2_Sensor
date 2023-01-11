@@ -3,6 +3,9 @@ Change Log
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.9.4 11/Ene/2023   - Code optimization
+                        + Http Connection to the Upload Server avoids getting blocked while trying to connect
+                         (button actions and Display Refresh allowed)
 - 0.9.3 10/Ene/2023   - Major code optimization (timers clean up, etc.)
                         + Periodical NTP checks to minimize clock drift due to Deep Mode
                         + Buttons checks code carved out from loop() to ButtonChecks.cpp

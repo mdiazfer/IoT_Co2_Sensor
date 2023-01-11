@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.3"
+#define VERSION "0.9.4"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -30,6 +30,7 @@
 #define I2C_SCL 22 //I2C - SCL pin in the ESP board (SCL pin in the sensor)
 #define DEVICE_NAME_PREFIX "co2-sensor"
 #define PIN_TFT_BACKLIGHT 4
+#define DEBUG_MODE_ON false
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
@@ -95,6 +96,8 @@
 #define ERROR_BREAK_WIFI_SETUP  0x0C
 #define ERROR_ABORT_NTP_SETUP   0x0D
 #define ERROR_BREAK_NTP_SETUP   0x0E
+#define ERROR_ABORT_WEB_SETUP   0x0F
+#define ERROR_BREAK_WEB_SETUP   0x10
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240
@@ -311,7 +314,7 @@
   #endif
 
   #ifndef _BUTTONSFRAMEWORK_
-    enum callingAction {mainloop,ntpcheck,wificheck};
+    enum callingAction {mainloop,ntpcheck,wificheck,webcheck};
     #define _BUTTONSFRAMEWORK_
   #endif
 

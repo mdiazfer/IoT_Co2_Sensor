@@ -79,11 +79,11 @@ RTC_DATA_ATTR char TZEnvVar[50]="\0"; //50 B Should be enough - To back Time Zon
 RTC_DATA_ATTR struct tm startTimeInfo; //36 B
 RTC_DATA_ATTR boolean firstWifiCheck=true,forceWifiReconnect=false,forceGetSample=false,forceGetVolt=false,
         forceDisplayRefresh=false,forceDisplayModeRefresh=false,forceNTPCheck=false,buttonWakeUp=false,
-        wifiResuming=false,NTPResuming=false; // 10*1=10 B
+        forceWEBCheck=false,forceWEBTestCheck=false; // 11*1=11 B
 RTC_DATA_ATTR int uploadServerIPAddressOctectArray[4]; // 4*4B = 16B - To store upload server's @IP
 RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
-RTC_DATA_ATTR boolean debugModeOn=true; //1*1=1B
+RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON; //1*1=1B
 RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0; //2*4=8B - Error stats
 
 //Global variable definitions stored in regular RAM. 520 KB Max
@@ -106,7 +106,7 @@ String serverToUploadSamplesString(SERVER_UPLOAD_SAMPLES);
 IPAddress serverToUploadSamplesIPAddress; //8 B
 String device(DEVICE_NAME_PREFIX); //16 B
 static const char hex_digits[] = "0123456789ABCDEF";
-boolean waitingMessage=true,runningMessage=true;
+boolean waitingMessage=true,runningMessage=true,wifiResuming=false,NTPResuming=false,webResuming=false;
 uint8_t pixelsPerLine,
     spL,            //Number of Lines in the Sprite
     scL,            //Number of Lines in the Scroll
@@ -117,7 +117,7 @@ uint8_t pixelsPerLine,
     scFL,           //Scroll First Line Window
     scLL;           //Scroll Last Line Window
 uint8_t auxLoopCounter=0,auxLoopCounter2=0,auxCounter=0;
-uint64_t whileLoopTimeLeft=NTP_CHECK_TIMEOUT;
+uint64_t whileLoopTimeLeft=NTP_CHECK_TIMEOUT,whileWebLoopTimeLeft=HTTP_ANSWER_TIMEOUT;
 
 
 //Code
@@ -652,7 +652,7 @@ uint8_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,u
 
   if (auxLoopCounter!=nullptr) *auxLoopCounter=0;                 //To avoid resuming connection the next loop interacion
   if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;  //To avoid resuming connection the next loop interacion       
-  if (fromSetup) return(error_setup); //not NTP server connection
+  if (fromSetup) return(error_setup); //return previous error - Mainly for firstSetup()
   else return(NO_ERROR);
 }
 
@@ -933,7 +933,7 @@ void firstSetup() {
   if (error_setup != ERROR_WIFI_SETUP && uploadSamplesToServer) { 
     //Send HttpRequest to check the server status
     // The request updates CloudSyncCurrentStatus
-    sendHttpRequest(false,serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1");
+    sendAsyncHttpRequest(false,true,error_setup,serverToUploadSamplesIPAddress,SERVER_UPLOAD_PORT,String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1",&whileWebLoopTimeLeft);
 
     if (CloudSyncCurrentStatus==CloudSyncOnStatus) {
       if (logsOn) {Serial.println("[OK]");}
@@ -1242,17 +1242,18 @@ void initVariable() {
                               TEMP_BAR_LENGTH,TEMP_BAR_HEIGH,TFT_GREEN,TEMP_BAR_TH1,
                               TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
   firstWifiCheck=true;forceWifiReconnect=false;forceGetSample=false;forceGetVolt=false;
-  forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;wifiResuming=false;
-  valueCO2=0,valueT=0,valueHum=0,lastValueCO2=-1,tempMeasure=0;
-  debugModeOn=true;
-  errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0;
-  error_setup=NO_ERROR,remainingBootupSeconds=0;
+  forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;
+  forceWEBCheck=false;forceWEBTestCheck=false;
+  valueCO2=0;valueT=0;valueHum=0;lastValueCO2=-1;tempMeasure=0;
+  debugModeOn=DEBUG_MODE_ON;
+  errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;
+  error_setup=NO_ERROR;remainingBootupSeconds=0;
   previousTime=0;remainingBootupTime=BOOTUP_TIMEOUT*1000;
   static const char hex_digits[] = "0123456789ABCDEF";
   waitingMessage=true;runningMessage=true;
-  auxLoopCounter=0,auxLoopCounter2=0,auxCounter=0;
-  whileLoopTimeLeft=NTP_CHECK_TIMEOUT;
-  wifiResuming=false;NTPResuming=false;
+  auxLoopCounter=0;auxLoopCounter2=0;auxCounter=0;
+  whileLoopTimeLeft=NTP_CHECK_TIMEOUT;whileWebLoopTimeLeft=HTTP_ANSWER_TIMEOUT;
+  wifiResuming=false;NTPResuming=false;webResuming=false;
 }
 
 void setup() {
@@ -1715,6 +1716,7 @@ void loop() {
     //WiFi Reconnection
     if (debugModeOn) {Serial.println("    - auxLoopCounter="+String(auxLoopCounter)+", auxCounter="+String(auxCounter));}
     
+    forceWEBTestCheck=false; //If WiFi reconnection is successfull, then check WEB server to update ICON. Decision is done below, if NO_ERROR
     switch(wifiConnect(debugModeOn,false,&auxLoopCounter,&auxCounter)) {
       case ERROR_ABORT_WIFI_SETUP: //Button pressed. WiFi reconnection aborted. Exit now but force reconnection next loop interaction
         wifiCurrentStatus=previousWifiCurrentStatus;
@@ -1730,6 +1732,7 @@ void loop() {
       break;
       case ERROR_WIFI_SETUP:
         wifiCurrentStatus=wifiOffStatus;
+        forceWifiReconnect=false;
         wifiResuming=false;
         if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with ERROR_WIFI_SETUP. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect));}
       break;
@@ -1740,13 +1743,13 @@ void loop() {
         else if (WiFi.RSSI()>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
         else if (WiFi.RSSI()>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
         else if (WiFi.RSSI()<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+        forceWifiReconnect=false;
         wifiResuming=false;
-        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with NO_ERROR. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect));}
-
         //Send HttpRequest to check the server status
         // The request updates CloudSyncCurrentStatus
         //if (uploadSamplesToServer) 
-          sendHttpRequest(false,serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1");
+        forceWEBTestCheck=true; //Will check WEB server in the next loop() interaction
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with NO_ERROR. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect)+", forceWEBTestCheck="+String(forceWEBTestCheck));}
       break;
     } 
 
@@ -1798,10 +1801,12 @@ void loop() {
           if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with ERROR_BREAK_NTP_SETUP. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
         break;
         case ERROR_NTP_SERVER:
+          forceNTPCheck=false;
           NTPResuming=false;
           if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with ERROR_NTP_SERVER. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
         break;
         case NO_ERROR:
+          forceNTPCheck=false;
           NTPResuming=false;
           if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with NO_ERROR. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
         break;
@@ -1816,13 +1821,25 @@ void loop() {
   
   //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
   //WiFi SITE must be UPLOAD_SAMPLES_SITE (case sensitive), otherwise sample is not uploaded
+  //forceWEBCheck is set when in the previous interaction the WEB connection was either:
+  // ABORTED (Button Pressed) or
+  // BREAK  (Display Refresh)
+  //This way it resume WEB connection and the Display or Buttons can be monitorized
+  //forceWEBTestCheck is set if WiFi is recovered from disconnection in order to force WEB
+  // server check and ICON update. If test overlaps the uploadSamplesPeriod timing, the later
+  // has higher priority in order to send the samples on time.
   nowTimeGlobal=loopStartTime+millis();
-  if ((((nowTimeGlobal-lastTimeUploadSampleCheck) >= uploadSamplesPeriod) || firstBoot) && uploadSamplesToServer &&
+  if ((((nowTimeGlobal-lastTimeUploadSampleCheck) >= uploadSamplesPeriod) || firstBoot || forceWEBCheck || forceWEBTestCheck) && uploadSamplesToServer &&
       wifiCurrentStatus!=wifiOffStatus &&
       (0==wifiCred.wifiSITEs[wifiCred.activeIndex].compareTo(UPLOAD_SAMPLES_SITE)) ) {
     
+    //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
+    if (!webResuming && !forceWEBTestCheck) lastTimeUploadSampleCheck=nowTimeGlobal; //Only if the HTTP connection didn't ABORT or BREAK in the previous interaction
+    
+    if (forceWEBTestCheck && ((nowTimeGlobal-lastTimeUploadSampleCheck) >= uploadSamplesPeriod))
+     {forceWEBTestCheck=false;} //Timer has priority over WEB test. httpRequest will be setup to send samples 
+
     if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - UPLOAD_SAMPLES_PERIOD - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
-    lastTimeUploadSampleCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
     
     String httpRequest=String(GET_REQUEST_TO_UPLOAD_SAMPLES);
 
@@ -1837,10 +1854,11 @@ void loop() {
       //If USB is plugged, timeUSBPowerGlobal is updated with nowTimeGlobal, to estimate batteryCharge based on time
       //If USB is unplugged, timeUSBPowerGlobal is set to zero
       updateBatteryVoltageAndStatus(nowTimeGlobal, &timeUSBPowerGlobal);
-    }
+    } 
 
     //GET /lar-co2/?device=co2-sensor&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
-    httpRequest=httpRequest+"device="+device+"&local_ip_address="+
+    if (forceWEBTestCheck) {httpRequest=httpRequest+"test HTTP/1.1";forceWEBTestCheck=false;}
+    else httpRequest=httpRequest+"device="+device+"&local_ip_address="+
       IpAddress2String(WiFi.localIP())+"&co2="+valueCO2+"&temp_by_co2_sensor="+valueT+"&hum_by_co2_sensor="+
       valueHum+"&temp_co2_sensor="+co2Sensor.getTemperature(true,true)+"&powerState="+powerState+
       "&batADCVolt="+batADCVolt+"&batCharge="+batCharge+"&batteryStatus="+batteryStatus+
@@ -1850,9 +1868,31 @@ void loop() {
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - serverToUploadSamplesIPAddress="+String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
                    ", httpRequest="+String(httpRequest));}
 
-    sendHttpRequest(false,serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, httpRequest);
+    forceWEBCheck=false;
+    switch(sendAsyncHttpRequest(false,false,0,serverToUploadSamplesIPAddress,SERVER_UPLOAD_PORT,httpRequest,&whileWebLoopTimeLeft)) { //Sending http request and CloudSyncCurrentStatus update
+      case ERROR_ABORT_WEB_SETUP: //Button pressed. NTP connection aborted. Exit now but force reconnection next loop interaction 
+        forceWEBCheck=true; //Force WEB reconnection in the next loop interaction
+        webResuming=true;
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - sendAsyncHttpRequest() finish with ERROR_ABORT_WEB_SETUP. CloudSyncCurrentStatus="+String(CloudSyncCurrentStatus)+", forceWEBCheck="+String(forceWEBCheck));}
+      break;
+      case ERROR_BREAK_WEB_SETUP: //Button pressed. WEB connection aborted. Exit now but force reconnection next loop interaction
+        forceWEBCheck=true; //Force WEB reconnection in the next loop interaction
+        webResuming=true;
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - sendAsyncHttpRequest() finish with ERROR_BREAK_WEB_SETUP. CloudSyncCurrentStatus="+String(CloudSyncCurrentStatus)+", forceWEBCheck="+String(forceWEBCheck));}
+      break;
+      case ERROR_WEB_SERVER:
+        forceWEBCheck=false;
+        webResuming=false;
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - sendAsyncHttpRequest() finish with ERROR_WEB_SERVER. CloudSyncCurrentStatus="+String(CloudSyncCurrentStatus)+", forceWEBCheck="+String(forceWEBCheck));}
+      break;
+      case NO_ERROR:
+        forceWEBCheck=false;
+        webResuming=false;
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - sendAsyncHttpRequest() finish with NO_ERROR. CloudSyncCurrentStatus="+String(CloudSyncCurrentStatus)+", forceWEBCheck="+String(forceWEBCheck));}
+      break;
+    }
   
-    if (debugModeOn) {Serial.print(String(loopStartTime+millis())+"  - UPLOAD_SAMPLES_PERIOD - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+    if (debugModeOn) {Serial.print(String(loopStartTime+millis())+"  - UPLOAD_SAMPLES_PERIOD - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.print(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println(", lastTimeUploadSampleCheck="+String(lastTimeUploadSampleCheck));}
   }
 
   if (firstBoot) firstBoot=false;
