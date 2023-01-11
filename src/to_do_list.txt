@@ -1,9 +1,6 @@
 To do list
 -----------
-- Check scaling last_hour buffer works when changing the sample period (changing saving energy mode) 
-- Check NTP_KO_CHECK_PERIOD works after code modification
-- Fix NTP KO message in boot screen
-- change nowTimeGlobal=lastNowTimeGlobal+… by nowTimeGlobal=nowTimeGlobal+…and delete lastNowTimeGlobal
+- Changes so that httpRequest function doesn't block neither Button nor Display Refresh
 - Config Menu for simple things: WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF
 - Troubleshoot WiFi connection failures
 - REST API to get results
@@ -21,6 +18,10 @@ To do list
 
 Done
 -------
++ Check scaling last_hour buffer works when changing the sample period (changing saving energy mode) 
++ Check NTP_KO_CHECK_PERIOD works after code modification
++ Fix NTP KO message in boot screen
++ change nowTimeGlobal=lastNowTimeGlobal+… by nowTimeGlobal=nowTimeGlobal+…and delete lastNowTimeGlobal
 + Bug fixing (v0.9.1)
   + Timer updates when power changes
 + Update icons during Warmup screen (v0.9.1)

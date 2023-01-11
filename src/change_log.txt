@@ -7,7 +7,13 @@ Version Date          Change
                         + Periodical NTP checks to minimize clock drift due to Deep Mode
                         + Buttons checks code carved out from loop() to ButtonChecks.cpp
                         + NTP Sync avoids getting blocked while trying to sync with NTP server (button actions allowed)
+                        + WiFi Reconnection avoids getting blocked while trying to connect (button actions allowed)
                       - lastTime<ACTION> flag alligned with the begining of the function/action for better reliability of period
+                      - Bug fixing:
+                        + Wrong NTP message during bootup if no WiFi
+                        + Correction of missing NTP servers in the Display message if no WiFi during bootup
+                        + Correction of non initialization of variable serverToUploadSamplesIPAddress if no WiFi during bootup
+                        + Correction of Cloud Upload Server ICON refresh when WiFi is recovered
 - 0.9.2  8/Ene/2023   - Loop Code cleanup for optimization (warmUP())
                       - added error counters for stats
                       - Deleted daily NTP Syncs at NTP_OK_CHECK_HOUR and NTP_OK_CHECK_MINUTE. Now it's randomly

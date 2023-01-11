@@ -10,4 +10,4 @@ extern RTC_DATA_ATTR CloudSyncStatus CloudSyncCurrentStatus; //Struct to store W
 extern RTC_DATA_ATTR int errorsSampleUpts;
 
 String IpAddress2String(const IPAddress& ipAddress);
-uint8_t sendHttpRequest (IPAddress server, uint16_t port, String httpRequest);
+uint8_t sendHttpRequest (boolean logsOn, IPAddress server, uint16_t port, String httpRequest);

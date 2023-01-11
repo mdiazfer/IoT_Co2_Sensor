@@ -13,7 +13,7 @@
   #endif
 
   #ifndef _BUTTONSFRAMEWORK_
-    enum callingAction {mainloop,ntpcheck};
+    enum callingAction {mainloop,ntpcheck,wificheck};
     #define _BUTTONSFRAMEWORK_
   #endif
 #endif

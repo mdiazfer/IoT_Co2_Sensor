@@ -204,6 +204,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
         //Do nothing else
       break;
       case ntpcheck:
+      case wificheck:
         return(1);
       break;
     }
@@ -251,6 +252,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
         //Do nothing else
       break;
       case ntpcheck:
+      case wificheck:
         return(2);
       break;
     }
@@ -265,6 +267,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
         //Do nothing else
       break;
       case ntpcheck:
+      case wificheck:
         return(3);
       break;
     }

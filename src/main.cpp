@@ -34,10 +34,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   741 B
+// RTC memory variables:                   748 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     3801 B
-// RTC memory left:     8000 B - 3801 B = 4199 B
+// RTC memorty TOTAL:                     3803 B
+// RTC memory left:     8000 B - 3803 B = 4197 B
 RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour C02 values
 RTC_DATA_ATTR float_t lastHourTempSamples[3600/SAMPLE_T_LAST_HOUR];  //4*(3600/60)=240 B - Buffer to record last-hour Temp values
 RTC_DATA_ATTR float_t lastHourHumSamples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour Hum values
@@ -78,7 +78,8 @@ RTC_DATA_ATTR Button  button2(BUTTON2); //16 B
 RTC_DATA_ATTR char TZEnvVar[50]="\0"; //50 B Should be enough - To back Time Zone Variable up
 RTC_DATA_ATTR struct tm startTimeInfo; //36 B
 RTC_DATA_ATTR boolean firstWifiCheck=true,forceWifiReconnect=false,forceGetSample=false,forceGetVolt=false,
-        forceDisplayRefresh=false,forceDisplayModeRefresh=false,forceNTPCheck=false,buttonWakeUp=false; // 8*1=8 B
+        forceDisplayRefresh=false,forceDisplayModeRefresh=false,forceNTPCheck=false,buttonWakeUp=false,
+        wifiResuming=false,NTPResuming=false; // 10*1=10 B
 RTC_DATA_ATTR int uploadServerIPAddressOctectArray[4]; // 4*4B = 16B - To store upload server's @IP
 RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
@@ -115,6 +116,9 @@ uint8_t pixelsPerLine,
     spLL,           //Sprite Last Line Window
     scFL,           //Scroll First Line Window
     scLL;           //Scroll Last Line Window
+uint8_t auxLoopCounter=0,auxLoopCounter2=0,auxCounter=0;
+uint64_t whileLoopTimeLeft=NTP_CHECK_TIMEOUT;
+
 
 //Code
 void loadBootImage() {
@@ -491,11 +495,33 @@ void go_to_sleep(void) {
   */
 }
 
-void setupNTPConfig(boolean fromSetup) {
+//void setupNTPConfig(boolean fromSetup) {
+uint8_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,uint64_t* whileLoopTimeLeft=nullptr) {
   //If function called fron firstSetup(), then logs are displayed
   // and buttons are checked during NTP Sync handshake
+  // Parameters:
+  // - fromSetup: where the function was called from. Diferent prints out are done base on its value
+  //      Value false: from main loop
+  //      Value true:  from the firstSetup() function
+  // - *auxLoopCounter is a pointer for the index of the NTP server array to check. It's sent from the main loop
+  //      Value 0: The NTP sync will start from the very first NTP server - First call to the funcion
+  //      Value other: The NTP sync will resume the sync with the same NTP server used in the previous interaction
+  //          which was stoped due to either Button Pressed (ABORT) or Display Refresh (BREAK)
+  // - *whileLoopTimeLeft is the pointer for the time of while() loop to stop checking the index of
+  //   the NTP server array. It's sent from the main loop
+  //      Value NTP_CHECK_TIMEOUT: The NTP sync will start from the beginig - First call to the funcion
+  //      Value other: The NTP sync will resume the sync at the same point where the previous interaction
+  //          was stoped due to either Button Pressed (ABORT) or Display Refresh (BREAK)
+  // *auxLoopCounter and *whileLoopTimeLeft are global variables. They are modified in here. The calling function
+  //   just send them to this function.
 
-  if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - [setupNTPConfig] - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", errorsNTPCnt="+String(errorsNTPCnt));}
+  if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - [setupNTPConfig] - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", errorsNTPCnt="+String(errorsNTPCnt)+", auxLoopCounter="+String(*auxLoopCounter)+", whileLoopTimeLeft="+String(*whileLoopTimeLeft));}
+
+  //to avoid pointer issues
+  if (auxLoopCounter==nullptr || whileLoopTimeLeft==nullptr) {
+    errorsNTPCnt++; //Something went wrong. Update error counter for stats
+    return(ERROR_NTP_SERVER);
+  }
   
   CloudClockStatus previousCloudClockCurrentStatus=CloudClockCurrentStatus;
   CloudClockCurrentStatus=CloudClockOffStatus;
@@ -514,86 +540,120 @@ void setupNTPConfig(boolean fromSetup) {
     ntpServers[3]=NTP_SERVER4;
   #endif
 
-  boolean whileFlagOn=true;
+  //boolean whileFlagOn=true;
   if (wifiCurrentStatus!=wifiOffStatus) {
-    uint8_t previousError_Setup=error_setup;
-    for (uint8_t loopCounter=0; loopCounter<(uint8_t)sizeof(ntpServers)/sizeof(String); loopCounter++) {
+    uint8_t previousError_Setup=error_setup,auxForLoop;
+    for (uint8_t loopCounter=*auxLoopCounter; loopCounter<(uint8_t)sizeof(ntpServers)/sizeof(String); loopCounter++) {
       error_setup=ERROR_NTP_SERVER;
       if (ntpServers[loopCounter].charAt(0)=='\0') loopCounter++;
       else {
         if ((logsOn && fromSetup) || debugModeOn) {Serial.println("[setup - NTP] Connecting to NTP Server: "+ntpServers[loopCounter]);}
-        #ifdef NTP_TZ_ENV_VARIABLE
-          configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
-        #else
-          configTime(gmtOffset_sec, daylightOffset_sec, ntpServers[loopCounter].c_str());
-        #endif
+        if (!NTPResuming) { //Only calling configXTime() for new checks
+          #ifdef NTP_TZ_ENV_VARIABLE
+            configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
+          #else
+            configTime(gmtOffset_sec, daylightOffset_sec, ntpServers[loopCounter].c_str());
+          #endif
+        }
 
-        uint64_t whileStartTime=loopStartTime+millis(),auxTime=whileStartTime;        
-        if (debugModeOn) {Serial.println("    - whileStartTime="+String(whileStartTime)+", waiting for NTPStatus=SNTP_SYNC_STATUS_COMPLETED");}
+        *auxLoopCounter=loopCounter;
+        uint64_t whileStartTime=loopStartTime+millis(),auxTime=whileStartTime;
+        if (*whileLoopTimeLeft>=NTP_CHECK_TIMEOUT) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;
+
+        if (debugModeOn) {Serial.println("    - whileStartTime="+String(whileStartTime)+", *whileLoopTimeLeft="+String(*whileLoopTimeLeft)+", *auxLoopCounter="+String(*auxLoopCounter)+", loopCounter="+String(loopCounter)+", waiting for NTPStatus=SNTP_SYNC_STATUS_COMPLETED");}
         while ( sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED &&
-               (auxTime-whileStartTime)<NTP_CHECK_TIMEOUT && whileFlagOn) {
+               //*whileLoopTimeLeft<=NTP_CHECK_TIMEOUT && whileFlagOn) {
+              *whileLoopTimeLeft<=NTP_CHECK_TIMEOUT) {
+          *whileLoopTimeLeft=*whileLoopTimeLeft-(loopStartTime+millis()-auxTime);
           auxTime=loopStartTime+millis();
-
-          //Check if buttons are pressed during NTP sync handshake if not in the first Setup
+          delay(50);
+          //Check if buttons are pressed during NTP sync handshake (if not in the first Setup)
           if (!fromSetup) {
             switch (checkButtonsActions(ntpcheck)) {
               case 1:
               case 2:
               case 3:
                 //Button1 or Button2 pressed or released. NTP Sync process aborted if not Sync is completed
+                if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - checkButtonsActions() returns 1, 2 or 3 - Returning with ERROR_ABORT_NTP_SETUP");}
                 if (sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED) { //Actions required as the process is aborted
                   forceNTPCheck=true; //Let's grant NTP check again in the next loop interaction
                   CloudClockCurrentStatus=previousCloudClockCurrentStatus; //Restore Cloud Clock status 
                   error_setup=previousError_Setup;                         //Restore previous error - Mainly for firstSetup()
                   loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String); //Ends the for loop
-                  whileFlagOn=false; //Breaks the while loop and continue to the regular loop() flow
+                  //whileFlagOn=false; //Breaks the while loop and continue to the regular loop() flow
+                  auxForLoop=loopCounter;
+                  return(ERROR_ABORT_NTP_SETUP);
                 }
               break;
+              case 0:
               default:
-                //Regular exit. Do nothing
+                //Regular exit. Do nothing else
               break;
             }
+            //Must the Display be refreshed? This check avoids the display gets blocked during NTP sync
+            if (digitalRead(PIN_TFT_BACKLIGHT)!=LOW &&
+                (
+                  (((loopStartTime+millis()-lastTimeDisplayModeCheck) >= DISPLAY_MODE_REFRESH_PERIOD) && currentState==displayingSequential)
+                  ||
+                  (((loopStartTime+millis()-lastTimeDisplayCheck) >= DISPLAY_REFRESH_PERIOD) && 
+                    (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
+                    currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) )
+                )
+              ) {
+              return (ERROR_BREAK_NTP_SETUP); //Returns to refresh the display
+            }
           }
-        }
+        } //end while() loop
 
         if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - End of wait - Elapsed Time: "+String(auxTime-whileStartTime));}
         
-        if (!whileFlagOn) {  //Process aborted due to buttons
-          if (debugModeOn) {
-            Serial.println("  Time: Button pressed - Abort to get time");
+        if (*whileLoopTimeLeft>NTP_CHECK_TIMEOUT) { //Case if while() loop timeout.
+          if ((logsOn && fromSetup) || debugModeOn) {
+            Serial.println("  Time: Failed to get time");
+            Serial.print("[setup] - NTP: ");Serial.println("KO");
           }
         }
-        else {
-          if ((auxTime-whileStartTime)>=NTP_CHECK_TIMEOUT) {
-            if ((logsOn && fromSetup) || debugModeOn) {
-              Serial.println("  Time: Failed to get time");
-              Serial.print("[setup] - NTP: ");Serial.println("KO");
-            }
+        else { 
+          //End of while() due to successful NTP sync
+          // (Button Pressed or Display Refresh force the function to return from the while() loop, 
+          //  so this point is not reached in those cases)
+          if ((logsOn && fromSetup) || debugModeOn) {
+            Serial.print("  Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
+            Serial.print("[setup] - NTP: ");Serial.println("OK");
           }
-          else {
-            if ((logsOn && fromSetup) || debugModeOn) {
-              Serial.print("  Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
-              Serial.print("[setup] - NTP: ");Serial.println("OK");
-            }
-            CloudClockCurrentStatus=CloudClockOnStatus;
-            ntpServerIndex=loopCounter;
-            error_setup=previousError_Setup;
-            loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String);
-            memcpy(TZEnvVar,getenv("TZ"),String(getenv("TZ")).length()); //Back Time Zone up to restore it after wakeup
-          }
+          CloudClockCurrentStatus=CloudClockOnStatus;
+          ntpServerIndex=loopCounter;
+          error_setup=previousError_Setup;
+          loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String);
+          memcpy(TZEnvVar,getenv("TZ"),String(getenv("TZ")).length()); //Back Time Zone up to restore it after wakeup
         }
       }
-    }
+    }//end For() loop
   }
 
-  if (CloudClockCurrentStatus==CloudClockOffStatus && whileFlagOn) {
-    errorsNTPCnt++; //Something went wrong. Update error counter for stats          
+  //This point is reached if either the while() loop timed out or successful NTP sync
+  // (Button Pressed or Display Refresh force the function to return from the while() loop, 
+  //  so this point is not reached in those cases)
+  
+  //if (CloudClockCurrentStatus==CloudClockOffStatus && whileFlagOn) {
+  if (CloudClockCurrentStatus==CloudClockOffStatus) {
+    //Case for while loop timeout (no successfull NTP sync)
+    errorsNTPCnt++; //Something went wrong. Update error counter for stats   
+    if (auxLoopCounter!=nullptr) *auxLoopCounter=0;                 //To avoid resuming connection the next loop interacion
+    if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;  //To avoid resuming connection the next loop interacion       
+    return(ERROR_NTP_SERVER); //not NTP server connection
   }
 
+  //Case for successfull NTP sync
   if (debugModeOn) {
       Serial.println("    - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck)+", errorsNTPCnt="+String(errorsNTPCnt));
       Serial.print(String(loopStartTime+millis())+"  - [setupNTPConfig] - Exit - Time:");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
   }
+
+  if (auxLoopCounter!=nullptr) *auxLoopCounter=0;                 //To avoid resuming connection the next loop interacion
+  if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;  //To avoid resuming connection the next loop interacion       
+  if (fromSetup) return(error_setup); //not NTP server connection
+  else return(NO_ERROR);
 }
 
 void firstSetup() {
@@ -807,7 +867,7 @@ void firstSetup() {
     wifiCred.wifiSITEs[2]=WIFI_SITE_BK2;
   #endif
 
-  error_setup=wifiConnect(true,true);
+  error_setup=wifiConnect(true,true,&auxLoopCounter,&auxCounter);
   //Clean-up dots displayed after trying to get connected
   stext1.setCursor(cuX,cuY);
   for (int counter2=0; counter2<MAX_CONNECTION_ATTEMPTS*(wifiCred.activeIndex+1); counter2++) stext1.print(" ");
@@ -842,38 +902,38 @@ void firstSetup() {
     wifiCurrentStatus=wifiOffStatus;
   }
 
-  //Setting up URL things to upload samples to an external server
+  //Pre-setting up URL things to upload samples to an external server
+  //Converting SERVER_UPLOAD_SAMPLES into IPAddress variable
+  char charToTest;
+  uint lastBegin=0,indexArray=0;
+  for (uint i=0; i<=serverToUploadSamplesString.length(); i++) {
+    charToTest=serverToUploadSamplesString.charAt(i);
+    if (charToTest=='.') {    
+      uploadServerIPAddressOctectArray[indexArray]=serverToUploadSamplesString.substring(lastBegin,i).toInt();
+      lastBegin=i+1;
+      if (indexArray==2) {
+        indexArray++;
+        uploadServerIPAddressOctectArray[indexArray]=serverToUploadSamplesString.substring(lastBegin,serverToUploadSamplesString.length()).toInt();
+      }
+      else indexArray++;
+    }
+  }
+  serverToUploadSamplesIPAddress=IPAddress(uploadServerIPAddressOctectArray[0],uploadServerIPAddressOctectArray[1],uploadServerIPAddressOctectArray[2],uploadServerIPAddressOctectArray[3]);
+
+  //Adding the 3 latest mac bytes to the device name (in Hex format)
+  WiFi.macAddress(mac);
+  device=device+"-"+String((char)hex_digits[mac[3]>>4])+String((char)hex_digits[mac[3]&15])+
+    String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
+    String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
+  
+  if (logsOn) {Serial.print("[setup] - URL: ");}
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - URL: ");
+
   CloudSyncCurrentStatus=CloudSyncOffStatus;
   if (error_setup != ERROR_WIFI_SETUP && uploadSamplesToServer) { 
-    //Converting SERVER_UPLOAD_SAMPLES into IPAddress variable
-    char charToTest;
-    uint lastBegin=0,indexArray=0;
-    for (uint i=0; i<=serverToUploadSamplesString.length(); i++) {
-      charToTest=serverToUploadSamplesString.charAt(i);
-      if (charToTest=='.') {    
-        uploadServerIPAddressOctectArray[indexArray]=serverToUploadSamplesString.substring(lastBegin,i).toInt();
-        lastBegin=i+1;
-        if (indexArray==2) {
-          indexArray++;
-          uploadServerIPAddressOctectArray[indexArray]=serverToUploadSamplesString.substring(lastBegin,serverToUploadSamplesString.length()).toInt();
-        }
-        else indexArray++;
-      }
-    }
-    serverToUploadSamplesIPAddress=IPAddress(uploadServerIPAddressOctectArray[0],uploadServerIPAddressOctectArray[1],uploadServerIPAddressOctectArray[2],uploadServerIPAddressOctectArray[3]);
-
-    //Adding the 3 latest mac bytes to the device name (in Hex format)
-    WiFi.macAddress(mac);
-    device=device+"-"+String((char)hex_digits[mac[3]>>4])+String((char)hex_digits[mac[3]&15])+
-      String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
-      String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
-    
-    if (logsOn) {Serial.print("[setup] - URL: ");}
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - URL: ");
-
     //Send HttpRequest to check the server status
     // The request updates CloudSyncCurrentStatus
-    sendHttpRequest(serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1");
+    sendHttpRequest(false,serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1");
 
     if (CloudSyncCurrentStatus==CloudSyncOnStatus) {
       if (logsOn) {Serial.println("[OK]");}
@@ -904,9 +964,10 @@ void firstSetup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Device name: ");
     stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(device);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
+  else {if (logsOn) {Serial.println("N/A");}}
 
   //NTP Server
-  setupNTPConfig(true);
+  error_setup=setupNTPConfig(true,&auxLoopCounter2,&whileLoopTimeLeft); //Control variables were init in initVariables()
   lastTimeNTPCheck=loopStartTime+millis();  //loopStartTime=0 just right after bootup
   if (error_setup==ERROR_NTP_SERVER) {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
@@ -914,12 +975,14 @@ void firstSetup() {
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print((String)(ntpServers[0]+" "+ntpServers[1]+" "+ntpServers[2]+" "+ntpServers[3]));if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    //Add one more line as NTP servers lists might need 2 lines
+    if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
   else {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
     stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK); stext1.print("  Date: ");stext1.print(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK); stext1.print("  Date: ");getLocalTime(&startTimeInfo);stext1.print(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
     stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(ntpServers[ntpServerIndex]);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
@@ -1179,15 +1242,17 @@ void initVariable() {
                               TEMP_BAR_LENGTH,TEMP_BAR_HEIGH,TFT_GREEN,TEMP_BAR_TH1,
                               TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
   firstWifiCheck=true;forceWifiReconnect=false;forceGetSample=false;forceGetVolt=false;
-  forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;
+  forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;wifiResuming=false;
   valueCO2=0,valueT=0,valueHum=0,lastValueCO2=-1,tempMeasure=0;
   debugModeOn=true;
   errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0;
-
   error_setup=NO_ERROR,remainingBootupSeconds=0;
   previousTime=0;remainingBootupTime=BOOTUP_TIMEOUT*1000;
   static const char hex_digits[] = "0123456789ABCDEF";
   waitingMessage=true;runningMessage=true;
+  auxLoopCounter=0,auxLoopCounter2=0,auxCounter=0;
+  whileLoopTimeLeft=NTP_CHECK_TIMEOUT;
+  wifiResuming=false;NTPResuming=false;
 }
 
 void setup() {
@@ -1617,14 +1682,16 @@ void loop() {
   }
 
   //Regular actions every WIFI_RECONNECT_PERIOD seconds to recover WiFi connection
-  //forceWifiReconnect==true after ICON_STATUS_REFRESH_PERIOD or buttons are pressed
-  //To avoid TFT gets frozen while WiFi reconnection, this code must be run after DISPLAY_REFRESH_PERIOD
+  //forceWifiReconnect==true if:
+  // 1) after ICON_STATUS_REFRESH_PERIOD
+  // 2) or buttons are pressed to wake up from sleep
+  // 3) or previous WiFi re-connection try was ABORTED (button pressed) or BREAK (need to refresh display)
   nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeWifiReconnectionCheck) >= WIFI_RECONNECT_PERIOD) || forceWifiReconnect ) && 
       !firstBoot && (wifiCurrentStatus==wifiOffStatus || WiFi.status()!=WL_CONNECTED) ) {
      
     if (debugModeOn) {
-      Serial.println(String(nowTimeGlobal)+"  - WIFI_RECONNECT_PERIOD (40 s)");
+      Serial.println(String(nowTimeGlobal)+"  - WIFI_RECONNECT_PERIOD ("+String(WIFI_RECONNECT_PERIOD/1000)+" s)");
       Serial.println("    - lastTimeWifiReconnectionCheck="+String(lastTimeWifiReconnectionCheck));
       Serial.println("    - nowTimeGlobal-lastTimeWifiReconnectionCheck="+String(nowTimeGlobal-lastTimeWifiReconnectionCheck));
       Serial.println("    - forceWifiReconnect="+String(forceWifiReconnect));
@@ -1632,7 +1699,12 @@ void loop() {
       Serial.println("    - wifiCurrentStatus="+String(wifiCurrentStatus)+", wifiOffStatus=0");
       Serial.println("    - WiFi.status()="+String(WiFi.status())+", WL_CONNECTED=3");
     }
-    lastTimeWifiReconnectionCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
+
+    //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
+    if (!wifiResuming) lastTimeWifiReconnectionCheck=nowTimeGlobal; //Only if the WiFi reconnection didn't ABORT or BREAK in the previous interaction
+    
+    wifiStatus previousWifiCurrentStatus=wifiCurrentStatus;
+    if(forceWifiReconnect) forceWifiReconnect=false;
     
     //If WiFi disconnected (wifiOffStatus), then re-connect
     //Conditions for wifiCurrentStatus==wifiOffStatus
@@ -1641,27 +1713,54 @@ void loop() {
     //WiFi.status() gets the WiFi status inmediatly. No need to scann WiFi networks
   
     //WiFi Reconnection
-    if (ERROR_WIFI_SETUP != wifiConnect(debugModeOn,false) ) { 
-      if (WiFi.RSSI()>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
-          else if (WiFi.RSSI()>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
-          else if (WiFi.RSSI()>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
-          else if (WiFi.RSSI()>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
-          else if (WiFi.RSSI()<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
-    } else {
-      wifiCurrentStatus=wifiOffStatus;
-    }
-   
-    if(forceWifiReconnect) forceWifiReconnect=false;
+    if (debugModeOn) {Serial.println("    - auxLoopCounter="+String(auxLoopCounter)+", auxCounter="+String(auxCounter));}
+    
+    switch(wifiConnect(debugModeOn,false,&auxLoopCounter,&auxCounter)) {
+      case ERROR_ABORT_WIFI_SETUP: //Button pressed. WiFi reconnection aborted. Exit now but force reconnection next loop interaction
+        wifiCurrentStatus=previousWifiCurrentStatus;
+        forceWifiReconnect=true; //Force WiFi reconnection in the next loop interaction
+        wifiResuming=true;
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with ERROR_ABORT_WIFI_SETUP. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect));}
+      break;
+      case ERROR_BREAK_WIFI_SETUP: //Time to refresh display. Exit now but force reconnection next loop interaction
+        wifiCurrentStatus=previousWifiCurrentStatus;
+        forceWifiReconnect=true; //Force WiFi reconnection in the next loop interaction
+        wifiResuming=true;
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with ERROR_BREAK_WIFI_SETUP. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect));}
+      break;
+      case ERROR_WIFI_SETUP:
+        wifiCurrentStatus=wifiOffStatus;
+        wifiResuming=false;
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with ERROR_WIFI_SETUP. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect));}
+      break;
+      case NO_ERROR:
+      default:
+        if (WiFi.RSSI()>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
+        else if (WiFi.RSSI()>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
+        else if (WiFi.RSSI()>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
+        else if (WiFi.RSSI()>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
+        else if (WiFi.RSSI()<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+        wifiResuming=false;
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with NO_ERROR. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect));}
 
-    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - WIFI_RECONNECT_PERIOD - exit");}
+        //Send HttpRequest to check the server status
+        // The request updates CloudSyncCurrentStatus
+        //if (uploadSamplesToServer) 
+          sendHttpRequest(false,serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1");
+      break;
+    } 
+
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - WIFI_RECONNECT_PERIOD - exit, lastTimeWifiReconnectionCheck="+String(lastTimeWifiReconnectionCheck));}
   }
 
   //Regular actions every NTP_KO_CHECK_PERIOD seconds. Cheking if NTP is off or should be checked
   nowTimeGlobal=loopStartTime+millis();
   if ((nowTimeGlobal-lastTimeNTPCheck) >= NTP_KO_CHECK_PERIOD || forceNTPCheck) {
-    lastTimeNTPCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
-
-    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - NTP_KO_CHECK_PERIOD");}
+    
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - NTP_KO_CHECK_PERIOD, last lastTimeNTPCheck="+String(lastTimeNTPCheck)+", NTPResuming="+String(NTPResuming)+", auxLoopCounter2="+String(auxLoopCounter2)+", whileLoopTimeLeft="+String(whileLoopTimeLeft));}
+    
+    //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
+    if (!NTPResuming) lastTimeNTPCheck=nowTimeGlobal; //Only if the NTP reconnection didn't ABORT or BREAK in the previous interaction
 
     //setupNTPConfig if either
     // - Last NTP check failed (and currently there is no NTP sycn) - It's done always (in any Energy Mode)
@@ -1687,12 +1786,31 @@ void loop() {
         if (saveEnergy==energyCurrentMode) Serial.println("        - Reason: saveEnergy==energyCurrentMode");
       }
       forceNTPCheck=false;
-      setupNTPConfig(false); //NTP Sync and CloudClockCurrentStatus update
+      switch(setupNTPConfig(false,&auxLoopCounter2,&whileLoopTimeLeft)) { //NTP Sync and CloudClockCurrentStatus update
+        case ERROR_ABORT_NTP_SETUP: //Button pressed. NTP reconnection aborted. Exit now but force reconnection next loop interaction 
+          forceNTPCheck=true; //Force NTP reconnection in the next loop interaction
+          NTPResuming=true;
+          if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with ERROR_ABORT_NTP_SETUP. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
+        break;
+        case ERROR_BREAK_NTP_SETUP: //Button pressed. NTP reconnection aborted. Exit now but force reconnection next loop interaction
+          forceNTPCheck=true; //Force NTP reconnection in the next loop interaction
+          NTPResuming=true;
+          if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with ERROR_BREAK_NTP_SETUP. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
+        break;
+        case ERROR_NTP_SERVER:
+          NTPResuming=false;
+          if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with ERROR_NTP_SERVER. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
+        break;
+        case NO_ERROR:
+          NTPResuming=false;
+          if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with NO_ERROR. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
+        break;
+      }
     }
     
     if (debugModeOn) {
       Serial.println(String(loopStartTime+millis())+"      - errorsNTPCnt="+String(errorsNTPCnt)+", CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck));
-      getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"  - NTP_KO_CHECK_PERIOD - Exit - Time: %d/%m/%Y - %H:%M:%S");
+      getLocalTime(&startTimeInfo);Serial.print("  - NTP_KO_CHECK_PERIOD, lastTimeNTPCheck="+String(lastTimeNTPCheck));Serial.println(&startTimeInfo," - Exit - Time: %d/%m/%Y - %H:%M:%S");
     }
   }
   
@@ -1732,7 +1850,7 @@ void loop() {
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - serverToUploadSamplesIPAddress="+String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
                    ", httpRequest="+String(httpRequest));}
 
-    sendHttpRequest(serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, httpRequest);
+    sendHttpRequest(false,serverToUploadSamplesIPAddress, SERVER_UPLOAD_PORT, httpRequest);
   
     if (debugModeOn) {Serial.print(String(loopStartTime+millis())+"  - UPLOAD_SAMPLES_PERIOD - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
   }

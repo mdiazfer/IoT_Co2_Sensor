@@ -91,6 +91,10 @@
 #define ERROR_NTP_SERVER        0x08
 #define ERROR_WEB_SERVER        0x09
 #define ERROR_BAT_ADC           0x0A
+#define ERROR_ABORT_WIFI_SETUP  0x0B
+#define ERROR_BREAK_WIFI_SETUP  0x0C
+#define ERROR_ABORT_NTP_SETUP   0x0D
+#define ERROR_BREAK_NTP_SETUP   0x0E
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240
@@ -158,7 +162,7 @@
 #define TFT_PINK_4_BITS_PALETTE   15   // 15
 
 //WiFi stuff
-#define MAX_CONNECTION_ATTEMPTS 20
+#define MAX_CONNECTION_ATTEMPTS 10
 #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
   #define NTP_SERVER  "10.88.50.5"
   #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
@@ -307,7 +311,7 @@
   #endif
 
   #ifndef _BUTTONSFRAMEWORK_
-    enum callingAction {mainloop,ntpcheck};
+    enum callingAction {mainloop,ntpcheck,wificheck};
     #define _BUTTONSFRAMEWORK_
   #endif
 

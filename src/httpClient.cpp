@@ -14,12 +14,13 @@ String IpAddress2String(const IPAddress& ipAddress)
     String(ipAddress[3])  ; 
 }
 
-uint8_t sendHttpRequest(IPAddress server, uint16_t port, String httpRequest) {
-  //Sending httpReques
-  boolean logsOn=false;
+uint8_t sendHttpRequest(boolean logsOn, IPAddress server, uint16_t port, String httpRequest) {
+  //Sending httpRequest
+  //boolean logsOn=false;
 
+  if (logsOn) {Serial.print("\n[sendHttpRequest] - Tying connection to ");Serial.print(IpAddress2String(server));Serial.print(" to send httpRequest: '");Serial.print(httpRequest);Serial.println("'");}
   if (client.connect(server, 80)) {
-    if (logsOn) {Serial.print("\n[sendHttpRequest] - connected to ");Serial.print(IpAddress2String(server));Serial.print(" to send httpRequest: '");Serial.print(httpRequest);Serial.println("'");}
+    if (logsOn) {Serial.println("[sendHttpRequest] - connected");}
     // Send a HTTP request:
     client.println(httpRequest);
     client.print("Host: "); client.println(IpAddress2String(server));
@@ -28,7 +29,10 @@ uint8_t sendHttpRequest(IPAddress server, uint16_t port, String httpRequest) {
     client.println("Connection: close");
     client.println();
   }
-  else errorsSampleUpts++;  //Something went wrong. Update error counter for stats
+  else {
+    errorsSampleUpts++;  //Something went wrong. Update error counter for stats
+    if (logsOn) {Serial.println("[sendHttpRequest] - Not connected, errorsSampleUpts="+String(errorsSampleUpts));}
+  }
   
   // if there are incoming bytes available
   // from the server, read them and print them:
