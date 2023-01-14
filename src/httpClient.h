@@ -3,10 +3,6 @@
 #include "ButtonChecks.h"
 
 extern boolean logsOn,webResuming,forceWEBCheck,forceWEBTestCheck;
-
-#ifndef _WIFINETWORKINFO_
-  enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus} ;
-#endif
 extern RTC_DATA_ATTR CloudSyncStatus CloudSyncCurrentStatus; //Struct to store WiFi parameters
 extern RTC_DATA_ATTR int errorsSampleUpts;
 

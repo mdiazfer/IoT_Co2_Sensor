@@ -15,8 +15,8 @@
   #include "global_setup.h"
   
   #ifndef _DISPLAYSUPPORTINFO_
-    enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
-                          displayingCo2LastDayGraphFixed,displayingSequential};
+    enum availableStates {bootupScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+                          displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     
     #define _DISPLAYSUPPORTINFO_
@@ -51,7 +51,7 @@
     enum batteryChargingStatus {batteryCharging000,batteryCharging010,batteryCharging025,batteryCharging050,
                                 batteryCharging075,batteryCharging100,
                                 battery000,battery010,battery025,battery050,battery075,battery100};
-    enum energyModes {fullEnergy, reducedEnergy, saveEnergy};
+    enum energyModes {fullEnergy, reducedEnergy, lowestEnergy};
     #define _BATTERYFRAMEWORK_ 
   #endif
 #endif
@@ -66,13 +66,13 @@ extern char co2SensorVersion[];
 extern struct tm startTimeInfo;
 extern Button button2;
 extern IPAddress serverToUploadSamplesIPAddress;
-extern boolean uploadSamplesToServer;
+extern boolean uploadSamplesEnabled;
 extern RTC_DATA_ATTR uint64_t timeUSBPowerGlobal,nowTimeGlobal;
 extern RTC_DATA_ATTR enum availableStates stateSelected,currentState;
 extern RTC_DATA_ATTR  enum CloudClockStatus CloudClockCurrentStatus;
 extern RTC_DATA_ATTR enum powerModes powerState;
 extern RTC_DATA_ATTR enum batteryChargingStatus batteryStatus;
-extern RTC_DATA_ATTR enum energyModes energyCurrentMode;
+extern RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode;
 extern RTC_DATA_ATTR float_t batADCVolt,lastBatCharge,batCharge;
 
 class HorizontalBar {
@@ -131,12 +131,13 @@ void drawText(float_t value, String textString, int32_t textSize, int32_t font, 
               float_t th1, uint32_t warningColor, float_t th2, uint32_t alarmColor);
 
 //Definition in display_support.cpp
-void printGlobalMenu();
-void printMenuWhatToDisplay();
+void printMainMenu();
+void printshowOptMenu();
 void printInfoMenu();
-void printInfoGral();
-void printInfoSensors();
-void printInfoWifi();
-void printInfoNet();
+void printConfigMenu();
+void printGralInfo();
+void printSensorsInfo();
+void printWifiInfo();
+void printNetInfo();
 
 

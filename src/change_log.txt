@@ -1,8 +1,14 @@
 Change Log
-------------
+----------------------------------------------
+BAT duration
+- Version 0.9.4     
+- Version 0.9.0     ~ 4 days (90 h)
+- Version < 0.9     ~19 hours
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.9.5 14/Ene/2023   - Rename functions for Menus
+                      - Added Config Menu for WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF, Saving Energy: Reduced/Lowest
 - 0.9.4 11/Ene/2023   - Code optimization
                         + Http Connection to the Upload Server avoids getting blocked while trying to connect
                          (button actions and Display Refresh allowed)

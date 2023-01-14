@@ -1,6 +1,11 @@
 To do list
 -----------
 - Config Menu for simple things: WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF
+  + uploadSamplesEnabled should be linked to wifiEnabled in the Config Menu
+  - Bug fixing: WiFi icon for wifi0Status
+  - Write in EEPROM the config variables: wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,energyCurrentMode
+  + change error_setup values to be mask-oriented and re-code the firstSetup for OR-error_setup and
+     warmingUp() to detec dead errors and take actions
 - Troubleshoot WiFi connection failures
 - REST API to get results
 - Get info about bluetooth to update icons

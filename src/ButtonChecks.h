@@ -5,10 +5,12 @@
   
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
-    enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
-                          displayingCo2LastDayGraphFixed,displayingSequential};
+    enum availableStates {bootupScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+                          displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
-    
+    enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
+    enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status};
+    enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
     #define _DISPLAYSUPPORTINFO_
   #endif
 
@@ -31,6 +33,10 @@ extern RTC_DATA_ATTR Button  button1; //16 B
 extern RTC_DATA_ATTR Button  button2;
 extern RTC_DATA_ATTR boolean debugModeOn;
 extern RTC_DATA_ATTR boolean firstBoot;
+extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled;
+extern RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus;
+extern RTC_DATA_ATTR enum wifiStatus wifiCurrentStatus;
+extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 
 
 void checkButton1();

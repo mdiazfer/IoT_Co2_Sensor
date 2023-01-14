@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.4"
+#define VERSION "0.9.5"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -30,7 +30,7 @@
 #define I2C_SCL 22 //I2C - SCL pin in the ESP board (SCL pin in the sensor)
 #define DEVICE_NAME_PREFIX "co2-sensor"
 #define PIN_TFT_BACKLIGHT 4
-#define DEBUG_MODE_ON false
+#define DEBUG_MODE_ON true
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
@@ -51,7 +51,7 @@
   #define CO2_SENSOR  "UNKNOWN"
 #endif
 
-//Temperature & Humidigy Sensor stuff
+//Temperature & Humidity Sensor stuff
 #ifdef  __SI7021__ //Sendor model dependant parameters
   #define TEMP_HUM_SENSOR  _STRINGIFY_(SI7021)  //SI7021, SHT21 and HTU21 are all equivalent
   #define TEMP_HUM_SENSOR_TYPE  "SI7021"
@@ -121,6 +121,8 @@
 #define MENU_BACK_COLOR TFT_BLACK
 #define MENU_INFO_FORE_COLOR TFT_WHITE
 #define MENU_INFO_BACK_COLOR TFT_BLACK
+#define MENU_CONFIG_FORE_COLOR TFT_VIOLET
+#define MENU_CONFIG_BACK_COLOR TFT_BLACK
 #define CO2_GAUGE_X      80
 #define CO2_GAUGE_Y      95
 #define CO2_GAUGE_R      70
@@ -165,6 +167,7 @@
 #define TFT_PINK_4_BITS_PALETTE   15   // 15
 
 //WiFi stuff
+#define WIFI_ENABLED  true
 #define MAX_CONNECTION_ATTEMPTS 10
 #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
   #define NTP_SERVER  "10.88.50.5"
@@ -186,7 +189,8 @@
   #define GMT_OFFSET_SEC 3600
   #define DAYLIGHT_OFFSET_SEC 7200 //3600 for CEST
 #endif
-//GET /lar-co2/?device=co2-sensor-XXXXXX&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
+#define UPLOAD_SAMPLES_ENABLED true
+#define UPLOAD_SAMPLES_FROM_SITE "home"
 #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
   #define SERVER_UPLOAD_SAMPLES  "10.88.50.5"
 #endif
@@ -196,17 +200,20 @@
 #ifndef SERVER_UPLOAD_SAMPLES
   #define SERVER_UPLOAD_SAMPLES "195.201.42.50"
 #endif
-#define UPLOAD_SAMPLES_SITE "home"
 #define SERVER_UPLOAD_PORT  80
+//GET /lar-co2/?device=co2-sensor-XXXXXX&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7&....
 #define GET_REQUEST_TO_UPLOAD_SAMPLES  "GET /lar-co2/?"
-#define UPLOAD_SAMPLES_TO_SERVER  true
 #define WIFI_100_RSSI -60  //RSSI > -60 dBm Excellent - Consider 100% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 #define WIFI_075_RSSI -70  //RSSI > -70 dBm Very Good - Consider 75% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 #define WIFI_050_RSSI -80  //RSSI > -80 dBm Good - Consider 50% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 #define WIFI_025_RSSI -90  //RSSI > -90 dBm Low - Consider 25% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 #define WIFI_000_RSSI -100 //RSSI < -100 dBm No Signal - Lower values mean no SSID visibiliy, 0% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 
+//BLE stuff
+#define BLE_ENABLED  true
+
 //Battery stuff
+#define SAVING_BATTERY_MODE  reducedEnergy //Other values: reducedEnergy lowestEnergy
 #define BAT_ADC_PIN 34
 #define POWER_ENABLE_PIN  14
 #define BAT_CHECK_ENABLE HIGH
@@ -291,12 +298,12 @@
   
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
-    enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
-                          displayingCo2LastDayGraphFixed,displayingSequential};
+    enum availableStates {bootupScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+                          displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode};
     RTC_DATA_ATTR enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
-    RTC_DATA_ATTR enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus} BLEClurrentStatus;
+    enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
-    RTC_DATA_ATTR enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus} CloudSyncCurrentStatus;
+    enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
     #define _DISPLAYSUPPORTINFO_
   #endif
 
@@ -309,7 +316,7 @@
     enum batteryChargingStatus {batteryCharging000,batteryCharging010,batteryCharging025,batteryCharging050,
                                 batteryCharging075,batteryCharging100,
                                 battery000,battery010,battery025,battery050,battery075,battery100};
-    enum energyModes {fullEnergy, reducedEnergy, saveEnergy};
+    enum energyModes {fullEnergy, reducedEnergy, lowestEnergy};
     #define _BATTERYFRAMEWORK_
   #endif
 

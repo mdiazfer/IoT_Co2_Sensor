@@ -34,10 +34,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   748 B
+// RTC memory variables:                   763 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     3803 B
-// RTC memory left:     8000 B - 3803 B = 4197 B
+// RTC memorty TOTAL:                     3819 B
+// RTC memory left:     8000 B - 3819 B = 4181 B
 RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour C02 values
 RTC_DATA_ATTR float_t lastHourTempSamples[3600/SAMPLE_T_LAST_HOUR];  //4*(3600/60)=240 B - Buffer to record last-hour Temp values
 RTC_DATA_ATTR float_t lastHourHumSamples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour Hum values
@@ -54,11 +54,12 @@ RTC_DATA_ATTR uint64_t sleepTimer=0; //8 B
 RTC_DATA_ATTR enum displayModes displayMode=bootup,lastDisplayMode=bootup; //2*4=8 B
 RTC_DATA_ATTR enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState; //3*4=12 B
 RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus; //4 B
+RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus; // 4B
 RTC_DATA_ATTR boolean updateHourSample=true,updateDaySample=true,updateHourGraph=true,updateDayGraph=true,
-              autoBackLightOff=true,button1Pressed=false,button2Pressed=false,uploadSamplesToServer=UPLOAD_SAMPLES_TO_SERVER; //8*1=8 B 
+              autoBackLightOff=true,button1Pressed=false,button2Pressed=false; //8*1=8 B 
 RTC_DATA_ATTR enum powerModes powerState=off; //1*4=4 B
 RTC_DATA_ATTR enum batteryChargingStatus batteryStatus=battery000; //1*4=4 B
-RTC_DATA_ATTR enum energyModes energyCurrentMode; //1*4=4 B
+RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode=SAVING_BATTERY_MODE; //2*4=8 B
 RTC_DATA_ATTR uint8_t bootCount=0,loopCount=0; //2*1=2 B
 RTC_DATA_ATTR const String co2SensorType=String(CO2_SENSOR_TYPE); //16 B
 RTC_DATA_ATTR const String tempHumSensorType=String(TEMP_HUM_SENSOR_TYPE); //16 B
@@ -83,8 +84,11 @@ RTC_DATA_ATTR boolean firstWifiCheck=true,forceWifiReconnect=false,forceGetSampl
 RTC_DATA_ATTR int uploadServerIPAddressOctectArray[4]; // 4*4B = 16B - To store upload server's @IP
 RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
-RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON; //1*1=1B
 RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0; //2*4=8B - Error stats
+RTC_DATA_ATTR boolean wifiEnabled=WIFI_ENABLED,bluetoothEnabled=BLE_ENABLED,
+                      uploadSamplesEnabled=UPLOAD_SAMPLES_ENABLED; //3*1=3B
+RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON; //1*1=1B
+RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus=BLEOffStatus; //1*4=4B
 
 //Global variable definitions stored in regular RAM. 520 KB Max
 TFT_eSPI tft = TFT_eSPI();  // 292 B - Invoke library to manage the display
@@ -155,7 +159,18 @@ void showIcons() {
   }
   
   //-->>Get BLE status
-  tft.pushImage(30,0,24,24,bluetoothOff);
+  switch (BLEClurrentStatus) {
+    case BLEOnStatus:
+      tft.pushImage(30,0,24,24,bluetooth);
+    break;
+    case BLEConnectedStatus:
+      tft.pushImage(30,0,24,24,bluetoothConnected);
+    break;
+    case BLEOffStatus:
+      tft.pushImage(30,0,24,24,bluetoothOff);
+    break;
+    
+  }
   
   //-->>Get NTP status
   switch (CloudClockCurrentStatus) {
@@ -467,7 +482,7 @@ void go_to_sleep(void) {
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
     break;
-    case saveEnergy:
+    case lowestEnergy:
       sleepTimer=TIME_TO_SLEEP_SAVE_ENERGY>((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000)?TIME_TO_SLEEP_SAVE_ENERGY-((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000):TIME_TO_SLEEP_SAVE_ENERGY;
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //Keeping in for future. In this version No BAT checks in Save Engergy Mode to save energy
       samplePeriod=SAMPLE_PERIOD_SE;
@@ -714,7 +729,7 @@ void firstSetup() {
     tft.fillScreen(TFT_BLACK);
   }
   
-  //-->>loadAllWiFiIcons();
+  //-->loadAllWiFiIcons();
 
   loadBootImage();
   delay(500);
@@ -722,6 +737,8 @@ void firstSetup() {
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_WHITE,TFT_BLACK);stext1.print("CO2 bootup v");stext1.print(VERSION);stext1.println(" ..........");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Display: [");stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+
   //Some Temp & Hum sensor checks and init
   if (logsOn) Serial.print("[setup] - Sensor Temp/HUM: ");
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Tp/Hu:  [");
@@ -763,6 +780,8 @@ void firstSetup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Can't continue. STOP");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     return;
   }
+
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //Sensor CO2 init
   if (logsOn) Serial.print("[setup] - Sensor: ");
@@ -806,10 +825,15 @@ void firstSetup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  CO2 Sensor Range: ");if  (CO2_SENSOR_CO2_RANGE!=co2Sensor.getRange()) stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print(co2Sensor.getRange());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.print(" ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Can't continue. STOP");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
+    stext1.setCursor(0,(pLL-1)*pixelsPerLine);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine); //Add one more line
+    #if BUILD_ENV_NAME!=BUILD_TYPE_DEVELOPMENT
       return;  //Development doesn't have CO2 sensor
+    #else
+      error_setup=NO_ERROR;
     #endif
   }
+
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //Initiating buffers to draw the Co2/Temp/Hum graphs
   for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++)  {lastHourCo2Samples[i]=0;lastHourTempSamples[i]=0;lastHourHumSamples[i]=0;}
@@ -832,6 +856,8 @@ void firstSetup() {
     return;
   }
   stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //WiFi init
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - WiFi: ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
@@ -867,40 +893,52 @@ void firstSetup() {
     wifiCred.wifiSITEs[2]=WIFI_SITE_BK2;
   #endif
 
-  error_setup=wifiConnect(true,true,&auxLoopCounter,&auxCounter);
+  if (logsOn) Serial.print("[setup] - WiFi: ");
   //Clean-up dots displayed after trying to get connected
   stext1.setCursor(cuX,cuY);
   for (int counter2=0; counter2<MAX_CONNECTION_ATTEMPTS*(wifiCred.activeIndex+1); counter2++) stext1.print(" ");
   stext1.setCursor(cuX,cuY);
 
-  //print Logs
-  if (logsOn) Serial.print("[setup] - WiFi: ");
-  if (error_setup != ERROR_WIFI_SETUP ) { 
-    if (logsOn) Serial.println("OK");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print(" [");
-    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("OK");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");//if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  SSID:  ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(wifiNet.ssid);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("    IP:  ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.localIP().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  MASK: ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.subnetMask().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  DFGW: ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.gatewayIP().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  if (wifiEnabled) {//Only if WiFi is enabled
+    error_setup=wifiConnect(true,true,&auxLoopCounter,&auxCounter);
+  
+    //print Logs
+    if (error_setup != ERROR_WIFI_SETUP ) { 
+      if (logsOn) Serial.println("OK");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print(" [");
+      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("OK");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");//if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  SSID:  ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(wifiNet.ssid);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("    IP:  ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.localIP().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  MASK: ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.subnetMask().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  DFGW: ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(WiFi.gatewayIP().toString());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
 
-    //WifiNet is updated in printCurrentWiFi(), which is called by wifiConnect(true,X);
-    //WiFi.RSSI() might be used instead. Doesn't hurt keeping wifiNet.RSSI as printCurrentWiFi() is required
-    // to print logs in init().
-    if (wifiNet.RSSI>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
-        else if (wifiNet.RSSI>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
-        else if (wifiNet.RSSI>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
-        else if (wifiNet.RSSI>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
-        else if (wifiNet.RSSI<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
-  } else {
-    if (logsOn) Serial.println("KO");
+      //WifiNet is updated in printCurrentWiFi(), which is called by wifiConnect(true,X);
+      //WiFi.RSSI() might be used instead, but doesn't hurt keeping wifiNet.RSSI instead, as printCurrentWiFi() is required
+      // to print logs in here.
+      if (wifiNet.RSSI>=WIFI_100_RSSI) wifiCurrentStatus=wifi100Status;
+      else if (wifiNet.RSSI>=WIFI_075_RSSI) wifiCurrentStatus=wifi75Status;
+      else if (wifiNet.RSSI>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
+      else if (wifiNet.RSSI>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
+      else if (wifiNet.RSSI<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+    } else {
+      if (logsOn) Serial.println("KO");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print(" [");
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("KO");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  SSID: ");stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("No SSID Available");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      wifiCurrentStatus=wifiOffStatus;
+    }
+  }
+  else {//If WiFi is not enabled, then inform
+    if (logsOn) Serial.println("N/E");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print(" [");
-    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("KO");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  SSID: ");stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("No SSID Available");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("N/E");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");//if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     wifiCurrentStatus=wifiOffStatus;
   }
+
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //Pre-setting up URL things to upload samples to an external server
   //Converting SERVER_UPLOAD_SAMPLES into IPAddress variable
@@ -930,10 +968,10 @@ void firstSetup() {
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - URL: ");
 
   CloudSyncCurrentStatus=CloudSyncOffStatus;
-  if (error_setup != ERROR_WIFI_SETUP && uploadSamplesToServer) { 
+  if (error_setup != ERROR_WIFI_SETUP && wifiEnabled && uploadSamplesEnabled) { 
     //Send HttpRequest to check the server status
     // The request updates CloudSyncCurrentStatus
-    sendAsyncHttpRequest(false,true,error_setup,serverToUploadSamplesIPAddress,SERVER_UPLOAD_PORT,String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1",&whileWebLoopTimeLeft);
+    error_setup=sendAsyncHttpRequest(false,true,error_setup,serverToUploadSamplesIPAddress,SERVER_UPLOAD_PORT,String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1",&whileWebLoopTimeLeft);
 
     if (CloudSyncCurrentStatus==CloudSyncOnStatus) {
       if (logsOn) {Serial.println("[OK]");}
@@ -950,8 +988,6 @@ void firstSetup() {
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
       stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  URL: ");
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);
-
-      error_setup = ERROR_WEB_SERVER;
     }
 
     if (logsOn) {Serial.print("  - URL: ");Serial.println("http://"+serverToUploadSamplesIPAddress.toString()+
@@ -964,41 +1000,74 @@ void firstSetup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Device name: ");
     stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(device);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
-  else {if (logsOn) {Serial.println("N/A");}}
+  else {
+    if (error_setup != ERROR_WIFI_SETUP || !wifiEnabled) {
+      if (logsOn) {Serial.println("No WiFi");}
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[");
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("No WiFi");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    }
+    else { 
+      if (logsOn) {Serial.println("N/E");}
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[");
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("N/E");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    }
+  }
+
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //NTP Server
-  error_setup=setupNTPConfig(true,&auxLoopCounter2,&whileLoopTimeLeft); //Control variables were init in initVariables()
-  lastTimeNTPCheck=loopStartTime+millis();  //loopStartTime=0 just right after bootup
-  if (error_setup==ERROR_NTP_SERVER) {
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
-    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
-    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print((String)(ntpServers[0]+" "+ntpServers[1]+" "+ntpServers[2]+" "+ntpServers[3]));if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    //Add one more line as NTP servers lists might need 2 lines
-    if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
+  if (wifiCurrentStatus!=wifiOffStatus && wifiEnabled) { 
+    error_setup=setupNTPConfig(true,&auxLoopCounter2,&whileLoopTimeLeft); //Control variables were init in initVariables()
+    lastTimeNTPCheck=loopStartTime+millis();  //loopStartTime=0 just right after bootup
+    if (error_setup==ERROR_NTP_SERVER) {
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print((String)(ntpServers[0]+" "+ntpServers[1]+" "+ntpServers[2]+" "+ntpServers[3]));if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      //Add one more line as NTP servers lists might need 2 lines
+      if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    }
+    else {
+      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK); stext1.print("  Date: ");getLocalTime(&startTimeInfo);stext1.print(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
+      stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(ntpServers[ntpServerIndex]);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    }
   }
   else {
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
-    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK); stext1.print("  Date: ");getLocalTime(&startTimeInfo);stext1.print(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
-    stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(ntpServers[ntpServerIndex]);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("No WiFi");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+
   //-->>BLE init
+  
   if (logsOn) Serial.print("[setup] - BLE: ");
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - BLE:     [");
-  if (error_setup != ERROR_BLE_SETUP ) { 
-    if (logsOn) Serial.println("OK");
-    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
-  } else {
-    if (logsOn) Serial.println("KO");
-    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+  BLEClurrentStatus=BLEOffStatus;
+  if (bluetoothEnabled) {  
+    if (error_setup != ERROR_BLE_SETUP ) { 
+      if (logsOn) Serial.println("OK");
+      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
+      BLEClurrentStatus=BLEOnStatus;
+    } else {
+      if (logsOn) Serial.println("KO");
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+    }
+  }
+  else {
+    if (logsOn) Serial.println("N/E");
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("N/E");
   }
   stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+
   //-->>Battery and ADC init
   if (logsOn) Serial.print("[setup] - Bat. ADC: ");
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Bat. ADC [");
@@ -1048,8 +1117,9 @@ void firstSetup() {
       timeUSBPowerGlobal=0;
       
       //Set the rigth Saving Energy mode based on the BAT charge
-      if (batCharge>=BAT_CHG_THR_FOR_SAVE_ENERGY) energyCurrentMode=reducedEnergy;
-      else energyCurrentMode=saveEnergy; 
+      //if (batCharge>=BAT_CHG_THR_FOR_SAVE_ENERGY) energyCurrentMode=reducedEnergy;
+      if (batCharge>=BAT_CHG_THR_FOR_SAVE_ENERGY) energyCurrentMode=configSavingEnergyMode; //Normally reducedEnergy if not changed in the Config Menu
+      else energyCurrentMode=lowestEnergy; 
       autoBackLightOff=true; //update autoBackLightOff if BAT power
     }
     if (logsOn) {
@@ -1066,8 +1136,10 @@ void firstSetup() {
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+
   if (error_setup != NO_ERROR) {
-    if (logsOn) Serial.println("Ready to start but with limitations");
+    if (logsOn) Serial.println("Ready to start but with limitations, error_setup="+String(error_setup));
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("Buttons to scroll UP/DOWN");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_ORANGE_4_BITS_PALETTE,TFT_BLACK);stext1.print("Ready in ");cuX=stext1.getCursorX();cuY=stext1.getCursorY();
@@ -1092,7 +1164,7 @@ void firstSetup() {
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
     break;
-    case saveEnergy:
+    case lowestEnergy:
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //Keeping it for future. In this version No BAT checks in Save Engergy Mode to save energy
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
@@ -1125,11 +1197,15 @@ boolean warmingUp() {
       
       //Update screen if last line is visible in the scroll window
       if (pLL-1>=scFL && pLL-1<=scLL) {
-        stext1.setCursor(cuX,(pLL-2)*pixelsPerLine);stext1.print(remainingBootupSeconds);
-        stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+        //Only if not dead errors
+        if (ERROR_DISPLAY_SETUP!=error_setup && ERROR_SENSOR_CO2_SETUP!=error_setup && 
+        ERROR_SENSOR_TEMP_HUM_SETUP!=error_setup && ERROR_BUTTONS_SETUP!=error_setup) {
+          stext1.setCursor(cuX,(pLL-2)*pixelsPerLine);stext1.print(remainingBootupSeconds);
+          stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+        }
       }
     }
-
+    
     //Scroll DOWN
     if (button1.pressed()) { 
       if (pFL<scFL) {
@@ -1162,7 +1238,7 @@ boolean warmingUp() {
     
     if (ERROR_DISPLAY_SETUP==error_setup || ERROR_SENSOR_CO2_SETUP==error_setup || 
         ERROR_SENSOR_TEMP_HUM_SETUP==error_setup || ERROR_BUTTONS_SETUP==error_setup)
-          remainingBootupTime=BOOTUP_TIMEOUT*1000;
+          remainingBootupTime=BOOTUP_TIMEOUT*1000;  //Can't continue. Dead errors. Infinite loop
           
     if ((int)remainingBootupTime<=0) {
       //After BOOTUP_TIMEOUT secons with no activity leaves bootupScreen and continue
@@ -1215,7 +1291,6 @@ boolean warmingUp() {
   }
   lastTimeTurnOffBacklightCheck=nowTimeGlobal;
   if (runningMessage) {if (logsOn) Serial.println("Running.... :-)");runningMessage=false;}
-
   return (false);
 }
 
@@ -1231,7 +1306,7 @@ void initVariable() {
   displayMode=bootup;lastDisplayMode=bootup;
   stateSelected=displayingSampleFixed;currentState=bootupScreen;lastState=currentState;
   updateHourSample=true;updateDaySample=true;updateHourGraph=true;updateDayGraph=true;
-  autoBackLightOff=true;button1Pressed=false;button2Pressed=false;uploadSamplesToServer=UPLOAD_SAMPLES_TO_SERVER;
+  autoBackLightOff=true;button1Pressed=false;button2Pressed=false;
   powerState=off;
   batteryStatus=battery000;
   bootCount=0;loopCount=0;
@@ -1245,7 +1320,6 @@ void initVariable() {
   forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;
   forceWEBCheck=false;forceWEBTestCheck=false;
   valueCO2=0;valueT=0;valueHum=0;lastValueCO2=-1;tempMeasure=0;
-  debugModeOn=DEBUG_MODE_ON;
   errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;
   error_setup=NO_ERROR;remainingBootupSeconds=0;
   previousTime=0;remainingBootupTime=BOOTUP_TIMEOUT*1000;
@@ -1254,6 +1328,10 @@ void initVariable() {
   auxLoopCounter=0;auxLoopCounter2=0;auxCounter=0;
   whileLoopTimeLeft=NTP_CHECK_TIMEOUT;whileWebLoopTimeLeft=HTTP_ANSWER_TIMEOUT;
   wifiResuming=false;NTPResuming=false;webResuming=false;
+  wifiEnabled=WIFI_ENABLED;bluetoothEnabled=BLE_ENABLED;uploadSamplesEnabled=UPLOAD_SAMPLES_ENABLED;
+  debugModeOn=DEBUG_MODE_ON;
+  configSavingEnergyMode=SAVING_BATTERY_MODE;
+  BLEClurrentStatus=BLEOffStatus;
 }
 
 void setup() {
@@ -1439,7 +1517,9 @@ void loop() {
   //Actions if button1 is pushed. It depens on the current state
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
   nowTimeGlobal=loopStartTime+millis();
+  //if (debugModeOn) {Serial.println("[loop()] Before checkButtonsActions(): currentState="+String(currentState)+", lastState="+String(lastState)+", forceDisplayRefresh="+String(forceDisplayRefresh)+", lastDisplayMode="+String(lastDisplayMode)+", displayMode="+String(displayMode));}
   checkButtonsActions(mainloop);
+  //if (debugModeOn) {Serial.println("[loop()] After checkButtonsActions(): currentState="+String(currentState)+", lastState="+String(lastState)+", forceDisplayRefresh="+String(forceDisplayRefresh)+", lastDisplayMode="+String(lastDisplayMode)+", displayMode="+String(displayMode));}
   
   //Regular actions every VOLTAGE_CHECK_PERIOD seconds
   //Checking out whether the voltage exceeds thresholds to detect energy source (bat or USB)
@@ -1594,7 +1674,7 @@ void loop() {
       (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
         currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
     
-    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - DISPLAY_REFRESH_PERIOD");}
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - DISPLAY_REFRESH_PERIOD, currentState="+String(currentState)+", lastState="+String(lastState)+", forceDisplayRefresh="+String(forceDisplayRefresh)+", lastDisplayMode="+String(lastDisplayMode)+", displayMode="+String(displayMode));}
     lastTimeDisplayCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
 
     switch (displayMode) {
@@ -1685,11 +1765,12 @@ void loop() {
   //Regular actions every WIFI_RECONNECT_PERIOD seconds to recover WiFi connection
   //forceWifiReconnect==true if:
   // 1) after ICON_STATUS_REFRESH_PERIOD
-  // 2) or buttons are pressed to wake up from sleep
-  // 3) or previous WiFi re-connection try was ABORTED (button pressed) or BREAK (need to refresh display)
+  // 2) after configuring WiFi = ON in the Config Menu
+  // 3) or buttons are pressed to wake up from sleep
+  // 4) or previous WiFi re-connection try was ABORTED (button pressed) or BREAK (need to refresh display)
   nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeWifiReconnectionCheck) >= WIFI_RECONNECT_PERIOD) || forceWifiReconnect ) && 
-      !firstBoot && (wifiCurrentStatus==wifiOffStatus || WiFi.status()!=WL_CONNECTED) ) {
+      wifiEnabled && !firstBoot && (wifiCurrentStatus==wifiOffStatus || WiFi.status()!=WL_CONNECTED) ) {
      
     if (debugModeOn) {
       Serial.println(String(nowTimeGlobal)+"  - WIFI_RECONNECT_PERIOD ("+String(WIFI_RECONNECT_PERIOD/1000)+" s)");
@@ -1747,7 +1828,7 @@ void loop() {
         wifiResuming=false;
         //Send HttpRequest to check the server status
         // The request updates CloudSyncCurrentStatus
-        //if (uploadSamplesToServer) 
+        //if (uploadSamplesEnabled) 
         forceWEBTestCheck=true; //Will check WEB server in the next loop() interaction
         if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with NO_ERROR. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect)+", forceWEBTestCheck="+String(forceWEBTestCheck));}
       break;
@@ -1757,6 +1838,10 @@ void loop() {
   }
 
   //Regular actions every NTP_KO_CHECK_PERIOD seconds. Cheking if NTP is off or should be checked
+  //forceNTPCheck is true if:
+  // 1) After NTP server config in firstSetup()
+  // 2) If the previous NTP check was aborted due eithe Button action or Display Refresh
+  // 2) WiFi has been setup ON in config menu
   nowTimeGlobal=loopStartTime+millis();
   if ((nowTimeGlobal-lastTimeNTPCheck) >= NTP_KO_CHECK_PERIOD || forceNTPCheck) {
     
@@ -1775,18 +1860,18 @@ void loop() {
     // - If the previous NTP check was aborted due to Button action (forceNTPCheck=true)
     
     long auxRandom=random(1,7);
-    if( wifiCurrentStatus!=wifiOffStatus &&
+    if( wifiCurrentStatus!=wifiOffStatus && wifiEnabled &&
         ( CloudClockCurrentStatus==CloudClockOffStatus || forceNTPCheck ||
           (fullEnergy==energyCurrentMode && (auxRandom<2)) ||
            reducedEnergy==energyCurrentMode || 
-           saveEnergy==energyCurrentMode ) ) {
+           lowestEnergy==energyCurrentMode ) ) {
       if (debugModeOn) {
         Serial.println("      - setupNTPConfig() for NTP Sync");
         if (CloudClockCurrentStatus==CloudClockOffStatus) Serial.println("        - Reason: CloudClockCurrentStatus==CloudClockOffStatus");
         if (forceNTPCheck) Serial.println("        - Reason: forceNTPCheck");
         if (fullEnergy==energyCurrentMode && (auxRandom<2)) Serial.println("        - Reason: fullEnergy==energyCurrentMode && (auxRandom(="+String(auxRandom)+")<2)");
         if (reducedEnergy==energyCurrentMode) Serial.println("        - Reason: reducedEnergy==energyCurrentMode");
-        if (saveEnergy==energyCurrentMode) Serial.println("        - Reason: saveEnergy==energyCurrentMode");
+        if (lowestEnergy==energyCurrentMode) Serial.println("        - Reason: lowestEnergy==energyCurrentMode");
       }
       forceNTPCheck=false;
       switch(setupNTPConfig(false,&auxLoopCounter2,&whileLoopTimeLeft)) { //NTP Sync and CloudClockCurrentStatus update
@@ -1820,7 +1905,7 @@ void loop() {
   }
   
   //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
-  //WiFi SITE must be UPLOAD_SAMPLES_SITE (case sensitive), otherwise sample is not uploaded
+  //WiFi SITE must be UPLOAD_SAMPLES_FROM_SITE (case sensitive), otherwise sample is not uploaded
   //forceWEBCheck is set when in the previous interaction the WEB connection was either:
   // ABORTED (Button Pressed) or
   // BREAK  (Display Refresh)
@@ -1829,9 +1914,9 @@ void loop() {
   // server check and ICON update. If test overlaps the uploadSamplesPeriod timing, the later
   // has higher priority in order to send the samples on time.
   nowTimeGlobal=loopStartTime+millis();
-  if ((((nowTimeGlobal-lastTimeUploadSampleCheck) >= uploadSamplesPeriod) || firstBoot || forceWEBCheck || forceWEBTestCheck) && uploadSamplesToServer &&
-      wifiCurrentStatus!=wifiOffStatus &&
-      (0==wifiCred.wifiSITEs[wifiCred.activeIndex].compareTo(UPLOAD_SAMPLES_SITE)) ) {
+  if ((((nowTimeGlobal-lastTimeUploadSampleCheck) >= uploadSamplesPeriod) || firstBoot || forceWEBCheck || forceWEBTestCheck) && uploadSamplesEnabled &&
+      wifiCurrentStatus!=wifiOffStatus && wifiEnabled &&
+      (0==wifiCred.wifiSITEs[wifiCred.activeIndex].compareTo(UPLOAD_SAMPLES_FROM_SITE)) ) {
     
     //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
     if (!webResuming && !forceWEBTestCheck) lastTimeUploadSampleCheck=nowTimeGlobal; //Only if the HTTP connection didn't ABORT or BREAK in the previous interaction
@@ -1845,7 +1930,7 @@ void loop() {
 
     //In Reduce or Save Energy Modes, there were no battery updates to save energy consume, 
     //so let's update battery parameters now before uploading the httpRequest
-    if (reducedEnergy==energyCurrentMode || saveEnergy==energyCurrentMode) {
+    if (reducedEnergy==energyCurrentMode || lowestEnergy==energyCurrentMode) {
       //batADCVolt update
       //Power state check and powerState update
       //batteryStatus update

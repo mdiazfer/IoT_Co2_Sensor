@@ -156,7 +156,6 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
   else {
     powerState=onlyBattery;
     *timeUSBPower=0;
-    //energyCurrentMode=reducedEnergy;
 
     if (fullEnergy==energyCurrentMode) { //Updates if power charged USB -> BAT
       autoBackLightOff=true; //update autoBackLightOff if BAT power
@@ -168,13 +167,14 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
 
     //Updates based on BAT charge
     if (batCharge>=BAT_CHG_THR_FOR_SAVE_ENERGY) {
-      energyCurrentMode=reducedEnergy;
+      //energyCurrentMode=reducedEnergy;
+      energyCurrentMode=configSavingEnergyMode; //Normally reducedEnergy if not changed in the Config Menu
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //Keeping it for future. In this version No BAT checks in Reduce Engergy Mode to save energy
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
     }
     else {
-      energyCurrentMode=saveEnergy;    
+      energyCurrentMode=lowestEnergy;    
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //Keeping it for future. In this version No BAT checks in Save Engergy Mode to save energy
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;

@@ -7,8 +7,8 @@
 
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
-    enum availableStates {bootupScreen,menuGlobal,menuWhatToDisplay,displayInfo,displayInfo1,displayInfo2,displayInfo3,displayInfo4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
-                          displayingCo2LastDayGraphFixed,displayingSequential};
+    enum availableStates {bootupScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+                          displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
   #endif
 
@@ -17,7 +17,7 @@
     enum batteryChargingStatus {batteryCharging000,batteryCharging010,batteryCharging025,batteryCharging050,
                                 batteryCharging075,batteryCharging100,
                                 battery000,battery010,battery025,battery050,battery075,battery100};
-    enum energyModes {fullEnergy, reducedEnergy, saveEnergy};
+    enum energyModes {fullEnergy, reducedEnergy, lowestEnergy};
     #define _BATTERYFRAMEWORK_ 
   #endif
 #endif
@@ -30,7 +30,7 @@ extern TFT_eSPI tft;
 extern RTC_DATA_ATTR float_t batADCVolt,lastBatCharge,batCharge;
 extern RTC_DATA_ATTR enum powerModes powerState;
 extern RTC_DATA_ATTR enum batteryChargingStatus batteryStatus;
-extern RTC_DATA_ATTR enum energyModes energyCurrentMode;
+extern RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode;
 extern RTC_DATA_ATTR boolean autoBackLightOff,forceDisplayModeRefresh,forceDisplayRefresh,forceGetSample;
 extern RTC_DATA_ATTR enum availableStates stateSelected,currentState;
 extern RTC_DATA_ATTR uint64_t nowTimeGlobal,previousLastTimeSampleCheck,lastTimeTurnOffBacklightCheck;

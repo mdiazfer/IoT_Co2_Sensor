@@ -1,4 +1,4 @@
-/* Library for displaying graphs in the TFT
+  /* Library for displaying graphs in the TFT
 
 */
 
@@ -383,14 +383,14 @@ void drawText(float_t value, String textString, int32_t textSize, int32_t font, 
   tft.drawString(String(textString),x,y,font);
 };
 
-void printMenuWhatToDisplay() {
+void printshowOptMenu() {
   //Cleaning and printing menu screen
   tft.fillScreen(MENU_BACK_COLOR);
   uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_BACK_COLOR;
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(25,10,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("What to display");
+  tft.setCursor(25,10,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Options to show");
   if (stateSelected==displayingSampleFixed) {auxColorFore=MENU_BACK_COLOR;auxColorBack=MENU_FORE_COLOR;} else {auxColorFore=MENU_FORE_COLOR;auxColorBack=MENU_BACK_COLOR;}tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(20,40,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Co2 measurements");
+  tft.setCursor(20,40,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("CO2 measurements");
   if (stateSelected==displayingCo2LastHourGraphFixed) {auxColorFore=MENU_BACK_COLOR;auxColorBack=MENU_FORE_COLOR;} else {auxColorFore=MENU_FORE_COLOR;auxColorBack=MENU_BACK_COLOR;}tft.setTextColor(auxColorFore,auxColorBack);
   tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Last hour graph");
   if (stateSelected==displayingCo2LastDayGraphFixed) {auxColorFore=MENU_BACK_COLOR;auxColorBack=MENU_FORE_COLOR;} else {auxColorFore=MENU_FORE_COLOR;auxColorBack=MENU_BACK_COLOR;}tft.setTextColor(auxColorFore,auxColorBack);
@@ -399,27 +399,29 @@ void printMenuWhatToDisplay() {
   tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.print("Sequentially all");
 }
 
-void printGlobalMenu() {
+void printMainMenu() {
   //Cleaning and printing menu screen
   tft.fillScreen(MENU_GLOBAL_BACK_COLOR);
   uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_GLOBAL_BACK_COLOR;
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(60,10,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Global Menu");
+  tft.setCursor(60,10,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Main Menu");
 
-  if (stateSelected==menuWhatToDisplay) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
+  if (stateSelected==showOptMenu) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(20,40,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Display Options");
-  if (stateSelected==displayInfo) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
+  tft.setCursor(20,40,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Show Options Menu");
+  if (stateSelected==infoMenu) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Display Gral. Info");
+  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("General Info");
+  if (stateSelected==configMenu) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Config Menu");
+  //Printing Back option
   if (  (stateSelected==displayingSampleFixed) || (stateSelected==displayingCo2LastHourGraphFixed) ||
         (stateSelected==displayingCo2LastDayGraphFixed) || (stateSelected==displayingSequential) )
         {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;}
   else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Back");
-
-  //if (stateSelected==menuGlobal) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
+  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Back");
 }
 
 void printInfoMenu() {
@@ -429,25 +431,70 @@ void printInfoMenu() {
   tft.setTextColor(auxColorFore,auxColorBack);
   tft.setCursor(60,10,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Info Menu");
 
-  if ( (stateSelected==displayInfo || stateSelected==displayInfo1) ) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
+  if ( (stateSelected==infoMenu || stateSelected==infoMenu1) ) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
   tft.setCursor(20,34,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Gral. Info");
-  if (stateSelected==displayInfo2) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
+  if (stateSelected==infoMenu2) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
   tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Sensors Info");
-  if (stateSelected==displayInfo3) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
+  if (stateSelected==infoMenu3) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
   tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("WiFi Info");
-  if (stateSelected==displayInfo4) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
+  if (stateSelected==infoMenu4) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
   tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Net Info");
-  if (stateSelected==menuGlobal) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
+  if (stateSelected==mainMenu) {auxColorFore=MENU_INFO_BACK_COLOR;auxColorBack=MENU_INFO_FORE_COLOR;} else {auxColorFore=MENU_INFO_FORE_COLOR;auxColorBack=MENU_INFO_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
   tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*4,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Back");
   
 }
 
-void printInfoGral() {
+void printConfigMenu() {
+  //Cleaning and printing menu screen
+  tft.fillScreen(MENU_CONFIG_BACK_COLOR);
+  uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_CONFIG_BACK_COLOR;
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(60,10,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Config Menu");
+
+  //Printing the first Config Menu Option - WiFi ON/OFF-
+  if ( (stateSelected==configMenu || stateSelected==confMenuWifi) ) {auxColorFore=MENU_CONFIG_BACK_COLOR;auxColorBack=MENU_CONFIG_FORE_COLOR;} else {auxColorFore=MENU_CONFIG_FORE_COLOR;auxColorBack=MENU_CONFIG_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);tft.setCursor(10,34,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("WiFi:          ");
+  tft.setCursor(10+tft.textWidth("WiFi:          ",TEXT_FONT_MENU),34,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);
+  if (wifiEnabled) {tft.println("ON");} else {tft.println("OFF");}
+
+  //Printing the 2nd Config Menu Option - Blueth.: ON/OFF-
+  if ( (stateSelected==confMenuBLE) ) {auxColorFore=MENU_CONFIG_BACK_COLOR;auxColorBack=MENU_CONFIG_FORE_COLOR;} else {auxColorFore=MENU_CONFIG_FORE_COLOR;auxColorBack=MENU_CONFIG_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);tft.setCursor(10,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Bluetooth:     ");
+  tft.setCursor(10+tft.textWidth("Bluetooth:     ",TEXT_FONT_MENU),34+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);
+  if (bluetoothEnabled) {tft.println("ON");} else {tft.println("OFF");}
+  
+  //Printing the 3nd Config Menu Option - Upl. Meas.: ON/OFF-
+  if (wifiEnabled) { 
+    if ( (stateSelected==confMenuUpMeas) ) {auxColorFore=MENU_CONFIG_BACK_COLOR;auxColorBack=MENU_CONFIG_FORE_COLOR;} else {auxColorFore=MENU_CONFIG_FORE_COLOR;auxColorBack=MENU_CONFIG_BACK_COLOR;}
+    tft.setTextColor(auxColorFore,auxColorBack);tft.setCursor(10,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Upload Measu.: ");
+    tft.setCursor(10+tft.textWidth("Upload Measu.: ",TEXT_FONT_MENU),34+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);
+    if (uploadSamplesEnabled) {tft.println("ON");} else {tft.println("OFF");}
+  }
+  else {
+    auxColorFore=TFT_DARKGREY;auxColorBack=MENU_CONFIG_BACK_COLOR;
+    tft.setTextColor(auxColorFore,auxColorBack);tft.setCursor(10,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Upload Measu.: ");
+    tft.setCursor(10+tft.textWidth("Upload Measu.: ",TEXT_FONT_MENU),34+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);
+    if (uploadSamplesEnabled) {tft.println("ON");} else {tft.println("OFF");}
+  }
+
+  //Printing the 4th Config Menu Option - Bat. Mode: Red./Low-
+  if ( (stateSelected==confMenuSavBatMode) ) {auxColorFore=MENU_CONFIG_BACK_COLOR;auxColorBack=MENU_CONFIG_FORE_COLOR;} else {auxColorFore=MENU_CONFIG_FORE_COLOR;auxColorBack=MENU_CONFIG_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);tft.setCursor(10,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Bat. Mode: ");
+  tft.setCursor(10+tft.textWidth("Bat. Mode: ",TEXT_FONT_MENU),34+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);
+  if (reducedEnergy==configSavingEnergyMode) {tft.println("Reduced");} else {tft.println("Lowest");}
+  
+  //Printing the Back option
+  if (stateSelected==mainMenu) {auxColorFore=MENU_CONFIG_BACK_COLOR;auxColorBack=MENU_CONFIG_FORE_COLOR;} else {auxColorFore=MENU_CONFIG_FORE_COLOR;auxColorBack=MENU_CONFIG_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(10,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*4,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Back");
+}
+
+void printGralInfo() {
   struct tm timeinfo;
   boolean ntpServerAvailable=true;
   if(!getLocalTime(&timeinfo)){
@@ -485,7 +532,7 @@ void printInfoGral() {
   tft.print("Uptime since: ");tft.println(&startTimeInfo, "%d/%m/%y - %H:%M:%S");
   tft.setCursor(15,30+(tft.fontHeight(TEXT_FONT_BOOT_SCREEN)+3)*3,TEXT_FONT_BOOT_SCREEN);tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);
   tft.print("Report URL: ");
-  if (uploadSamplesToServer) //URL shown only if setup
+  if (uploadSamplesEnabled) //URL shown only if setup
     tft.print("http://"+serverToUploadSamplesIPAddress.toString()+String(GET_REQUEST_TO_UPLOAD_SAMPLES).substring(4,String(GET_REQUEST_TO_UPLOAD_SAMPLES).length()-1));
   else
     tft.print("Not Available");
@@ -569,7 +616,7 @@ void printInfoGral() {
   return;
 }
 
-void printInfoSensors() {
+void printSensorsInfo() {
   tft.fillScreen(MENU_INFO_BACK_COLOR);
   uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_INFO_BACK_COLOR;
   tft.setTextColor(auxColorFore,auxColorBack);
@@ -594,7 +641,7 @@ void printInfoSensors() {
   return;
 }
 
-void printInfoWifi() {
+void printWifiInfo() {
   int16_t numberWiFiNetworks=0;
   tft.fillScreen(MENU_INFO_BACK_COLOR);
   uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_INFO_BACK_COLOR;
@@ -652,7 +699,7 @@ void printInfoWifi() {
   return;
 }
 
-void printInfoNet() {
+void printNetInfo() {
   tft.fillScreen(MENU_INFO_BACK_COLOR);
   uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_INFO_BACK_COLOR;
   tft.setTextColor(auxColorFore,auxColorBack);

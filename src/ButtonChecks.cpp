@@ -28,22 +28,25 @@ void checkButton1() {
   switch(currentState) {
     case bootupScreen:
     break;
-    case menuGlobal:
-    //Changing Menus: Global Menu -> What to display Menu -> Display Gra. Info -> back
+    case mainMenu:
+    //Changing Menus: Main Menu -> What to Show Menu -> Display Gral. Info -> back
       switch(stateSelected) {
-        case menuWhatToDisplay:
-          stateSelected=displayInfo;
+        case showOptMenu:
+          stateSelected=infoMenu;
         break;
-        case displayInfo:
+        case infoMenu:
+          stateSelected=configMenu;
+        break;
+        case configMenu:
           stateSelected=lastState;
         break;
         default:
-          stateSelected=menuWhatToDisplay;
+          stateSelected=showOptMenu;
         break;
       }
-      printGlobalMenu();
+      printMainMenu();
     break;
-    case menuWhatToDisplay:
+    case showOptMenu:
     //Changing displayingMode: sampleFixed -> co2LastHourGraphFixe -> co2LastDayGraphFixed -> sequential
       switch(stateSelected) {
         case displayingSampleFixed:
@@ -63,38 +66,63 @@ void checkButton1() {
           displayMode=sampleValue;
         break;
       }
-      printMenuWhatToDisplay();
+      printshowOptMenu();
     break;
-    case displayInfo:
+    case infoMenu:
       switch(stateSelected) {
-          case displayInfo1:
-            stateSelected=displayInfo2;
+          case infoMenu1:
+            stateSelected=infoMenu2;
           break;
-          case displayInfo2:
-            stateSelected=displayInfo3;
+          case infoMenu2:
+            stateSelected=infoMenu3;
           break;
-          case displayInfo3:
-            stateSelected=displayInfo4;
+          case infoMenu3:
+            stateSelected=infoMenu4;
           break;
-          case displayInfo4:
-            stateSelected=menuGlobal;
+          case infoMenu4:
+            stateSelected=mainMenu;
           break;
           default:
-            stateSelected=displayInfo1;
+            stateSelected=infoMenu1;
           break;
         }
         printInfoMenu();
     break;
-    case displayInfo1:
-    case displayInfo2:
-    case displayInfo3:
-    case displayInfo4:
+    case infoMenu1:
+    case infoMenu2:
+    case infoMenu3:
+    case infoMenu4:
+    break;
+    case configMenu:
+      switch (stateSelected) {
+        case confMenuWifi:
+          stateSelected=confMenuBLE;
+        break;
+        case confMenuBLE:
+          if (wifiEnabled) stateSelected=confMenuUpMeas; //Only if WiFi is enabled
+          else stateSelected=confMenuSavBatMode;
+        break;
+        case confMenuUpMeas:
+          stateSelected=confMenuSavBatMode;
+        break;
+        case confMenuSavBatMode:
+          stateSelected=mainMenu;
+        break;
+        default:
+          stateSelected=confMenuWifi;
+        break;
+      }
+      printConfigMenu();
     break;
     default:
+      //Landing here after Button1 pressed from regular screen (sample or graphs)
+      //lastState is the screen which came from
+      if (debugModeOn) {Serial.println("    - [checkButton1] - B1, antes de cambiar, lastState="+String(lastState));}
       lastState=currentState;
-      stateSelected=menuWhatToDisplay;
-      currentState=menuGlobal;
-      printGlobalMenu();
+      if (debugModeOn) {Serial.println("    - [checkButton1] - B1, despues de cambiar, lastState="+String(lastState));}
+      stateSelected=showOptMenu;
+      currentState=mainMenu;
+      printMainMenu();
     break;
   }
 }
@@ -127,16 +155,17 @@ void checkButton2() {
   
   //Actions are different based on the current state
   switch(currentState) {
-    case menuGlobal:
+    case mainMenu:
       currentState=stateSelected;
-      if (currentState==menuWhatToDisplay) {stateSelected=lastState; printMenuWhatToDisplay();}
-      else if (currentState==displayInfo) {stateSelected=displayInfo1; printInfoMenu();}
+      if (currentState==showOptMenu) {stateSelected=lastState; printshowOptMenu();}
+      else if (currentState==infoMenu) {stateSelected=infoMenu1; printInfoMenu();}
+      else if (currentState==configMenu) {stateSelected=confMenuWifi; printConfigMenu();}
       else if (currentState==displayingSampleFixed){forceDisplayRefresh=true;lastDisplayMode=menu;}
       else if (currentState==displayingCo2LastHourGraphFixed){forceDisplayRefresh=true;updateHourGraph=true;}
       else if (currentState==displayingCo2LastDayGraphFixed){forceDisplayRefresh=true;updateDayGraph=true;}
-      else if (currentState==displayingSequential){forceDisplayRefresh=true;lastDisplayMode=menu;displayMode=sampleValue;}
+      else if (currentState==displayingSequential){forceDisplayRefresh=true;forceDisplayModeRefresh=true;lastDisplayMode=menu;displayMode=sampleValue;}
     break;
-    case menuWhatToDisplay:
+    case showOptMenu:
       currentState=stateSelected;
       forceDisplayRefresh=true;
       forceDisplayModeRefresh=true;
@@ -144,34 +173,70 @@ void checkButton2() {
       previousLastTimeSampleCheck=nowTimeGlobal-SAMPLE_PERIOD; //Refresh the circular graph for CO2 sample
       //tft.fillScreen(MENU_BACK_COLOR);
     break;
-    case displayInfo:
+    case infoMenu:
       currentState=stateSelected;
-      stateSelected=displayInfo;
-      if (currentState==displayInfo1) printInfoGral();
-      else if (currentState==displayInfo2) printInfoSensors();
-      else if (currentState==displayInfo3) printInfoWifi();
-      else if (currentState==displayInfo4) printInfoNet();
-      else printGlobalMenu();
+      stateSelected=infoMenu;
+      if (currentState==infoMenu1) printGralInfo();
+      else if (currentState==infoMenu2) printSensorsInfo();
+      else if (currentState==infoMenu3) printWifiInfo();
+      else if (currentState==infoMenu4) printNetInfo();
+      else printMainMenu();
     break;
-    case displayInfo1:
+    case infoMenu1:
       currentState=stateSelected;
-      stateSelected=displayInfo1;
+      stateSelected=infoMenu1;
       printInfoMenu();
     break;
-    case displayInfo2:
+    case infoMenu2:
       currentState=stateSelected;
-      stateSelected=displayInfo2;
+      stateSelected=infoMenu2;
       printInfoMenu();
     break;
-    case displayInfo3:
+    case infoMenu3:
       currentState=stateSelected;
-      stateSelected=displayInfo3;
+      stateSelected=infoMenu3;
       printInfoMenu();
     break;
-    case displayInfo4:
+    case infoMenu4:
       currentState=stateSelected;
-      stateSelected=displayInfo4;
+      stateSelected=infoMenu4;
       printInfoMenu();
+    break;
+    case configMenu:
+      if (stateSelected==confMenuWifi) {wifiEnabled=!wifiEnabled;printConfigMenu();}
+      else if (stateSelected==confMenuBLE) {bluetoothEnabled=!bluetoothEnabled;printConfigMenu();}
+      else if (stateSelected==confMenuUpMeas) {uploadSamplesEnabled=!uploadSamplesEnabled;printConfigMenu();}
+      else if (stateSelected==confMenuSavBatMode) {configSavingEnergyMode=configSavingEnergyMode==reducedEnergy?lowestEnergy:reducedEnergy;energyCurrentMode=configSavingEnergyMode;printConfigMenu();}
+      else { //Back
+        currentState=lastState; 
+        if (currentState==displayingSampleFixed){forceDisplayRefresh=true;lastDisplayMode=menu;}
+        else if (currentState==displayingCo2LastHourGraphFixed){forceDisplayRefresh=true;updateHourGraph=true;}
+        else if (currentState==displayingCo2LastDayGraphFixed){forceDisplayRefresh=true;updateDayGraph=true;}
+        else if (currentState==displayingSequential){forceDisplayRefresh=true;forceDisplayModeRefresh=true;lastDisplayMode=menu;displayMode=sampleValue;}
+        if (debugModeOn) {Serial.println("    - [checkButton2] - B2 lastState="+String(lastState)+", forceDisplayModeRefresh="+String(forceDisplayModeRefresh)+", forceDisplayRefresh="+String(forceDisplayRefresh)+", lastDisplayMode="+String(lastDisplayMode)+", displayMode="+String(displayMode));}
+
+        //Actions based on the configuration
+        if (wifiEnabled) { 
+          if(WiFi.status()!=WL_CONNECTED) {
+            forceWifiReconnect=true; //Next loop interaction the WiFi connection is done
+            forceNTPCheck=true; //Let's force NTP sync
+          }
+        }
+        else {
+          if(WiFi.status()!=WL_DISCONNECTED) {
+            WiFi.disconnect();
+            wifiCurrentStatus=wifiOffStatus;
+            forceWifiReconnect=false; //To avoid deadlock in WIFI_RECONNECT_PERIOD chck if a previous WiFi reconnection was ongoing
+            uploadSamplesEnabled=false; //To avoid uploading samples tries
+          }
+        }
+        if (bluetoothEnabled) {if (BLEClurrentStatus==BLEOffStatus) BLEClurrentStatus=BLEOnStatus;}
+        else {if (BLEClurrentStatus==BLEOnStatus) BLEClurrentStatus=BLEOffStatus;}
+        if (uploadSamplesEnabled) {} //Do nothing else. CloudSyncCurrentStatus update and Upload will be done just right after WiFi (re-)connection.
+        else {CloudSyncCurrentStatus=CloudSyncOffStatus;}//Do nothing else
+        if (reducedEnergy==configSavingEnergyMode) {}//Do nothing esle. Update is done through the regular loop() flow
+        else {} //Do nothing else
+      }
     break;
     default:
     break;
@@ -245,6 +310,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
     else
       timePressButton2=0;
     checkButton2();
+    if (debugModeOn) {Serial.println("  - [checkButtonsActions]  - B2 lastState="+String(lastState)+", forceDisplayRefresh="+String(forceDisplayRefresh)+", lastDisplayMode="+String(lastDisplayMode)+", displayMode="+String(displayMode));}
 
     //Specific actions based on where this functions has been called from
     switch (fromAction) {
