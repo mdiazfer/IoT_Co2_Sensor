@@ -7,6 +7,13 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.9.6 15/Ene/2023   - Config Menu for: WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF, Saving Battery Mode Reduced/Lowest
+                      - Writting in EEPROM the Config Variables values to make them permanent
+                      - Bug fixing:
+                        + Button1 presses in firstBoot goest to hibernate regardless how long it was pressed
+                        + Going to the menu screen if Button1 is pressed during bootup phase
+                      - change error_setup values to be mask-oriented and re-code the firstSetup for OR-error_setup and
+                        warmingUp() to detect dead errors and take actions
 - 0.9.5 14/Ene/2023   - Rename functions for Menus
                       - Added Config Menu for WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF, Saving Energy: Reduced/Lowest
 - 0.9.4 11/Ene/2023   - Code optimization

@@ -159,7 +159,7 @@ void checkButton2() {
       currentState=stateSelected;
       if (currentState==showOptMenu) {stateSelected=lastState; printshowOptMenu();}
       else if (currentState==infoMenu) {stateSelected=infoMenu1; printInfoMenu();}
-      else if (currentState==configMenu) {stateSelected=confMenuWifi; printConfigMenu();}
+      else if (currentState==configMenu) {stateSelected=confMenuWifi;printConfigMenu();}
       else if (currentState==displayingSampleFixed){forceDisplayRefresh=true;lastDisplayMode=menu;}
       else if (currentState==displayingCo2LastHourGraphFixed){forceDisplayRefresh=true;updateHourGraph=true;}
       else if (currentState==displayingCo2LastDayGraphFixed){forceDisplayRefresh=true;updateDayGraph=true;}
@@ -203,7 +203,7 @@ void checkButton2() {
       printInfoMenu();
     break;
     case configMenu:
-      if (stateSelected==confMenuWifi) {wifiEnabled=!wifiEnabled;printConfigMenu();}
+      if (stateSelected==confMenuWifi) {wifiEnabled=!wifiEnabled;if (!wifiEnabled ) uploadSamplesEnabled=false; printConfigMenu();}
       else if (stateSelected==confMenuBLE) {bluetoothEnabled=!bluetoothEnabled;printConfigMenu();}
       else if (stateSelected==confMenuUpMeas) {uploadSamplesEnabled=!uploadSamplesEnabled;printConfigMenu();}
       else if (stateSelected==confMenuSavBatMode) {configSavingEnergyMode=configSavingEnergyMode==reducedEnergy?lowestEnergy:reducedEnergy;energyCurrentMode=configSavingEnergyMode;printConfigMenu();}
@@ -228,6 +228,7 @@ void checkButton2() {
             wifiCurrentStatus=wifiOffStatus;
             forceWifiReconnect=false; //To avoid deadlock in WIFI_RECONNECT_PERIOD chck if a previous WiFi reconnection was ongoing
             uploadSamplesEnabled=false; //To avoid uploading samples tries
+            CloudClockCurrentStatus=CloudClockOffStatus;
           }
         }
         if (bluetoothEnabled) {if (BLEClurrentStatus==BLEOffStatus) BLEClurrentStatus=BLEOnStatus;}
@@ -236,6 +237,20 @@ void checkButton2() {
         else {CloudSyncCurrentStatus=CloudSyncOffStatus;}//Do nothing else
         if (reducedEnergy==configSavingEnergyMode) {}//Do nothing esle. Update is done through the regular loop() flow
         else {} //Do nothing else
+
+        //Writting the modified values in EEPROM
+        //Reaching this point means the EEPROM bit (bit 0) for the very firs run is set (0x01).
+        uint8_t currentConfigVariables=0x01;
+        if (reducedEnergy==configSavingEnergyMode) currentConfigVariables|=0x02;
+        if (uploadSamplesEnabled) currentConfigVariables|=0x04;
+        if (bluetoothEnabled) currentConfigVariables|=0x08;
+        if (wifiEnabled) currentConfigVariables|=0x10;
+        if (configVariables!=currentConfigVariables) {
+          // save the LED state in flash memory
+            configVariables=currentConfigVariables;
+            EEPROM.write(0,configVariables);
+            EEPROM.commit();
+        }
       }
     break;
     default:
@@ -248,7 +263,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
   //Actions if button1 is pushed. It depens on the current state
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
   if (button1.pressed() && !buttonWakeUp && !button1Pressed) {
-    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - button1.pressed");}
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - button1.pressed, currentState="+String(currentState)+", buttonWakeUp="+String(buttonWakeUp)+", firstBoot="+String(firstBoot));}
 
     //Take time to check if it is long press
     button1Pressed=true;
@@ -259,7 +274,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
       timePressButton1=0;
   }
 
-  if (button1.released() && !buttonWakeUp && !firstBoot) {
+  if (button1.released() && !buttonWakeUp) {
     button1Pressed=false;
 
     checkButton1();
@@ -277,7 +292,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
 
   //Check if Button1 was long pressed
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
-  if (button1Pressed && timePressButton1!=0 && !buttonWakeUp) { 
+  if (button1Pressed && timePressButton1!=0 && !buttonWakeUp) {
 
     if ((millis()-timePressButton1) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) {
       //Long press, so toggle going to hibernate

@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.5"
+#define VERSION "0.9.6"
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -31,6 +31,7 @@
 #define DEVICE_NAME_PREFIX "co2-sensor"
 #define PIN_TFT_BACKLIGHT 4
 #define DEBUG_MODE_ON true
+#define EEPROM_SIZE 1
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
@@ -81,23 +82,24 @@
     #define CO2_SENSOR_HUM_MIN 0
 
 //Error stuff
-#define NO_ERROR                0x00
-#define ERROR_DISPLAY_SETUP     0x01
-#define ERROR_SENSOR_TEMP_HUM_SETUP  0x02
-#define ERROR_SENSOR_CO2_SETUP  0x03
-#define ERROR_BUTTONS_SETUP     0x04
-#define ERROR_WIFI_SETUP        0x05
-#define ERROR_BLE_SETUP         0x06
-#define ERROR_SSID_CONNECTION   0x07
-#define ERROR_NTP_SERVER        0x08
-#define ERROR_WEB_SERVER        0x09
-#define ERROR_BAT_ADC           0x0A
-#define ERROR_ABORT_WIFI_SETUP  0x0B
-#define ERROR_BREAK_WIFI_SETUP  0x0C
-#define ERROR_ABORT_NTP_SETUP   0x0D
-#define ERROR_BREAK_NTP_SETUP   0x0E
-#define ERROR_ABORT_WEB_SETUP   0x0F
-#define ERROR_BREAK_WEB_SETUP   0x10
+#define NO_ERROR                      0x00000000
+#define ERROR_DISPLAY_SETUP           0x00000001
+#define ERROR_SENSOR_TEMP_HUM_SETUP   0x00000002
+#define ERROR_SENSOR_CO2_SETUP        0x00000004
+#define ERROR_BUTTONS_SETUP           0x00000008
+#define DEAD_ERRORS                   0x0000000F //ERROR_DISPLAY_SETUP OR ERROR_SENSOR_CO2_SETUP OR ERROR_SENSOR_TEMP_HUM_SETUP OR ERROR_BUTTONS_SETUP
+#define ERROR_WIFI_SETUP              0x00000010
+#define ERROR_BLE_SETUP               0x00000020
+#define ERROR_SSID_CONNECTION         0x00000040
+#define ERROR_NTP_SERVER              0x00000080
+#define ERROR_WEB_SERVER              0x00000100
+#define ERROR_BAT_ADC                 0x00000200
+#define ERROR_ABORT_WIFI_SETUP        0x00000400
+#define ERROR_BREAK_WIFI_SETUP        0x00000800
+#define ERROR_ABORT_NTP_SETUP         0x00001000
+#define ERROR_BREAK_NTP_SETUP         0x00002000
+#define ERROR_ABORT_WEB_SETUP         0x00004000
+#define ERROR_BREAK_WEB_SETUP         0x00008000
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240
@@ -210,7 +212,7 @@
 #define WIFI_000_RSSI -100 //RSSI < -100 dBm No Signal - Lower values mean no SSID visibiliy, 0% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 
 //BLE stuff
-#define BLE_ENABLED  true
+#define BLE_ENABLED  false
 
 //Battery stuff
 #define SAVING_BATTERY_MODE  reducedEnergy //Other values: reducedEnergy lowestEnergy

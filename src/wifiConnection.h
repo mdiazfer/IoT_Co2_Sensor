@@ -33,5 +33,5 @@
 
 void printNetData();
 wifiNetworkInfo * printCurrentWiFi(boolean logsOn, int16_t *numberWiFiNetworks);
-uint8_t wifiConnect(boolean logsOn,boolean msgTFT,uint8_t* auxLoopCounter,uint8_t* auxCounter);
+uint32_t wifiConnect(boolean logsOn,boolean msgTFT,uint8_t* auxLoopCounter,uint8_t* auxCounter);
 extern RTC_DATA_ATTR int errorsWiFiCnt;

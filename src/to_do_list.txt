@@ -1,11 +1,8 @@
 To do list
 -----------
 - Config Menu for simple things: WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF
-  + uploadSamplesEnabled should be linked to wifiEnabled in the Config Menu
   - Bug fixing: WiFi icon for wifi0Status
   - Write in EEPROM the config variables: wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,energyCurrentMode
-  + change error_setup values to be mask-oriented and re-code the firstSetup for OR-error_setup and
-     warmingUp() to detec dead errors and take actions
 - Troubleshoot WiFi connection failures
 - REST API to get results
 - Get info about bluetooth to update icons
@@ -22,6 +19,11 @@ To do list
 
 Done
 -------
++ Config Menu for simple things: WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF
+  + uploadSamplesEnabled should be linked to wifiEnabled in the Config Menu
+  + change error_setup values to be mask-oriented and re-code the firstSetup for OR-error_setup and
+     warmingUp() to detec dead errors and take actions
++ Bug fixing: Button1 presses in firstBoot goest to hibernate regardless how long it was pressed
 + Changes so that WIFI connection, NTP Sync and httpRequest functions don't block neither Button nor Display Refresh
 + Check scaling last_hour buffer works when changing the sample period (changing saving energy mode) 
 + Check NTP_KO_CHECK_PERIOD works after code modification

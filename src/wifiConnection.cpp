@@ -124,7 +124,7 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
  Function wifiConnect
  Target: to get connected to the WiFi
  *****************************************************/
-uint8_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, uint8_t* auxLoopCounter=nullptr, uint8_t* auxCounter=nullptr) {
+uint32_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, uint8_t* auxLoopCounter=nullptr, uint8_t* auxCounter=nullptr) {
   // Parameters:
   // - logsOn: Print or not log messages in Serial line. Diferent prints out are done base on its value
   //      Value false: no log messages are printed out

@@ -67,7 +67,7 @@ uint8_t sendHttpRequest(boolean logsOn, IPAddress server, uint16_t port, String 
   return 0;
 }
 
-uint8_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint8_t error_setup, IPAddress server, 
+uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_setup, IPAddress server, 
                              uint16_t port, String httpRequest, uint64_t* whileLoopTimeLeft) {
   //Sending Async httpRequest
   // Parameters:
@@ -88,6 +88,8 @@ uint8_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint8_t error_se
   // *whileLoopTimeLeft is a global variable. It is modified in here. The calling function
   //   just send it to this function.
   
+  logsOn=true;
+  
   if (logsOn) {
     Serial.print("\n"+String(loopStartTime+millis())+" [sendAsyncHttpRequest] - Trying connection to ");Serial.print(IpAddress2String(server));Serial.print(" to send httpRequest: '");Serial.print(httpRequest);Serial.println("'");
     Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest] - forceWEBCheck="+String(forceWEBCheck)+", forceWEBTestCheck="+String(forceWEBTestCheck)+", webResuming="+String(webResuming));
@@ -104,7 +106,7 @@ uint8_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint8_t error_se
 
   if (!webResuming) { //To avoid repeating sending the same http request if resuming after ABORT or BREAK
     if (client.connect(server, 80)) {
-      if (logsOn) {Serial.println("[sendAsyncHttpRequest] - connected");}
+      if (logsOn) {Serial.println(String(loopStartTime+millis())+"[sendAsyncHttpRequest] - connected");}
       // Send a HTTP request:
       client.println(httpRequest);
       client.print("Host: "); client.println(IpAddress2String(server));
@@ -172,7 +174,7 @@ uint8_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint8_t error_se
   if (*whileLoopTimeLeft>HTTP_ANSWER_TIMEOUT) { //Case if while() loop timeout.
     //Too long with no server answer. Something was wrong. Changing icon
     if ((logsOn && fromSetup) || debugModeOn) {
-      Serial.println("NO Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+      Serial.println(String(loopStartTime+millis())+" NO Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
     }
   }
   else { 
@@ -180,14 +182,14 @@ uint8_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint8_t error_se
     // (Button Pressed or Display Refresh force the function to return from the while() loop, 
     //  so this point is not reached in those cases)
     if ((logsOn && fromSetup) || debugModeOn) {
-      Serial.println("Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+      Serial.println(String(loopStartTime+millis())+" Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
     }
     while (client.available()) {//Should be very fast.
       char c = client.read();
       if (logsOn) {Serial.write(c);}
     }
     CloudSyncCurrentStatus=CloudSyncOnStatus;
-    if (logsOn) {Serial.println("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
+    if (logsOn) {Serial.println("\n"+String(loopStartTime+millis())+"++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
   }
 
   //This point is reached if either the while() loop timed out or successful WEB sync
@@ -196,7 +198,7 @@ uint8_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint8_t error_se
   
   // if the server's disconnected, stop the client:
   if (!client.connected()) {
-    if (logsOn) {Serial.println("[sendAsyncHttpRequest] - Disconnecting from server. Bye!");}
+    if (logsOn) {Serial.println(String(loopStartTime+millis())+"[sendAsyncHttpRequest] - Disconnecting from server. Bye!");}
     client.stop();
   }
   
@@ -219,7 +221,7 @@ uint8_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint8_t error_se
     if (fromSetup) {
       forceWEBCheck=false;
       webResuming=false;
-      return(error_setup); //return previous error - Mainly for firstSetup()
+      return(error_setup); //return previous error - Only for firstSetup()
     }
     else {
       forceWEBCheck=false;

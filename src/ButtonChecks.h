@@ -1,4 +1,5 @@
 #include "Button.h"
+#include <EEPROM.h>
 
 #ifndef _DECLAREGLOBALPARAMETERS_
   #include "global_setup.h"
@@ -21,6 +22,7 @@
 #endif
 
 extern enum availableStates currentState,lastState,stateSelected;
+extern uint8_t configVariables;
 extern ulong timePressButton1,timeReleaseButton1,timePressButton2,timeReleaseButton2;
 extern RTC_DATA_ATTR enum displayModes displayMode,lastDisplayMode;
 extern RTC_DATA_ATTR uint64_t lastTimeSampleCheck,lastTimeDisplayCheck,lastTimeDisplayModeCheck,nowTimeGlobal,lastTimeTurnOffBacklightCheck,lastTimeIconStatusRefreshCheck,previousLastTimeSampleCheck;
