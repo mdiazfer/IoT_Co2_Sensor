@@ -1,20 +1,21 @@
 To do list
 -----------
-- Config Menu for simple things: WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF
-  - Bug fixing: WiFi icon for wifi0Status
-  - Write in EEPROM the config variables: wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,energyCurrentMode
-- Troubleshoot WiFi connection failures
-- REST API to get results
-- Get info about bluetooth to update icons
+- Troubleshoot
+  + WiFi connection failures
+  + No button action after wakingup with button
+  + After battery is ran out, pluging USB power doesn't take effect in the IoT
 - Web server to display results
-- Triger alarms
 - Web server for configuration
-- Save CO2 samples in cloud to not lose graph pictures when the battery runs out
 - AP mode to provide first SSID
 - BLE sutff
+- Get info about bluetooth to update icons
 - Icon for the bootup screen
-- Adding Bootup info Option to the Display Info Menu
-- Firmware upgrade OTA (?)
+- Candidate features
+  + REST API to get results
+  + Triger alarms
+  + Save CO2 samples in cloud to not lose graph pictures when the battery runs out
+  + Adding Bootup info Option to the Display Info Menu
+  + Firmware upgrade OTA
 
 
 Done
@@ -23,6 +24,8 @@ Done
   + uploadSamplesEnabled should be linked to wifiEnabled in the Config Menu
   + change error_setup values to be mask-oriented and re-code the firstSetup for OR-error_setup and
      warmingUp() to detec dead errors and take actions
+  + Bug fixing: WiFi icon for wifi0Status
+  + Write in EEPROM the config variables: wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,energyCurrentMode
 + Bug fixing: Button1 presses in firstBoot goest to hibernate regardless how long it was pressed
 + Changes so that WIFI connection, NTP Sync and httpRequest functions don't block neither Button nor Display Refresh
 + Check scaling last_hour buffer works when changing the sample period (changing saving energy mode) 

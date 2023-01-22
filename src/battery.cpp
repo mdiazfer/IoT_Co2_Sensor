@@ -1,5 +1,46 @@
 /* Dealing with Battery stuff
 
+There are 4 different Saving Energy modes:
+ - fullEnergy: Active if USB is powering the device. CPU is always UP and Running.
+ - reducedEnergy. Active if BAT is powering the device. CPU goes to sleep and wakenup after a TIMER
+ - lowestEnergy. BAT is powering the device and the charge is below BAT_CHG_THR_FOR_SAVE_ENERGY (25%).
+                 CPU goes to sleep and wakenup after a TIMER. User can also setup this on the Config Menu
+ - hibernate. Active is Button1 is pressed longer than TIME_LONG_PRESS_BUTTON1_HIBERNATE (5 s). CPU goes to hibernate (Switch off)
+
+ Action Timers depend on the Saving Energy Mode.
+
+.                                                 fullEnergy                   reduceEnergy                    lowestEnergy
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ TFT Backlight Check                  |     TIME_TURN_OFF_BACKLIGHT    |            same              |            same                |
+ (TIME_TURN_OFF_BACKLIGHT)            |               30 s             |                              |                                |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ Battery Level                        |     VOLTAGE_CHECK_PERIOD       |     With Sample Uploads      |      With Sample Uploads       |
+ (VOLTAGE_CHECK_PERIOD)               |               5 s              |            5 min             |             5 min              |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ Taking Measurement                   |          SAMPLE_PERIOD         |       SAMPLE_PERIOD_RE       |       SAMPLE_PERIOD_RE         |
+ (SAMPLE_PERIOD)                      |              20 s              |             60 s             |             5 min              |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ Checking WiFi signal strength        |   ICON_STATUS_REFRESH_PERIOD   |           NOT DONE           |           NOT DONE             |
+ (ICON_STATUS_REFRESH_PERIOD)         |               5 s              |                              |                                |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ Select the screen (only Seq. Mode)   |   DISPLAY_MODE_REFRESH_PERIOD  |           NOT DONE           |           NOT DONE             |
+ (DISPLAY_MODE_REFRESH_PERIOD)        |               5 s              |                              |                                |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ Update Screen                        |     DISPLAY_REFRESH_PERIOD     |           NOT DONE           |           NOT DONE             |
+ (DISPLAY_REFRESH_PERIOD)             |               5 s              |                              |                                |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ Checking WiFi Connection             |     WIFI_RECONNECT_PERIOD      |            same              |            same                |
+ (WIFI_RECONNECT_PERIOD)              |              5 min             |                              |                                |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ Checking NTP Connection              |     NTP_KO_CHECK_PERIOD        |            same              |            same                |
+ (NTP_KO_CHECK_PERIOD)                |           60 s (random)        |     5 min as needs WiFi      |      5 min as needs WiFi       |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ Upload Measurements to the server    |     UPLOAD_SAMPLES_PERIOD      |   UPLOAD_SAMPLES_PERIOD_RE   |   TIME_TO_SLEEP_SAVE_ENERGY_SE |
+ (UPLOAD_SAMPLES_PERIOD)              |       5 min (WiFi needed)      |       5 min (WiFi needed)    |       5 min (WiFi needed)      |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ Wakeup Period                        |   TIME_TO_SLEEP_FULL_ENERGY    | TIME_TO_SLEEP_REDUCED_ENERGY |   TIME_TO_SLEEP_SAVE_ENERGY    |
+ (sleepTimer)                         |   5 s  (No sleep currently)    |             60 s             |            5 min               |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
 */
 
 #include <Arduino.h>
@@ -171,13 +212,13 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
       energyCurrentMode=configSavingEnergyMode; //Normally reducedEnergy if not changed in the Config Menu
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //Keeping it for future. In this version No BAT checks in Reduce Engergy Mode to save energy
       samplePeriod=SAMPLE_PERIOD_RE;
-      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
     }
     else {
       energyCurrentMode=lowestEnergy;    
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //Keeping it for future. In this version No BAT checks in Save Engergy Mode to save energy
       samplePeriod=SAMPLE_PERIOD_SE;
-      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
     }
   }
 }

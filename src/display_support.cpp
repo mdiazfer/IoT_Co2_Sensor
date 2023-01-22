@@ -4,6 +4,7 @@
 
 #include "display_support.h"
 #include "battery.h"
+#include "icons.h"
 
 HorizontalBar::HorizontalBar(float_t value, float_t valueMin, float_t valueMax, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color,
         float_t th1, uint32_t color1, float_t th2, uint32_t color2, uint32_t colorBar, uint32_t colorBackground) {
@@ -724,4 +725,299 @@ void printNetInfo() {
   tft.println("Back");
 
   return;
+}
+
+void loadBootImage() {
+  //-->>Load the logo image when booting up
+  
+  return;
+}
+
+void showIcons() {
+  //Load the icons
+
+  tft.setSwapBytes(true);
+  
+  //Drawign wifi icon
+  switch (wifiCurrentStatus) {
+    case (wifi100Status):
+      tft.pushImage(0,0,24,24,wifi100);
+    break;
+    case (wifi75Status):
+      tft.pushImage(0,0,24,24,wifi075);
+    break;
+    case (wifi50Status):
+      tft.pushImage(0,0,24,24,wifi050);
+    break;
+    case (wifi25Status):
+      tft.pushImage(0,0,24,24,wifi025);
+    break;
+    case (wifi0Status):
+      tft.pushImage(0,0,24,24,wifi000);
+    break;
+    case (wifiOffStatus):
+      tft.pushImage(0,0,24,24,wifiOff);
+    break;
+  }
+  
+  //-->>Get BLE status
+  switch (BLEClurrentStatus) {
+    case BLEOnStatus:
+      tft.pushImage(30,0,24,24,bluetooth);
+    break;
+    case BLEConnectedStatus:
+      tft.pushImage(30,0,24,24,bluetoothConnected);
+    break;
+    case BLEOffStatus:
+      tft.pushImage(30,0,24,24,bluetoothOff);
+    break;
+    
+  }
+  
+  //-->>Get NTP status
+  switch (CloudClockCurrentStatus) {
+    case (CloudClockOnStatus):
+      tft.pushImage(95,0,24,24,cloudClockOn);
+    break;
+    case (CloudClockOffStatus):
+      tft.pushImage(95,0,24,24,cloudClockOff);
+    break;
+  }
+  
+  //-->>Get Cloud status
+  switch (CloudSyncCurrentStatus) {
+    case (CloudSyncOnStatus):
+      tft.pushImage(125,0,24,24,cloudSyncOn);
+    break;
+    case (CloudSyncOffStatus):
+      tft.pushImage(125,0,24,24,cloudSyncOff);
+    break;
+   }
+  
+  //-->>Get Batery status
+  switch (batteryStatus) {
+    case (batteryCharging000):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging000);
+    break;
+    case (batteryCharging010):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging010);
+    break;
+    case (batteryCharging025):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging025);
+    break;
+    case (batteryCharging050):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging050);
+    break;
+    case (batteryCharging075):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging075);
+    break;
+    case (batteryCharging100):
+      tft.pushImage(215,0,24,24,StatusBatteryCharging100);
+    break;
+    case (battery000):
+      tft.pushImage(215,0,24,24,StatusBattery000);
+    break;
+    case (battery010):
+      tft.pushImage(215,0,24,24,StatusBattery010);
+    break;
+    case (battery025):
+      tft.pushImage(215,0,24,24,StatusBattery025);
+    break;
+    case (battery050):
+      tft.pushImage(215,0,24,24,StatusBattery050);
+    break;
+    case (battery075):
+      tft.pushImage(215,0,24,24,StatusBattery075);
+    break;
+    case (battery100):
+      tft.pushImage(215,0,24,24,StatusBattery100);
+    break;
+  } 
+}
+
+void loadAllIcons() {
+  tft.setSwapBytes(true);
+
+  tft.pushImage(0,0,24,24,StatusBattery000);
+  tft.pushImage(30,0,24,24,StatusBattery010);
+  tft.pushImage(60,0,24,24,StatusBattery025);
+  tft.pushImage(90,0,24,24,StatusBattery050);
+  tft.pushImage(120,0,24,24,StatusBattery075);
+  tft.pushImage(150,0,24,24,StatusBattery100);
+    
+  tft.pushImage(0,30,24,24,StatusBatteryCharging000);
+  tft.pushImage(30,30,24,24,StatusBatteryCharging010);
+  tft.pushImage(60,30,24,24,StatusBatteryCharging025);
+  tft.pushImage(90,30,24,24,StatusBatteryCharging050);
+  tft.pushImage(120,30,24,24,StatusBatteryCharging075);
+  tft.pushImage(150,30,24,24,StatusBatteryCharging100);
+
+  tft.pushImage(0,60,24,24,wifi000);
+  tft.pushImage(30,60,24,24,wifi025);
+  tft.pushImage(60,60,24,24,wifi050);
+  tft.pushImage(90,60,24,24,wifi075);
+  tft.pushImage(120,60,24,24,wifi100);
+  tft.pushImage(150,60,24,24,wifiOff);
+
+  tft.pushImage(0,90,24,24,bluetooth);
+  tft.pushImage(30,90,24,24,bluetoothConnected);
+  tft.pushImage(60,90,24,24,bluetoothOff);
+
+  tft.pushImage(180,0,24,24,cloudClockOn);
+  tft.pushImage(180,30,24,24,cloudClockOff);
+
+  tft.pushImage(210,0,24,24,cloudSyncOn);
+  tft.pushImage(210,30,24,24,cloudSyncOff);
+  
+  while(true);
+}
+
+void loadAllWiFiIcons() {
+  tft.setSwapBytes(true);
+
+  
+  /*tft.pushImage(0,0,24,24,wifi000_blue);
+  tft.pushImage(30,0,24,24,wifi010_blue);
+  tft.pushImage(60,0,24,24,wifi025_blue);
+  tft.pushImage(90,0,24,24,wifi050_blue);
+  tft.pushImage(120,0,24,24,wifi075_blue);
+  tft.pushImage(150,0,24,24,wifi100_blue);
+  //tft.pushImage(180,0,24,24,wifiOff_blue);
+  tft.pushImage(180,0,24,24,wifiOff_3_blue);
+  tft.pushImage(210,0,24,24,wifiOff_2_blue);
+
+  tft.pushImage(0,70,24,24,wifi000_white);
+  tft.pushImage(30,70,24,24,wifi010_white);
+  tft.pushImage(60,70,24,24,wifi025_white);
+  tft.pushImage(90,70,24,24,wifi050_white);
+  tft.pushImage(120,70,24,24,wifi075_white);
+  tft.pushImage(150,70,24,24,wifi100_white);
+  //tft.pushImage(180,70,24,24,wifiOff_white);
+  tft.pushImage(180,70,24,24,wifiOff_3_white);
+  tft.pushImage(210,70,24,24,wifiOff_2_white);*/
+  
+  /*tft.pushImage(0,0,24,24,wifi000_blue);
+  tft.pushImage(30,0,24,24,wifi025_blue);
+  tft.pushImage(60,0,24,24,wifi050_blue);
+  tft.pushImage(90,0,24,24,wifi075_blue);
+  tft.pushImage(120,0,24,24,wifi100_blue);
+  tft.pushImage(150,0,24,24,wifiOff_blue);
+
+  tft.pushImage(0,30,24,24,wifi000_blue_bis);
+  tft.pushImage(30,30,24,24,wifi025_blue_bis);
+  tft.pushImage(60,30,24,24,wifi050_blue_bis);
+  tft.pushImage(90,30,24,24,wifi075_blue_bis);
+  tft.pushImage(120,30,24,24,wifi100_blue);
+  tft.pushImage(150,30,24,24,wifiOff_blue_bis);
+
+  tft.pushImage(0,70,24,24,wifi000_white);
+  tft.pushImage(30,70,24,24,wifi025_white);
+  tft.pushImage(60,70,24,24,wifi050_white);
+  tft.pushImage(90,70,24,24,wifi075_white);
+  tft.pushImage(120,70,24,24,wifi100_white);
+  tft.pushImage(150,70,24,24,wifiOff_white);
+
+  tft.pushImage(0,100,24,24,wifi000_bis3);
+  tft.pushImage(30,100,24,24,wifi025_bis2);
+  tft.pushImage(60,100,24,24,wifi050_bis2);
+  tft.pushImage(90,100,24,24,wifi075_bis2);
+  tft.pushImage(120,100,24,24,wifi100_bis2);
+  tft.pushImage(150,100,24,24,wifiOff);
+  */
+  
+  /*tft.pushImage(0,100,24,24,wifi000_white_bis);
+  tft.pushImage(30,100,24,24,wifi025_white_bis);
+  tft.pushImage(60,100,24,24,wifi050_white_bis);
+  tft.pushImage(90,100,24,24,wifi075_white_bis);
+  tft.pushImage(120,100,24,24,wifi100_white);
+  tft.pushImage(150,100,24,24,wifiOff_white_bis);
+
+  tft.pushImage(0,100,24,24,wifi000_bis);
+  tft.pushImage(30,100,24,24,wifi025_bis);
+  tft.pushImage(60,100,24,24,wifi050_bis);
+  tft.pushImage(90,100,24,24,wifi075_bis);
+  tft.pushImage(120,100,24,24,wifi100);
+  tft.pushImage(150,100,24,24,wifiOff);*/
+  
+  while(true);
+}
+
+void drawGraphLastHourCo2() {
+  //Clean-up display
+  tft.fillScreen(TFT_BLACK);
+
+  //Draw thresholds, axis & legend
+  tft.fillRect(CO2_GRAPH_X,(int32_t)(CO2_GRAPH_Y_END-CO2_GAUGE_TH2*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX),CO2_GRAPH_WIDTH,8,TFT_NAVY);
+  tft.drawFastVLine(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_HEIGH+5,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_X-5,CO2_GRAPH_Y+2,CO2_GRAPH_X+5,CO2_GRAPH_Y+2,TFT_DARKGREY);
+  tft.drawFastHLine(CO2_GRAPH_X,CO2_GRAPH_Y+CO2_GRAPH_HEIGH,CO2_GRAPH_WIDTH,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X_END,CO2_GRAPH_Y_END,CO2_GRAPH_X_END-5,CO2_GRAPH_Y_END-3,CO2_GRAPH_X_END-5,CO2_GRAPH_Y_END+3,TFT_DARKGREY);
+  for (int i=1;i<=12;i++) if (3*(int)(i/3)==i) tft.drawFastVLine(CO2_GRAPH_X+15*i,CO2_GRAPH_Y_END-5,10,TFT_DARKGREY);
+    else tft.drawFastVLine(CO2_GRAPH_X+15*i,CO2_GRAPH_Y_END-2,4,TFT_DARKGREY); 
+  for (int i=0;i<=3;i++) tft.drawFastHLine(CO2_GRAPH_X-5,CO2_GRAPH_Y+25*i,10,TFT_DARKGREY);
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREY,TFT_BLACK);
+  tft.setCursor(CO2_GRAPH_X+35,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-45");
+  tft.setCursor(CO2_GRAPH_X+80,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-30");
+  tft.setCursor(CO2_GRAPH_X+125,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-15");
+  tft.setCursor(CO2_GRAPH_X+170,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("Now");
+  tft.setCursor(CO2_GRAPH_X+190,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("t(m)");
+  tft.setCursor(CO2_GRAPH_X+15,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("Last 60 min   ");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREEN,TFT_BLACK);tft.print("CO2 (ppm) [0-2000]");
+  tft.setCursor(CO2_GRAPH_X+15,14,TEXT_FONT_BOOT_SCREEN-1);
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_CYAN,TFT_BLACK);tft.print("Temp (C) [0-50] ");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_MAGENTA,TFT_BLACK);tft.print(" Hum (%) [0-100]");
+
+  //Draw samples
+  int32_t co2Sample,tempSample,humSample,auxCo2Color,auxTempColor=TFT_CYAN,auxHumColor=TFT_MAGENTA;
+  for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++) {
+    co2Sample=(int32_t) (CO2_GRAPH_Y_END-lastHourCo2Samples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX);
+    tempSample=(int32_t) (CO2_GRAPH_Y_END-lastHourTempSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_TEMP_MAX);
+    humSample=(int32_t) (CO2_GRAPH_Y_END-lastHourHumSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_HUM_MAX);
+    if (lastHourCo2Samples[i]<=CO2_GAUGE_TH1) auxCo2Color=TFT_GREEN;
+    else if (CO2_GAUGE_TH1 < lastHourCo2Samples[i] && lastHourCo2Samples[i] <= CO2_GAUGE_TH2) auxCo2Color=TFT_YELLOW;
+    else auxCo2Color=TFT_RED;
+    if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
+    if(lastHourTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_CYAN;
+    if(lastHourHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_MAGENTA;
+    tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
+    tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
+    tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color); //CO2 sample
+  }
+}
+
+void drawGraphLastDayCo2() {
+  //Clean-up display
+  tft.fillScreen(TFT_BLACK);
+
+  tft.fillRect(CO2_GRAPH_X,(int32_t)(CO2_GRAPH_Y_END-CO2_GAUGE_TH2*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX),CO2_GRAPH_WIDTH,8,TFT_NAVY);
+  tft.drawFastVLine(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_HEIGH+5,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_X-5,CO2_GRAPH_Y+2,CO2_GRAPH_X+5,CO2_GRAPH_Y+2,TFT_DARKGREY);
+  tft.drawFastHLine(CO2_GRAPH_X,CO2_GRAPH_Y+CO2_GRAPH_HEIGH,CO2_GRAPH_WIDTH+12,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X_END+12,CO2_GRAPH_Y_END,CO2_GRAPH_X_END+12-5,CO2_GRAPH_Y_END-3,CO2_GRAPH_X_END+12-5,CO2_GRAPH_Y_END+3,TFT_DARKGREY);
+  for (int i=1;i<=12;i++) if (3*(int)(i/3)==i) tft.drawFastVLine(CO2_GRAPH_X+16*i,CO2_GRAPH_Y_END-5,10,TFT_DARKGREY);
+    else tft.drawFastVLine(CO2_GRAPH_X+16*i,CO2_GRAPH_Y_END-2,4,TFT_DARKGREY);
+  for (int i=0;i<=3;i++) tft.drawFastHLine(CO2_GRAPH_X-5,CO2_GRAPH_Y+25*i,10,TFT_DARKGREY);
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREY,TFT_BLACK);
+  tft.setCursor(CO2_GRAPH_X+38,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-18");
+  tft.setCursor(CO2_GRAPH_X+86,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-12");
+  tft.setCursor(CO2_GRAPH_X+134,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-6");
+  tft.setCursor(CO2_GRAPH_X+165,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("Now t(h)");
+  tft.setCursor(CO2_GRAPH_X+15,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("Last 24 h.    ");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREEN,TFT_BLACK);tft.print("CO2 (ppm) [0-2000]");
+  tft.setCursor(CO2_GRAPH_X+15,14,TEXT_FONT_BOOT_SCREEN-1);
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_CYAN,TFT_BLACK);tft.print("Temp (C) [0-50] ");
+  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_MAGENTA,TFT_BLACK);tft.print(" Hum (%) [0-100]");
+  //Draw samples
+  int32_t co2Sample,tempSample,humSample,auxCo2Color,auxTempColor=TFT_CYAN,auxHumColor=TFT_MAGENTA;
+  for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY); i++)
+  {
+    co2Sample=(int32_t) (CO2_GRAPH_Y_END-lastDayCo2Samples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX);
+    tempSample=(int32_t) (CO2_GRAPH_Y_END-lastDayTempSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_TEMP_MAX);
+    humSample=(int32_t) (CO2_GRAPH_Y_END-lastDayHumSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_HUM_MAX);
+    if (lastDayCo2Samples[i]<=CO2_GAUGE_TH1) auxCo2Color=TFT_GREEN;
+    else if (CO2_GAUGE_TH1 < lastDayCo2Samples[i] && lastDayCo2Samples[i] <= CO2_GAUGE_TH2) auxCo2Color=TFT_YELLOW;
+    else auxCo2Color=TFT_RED;
+    if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
+    if(lastDayTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_CYAN;
+    if(lastDayHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_MAGENTA;
+    tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
+    tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
+    tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color);   //CO2 sample
+  }
 }

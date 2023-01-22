@@ -3,6 +3,7 @@
 */
 
 #include "wifiConnection.h"
+#include "esp_sntp.h"
 
 #ifdef __TFT_DISPLAY_PRESENT__
   #include <TFT_eSPI.h>
@@ -90,7 +91,7 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
   // print current network parameters
   if (logsOn) {
     Serial.print("  Wifi Network Node: ");Serial.print(wifiNetworkNode);
-    Serial.print(", "); Serial.print(scanReturn); Serial.println(" detected");
+    Serial.print(" and "); Serial.print(scanReturn); Serial.println(" detected");
     //Serial.print("SSID: ");Serial.println(WiFi.SSID());
     Serial.print("  SSID: ");Serial.println(wifiNet.ssid);
 
@@ -124,7 +125,7 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
  Function wifiConnect
  Target: to get connected to the WiFi
  *****************************************************/
-uint32_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, uint8_t* auxLoopCounter=nullptr, uint8_t* auxCounter=nullptr) {
+uint32_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, boolean checkButtons=false, uint8_t* auxLoopCounter=nullptr, uint8_t* auxCounter=nullptr) {
   // Parameters:
   // - logsOn: Print or not log messages in Serial line. Diferent prints out are done base on its value
   //      Value false: no log messages are printed out
@@ -132,6 +133,9 @@ uint32_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, uint8_t* auxLoopC
   // - msgTFT: Print or not log messages in the Display during the boot time. Diferent prints out are done base on its value
   //      Value false: no log messages are displayed out
   //      Value true:  log messages are displayed out
+  // - checkButtons: Check if buttons are pressed or not to go through Menus
+  //      Value false: no buttons checks
+  //      Value true:  buttons are checked
   // - *auxLoopCounter is a pointer for the index of the SSID array to check. It's sent from the main loop
   //      Value 0: The SSID will start from the very first SSID - First call to the funcion
   //      Value other: The SSID will resume the connection with the same SSID used in the previous interaction
@@ -174,8 +178,8 @@ uint32_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, uint8_t* auxLoopC
           #endif
         }
       }
-      //Check if buttons are pressed during SSID connection (if not in the first Setup --!msgTFT--)
-      if (!msgTFT) {
+      //Check if buttons are pressed during SSID connection
+      if (checkButtons) {
         switch (checkButtonsActions(wificheck)) {
           case 1:
           case 2:
@@ -249,4 +253,160 @@ uint32_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, uint8_t* auxLoopC
   if (auxLoopCounter!=nullptr) *auxLoopCounter=0;  //To avoid resuming connection the next loop interacion
   if (auxCounter!=nullptr) *auxCounter=0;          //To avoid resuming connection the next loop interacion
   return(NO_ERROR); //WiFi Connection OK
+}
+
+uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,uint64_t* whileLoopTimeLeft=nullptr) {
+  //If function called fron firstSetup(), then logs are displayed
+  // and buttons are checked during NTP Sync handshake
+  // Parameters:
+  // - fromSetup: where the function was called from. Diferent prints out are done base on its value
+  //      Value false: from main loop
+  //      Value true:  from the firstSetup() function
+  // - *auxLoopCounter is a pointer for the index of the NTP server array to check. It's sent from the main loop
+  //      Value 0: The NTP sync will start from the very first NTP server - First call to the funcion
+  //      Value other: The NTP sync will resume the sync with the same NTP server used in the previous interaction
+  //          which was stoped due to either Button Pressed (ABORT) or Display Refresh (BREAK)
+  // - *whileLoopTimeLeft is the pointer for the time of while() loop to stop checking the index of
+  //   the NTP server array. It's sent from the main loop
+  //      Value NTP_CHECK_TIMEOUT: The NTP sync will start from the beginig - First call to the funcion
+  //      Value other: The NTP sync will resume the sync at the same point where the previous interaction
+  //          was stoped due to either Button Pressed (ABORT) or Display Refresh (BREAK)
+  // *auxLoopCounter and *whileLoopTimeLeft are global variables. They are modified in here. The calling function
+  //   just send them to this function.
+
+  if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - [setupNTPConfig] - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", errorsNTPCnt="+String(errorsNTPCnt)+", auxLoopCounter="+String(*auxLoopCounter)+", whileLoopTimeLeft="+String(*whileLoopTimeLeft));}
+
+  //to avoid pointer issues
+  if (auxLoopCounter==nullptr || whileLoopTimeLeft==nullptr) {
+    errorsNTPCnt++; //Something went wrong. Update error counter for stats
+    return(ERROR_NTP_SERVER);
+  }
+  
+  CloudClockStatus previousCloudClockCurrentStatus=CloudClockCurrentStatus;
+  CloudClockCurrentStatus=CloudClockOffStatus;
+  //User credentials definition
+  ntpServers[0]="\0";ntpServers[1]="\0";ntpServers[2]="\0";ntpServers[3]="\0";
+  #ifdef NTP_SERVER
+    ntpServers[0]=NTP_SERVER;
+  #endif
+  #ifdef NTP_SERVER2
+    ntpServers[1]=NTP_SERVER2;
+  #endif
+  #ifdef NTP_SERVER3
+    ntpServers[2]=NTP_SERVER3;
+  #endif
+  #ifdef NTP_SERVER4
+    ntpServers[3]=NTP_SERVER4;
+  #endif
+
+  //boolean whileFlagOn=true;
+  if (wifiCurrentStatus!=wifiOffStatus) {
+    uint8_t auxForLoop;
+    for (uint8_t loopCounter=*auxLoopCounter; loopCounter<(uint8_t)sizeof(ntpServers)/sizeof(String); loopCounter++) {
+      if (ntpServers[loopCounter].charAt(0)=='\0') loopCounter++;
+      else {
+        if ((logsOn && fromSetup) || debugModeOn) {Serial.println("[setup - NTP] Connecting to NTP Server: "+ntpServers[loopCounter]);}
+        if (!NTPResuming) { //Only calling configXTime() for new checks
+          #ifdef NTP_TZ_ENV_VARIABLE
+            configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
+          #else
+            configTime(gmtOffset_sec, daylightOffset_sec, ntpServers[loopCounter].c_str());
+          #endif
+        }
+
+        *auxLoopCounter=loopCounter;
+        uint64_t whileStartTime=loopStartTime+millis(),auxTime=whileStartTime;
+        if (*whileLoopTimeLeft>=NTP_CHECK_TIMEOUT) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;
+
+        if (debugModeOn) {Serial.println("    - whileStartTime="+String(whileStartTime)+", *whileLoopTimeLeft="+String(*whileLoopTimeLeft)+", *auxLoopCounter="+String(*auxLoopCounter)+", loopCounter="+String(loopCounter)+", waiting for NTPStatus=SNTP_SYNC_STATUS_COMPLETED");}
+        while ( sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED &&
+               //*whileLoopTimeLeft<=NTP_CHECK_TIMEOUT && whileFlagOn) {
+              *whileLoopTimeLeft<=NTP_CHECK_TIMEOUT) {
+          *whileLoopTimeLeft=*whileLoopTimeLeft-(loopStartTime+millis()-auxTime);
+          auxTime=loopStartTime+millis();
+          delay(50);
+          //Check if buttons are pressed during NTP sync handshake (if not in the first Setup)
+          if (!fromSetup) {
+            switch (checkButtonsActions(ntpcheck)) {
+              case 1:
+              case 2:
+              case 3:
+                //Button1 or Button2 pressed or released. NTP Sync process aborted if not Sync is completed
+                if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - checkButtonsActions() returns 1, 2 or 3 - Returning with ERROR_ABORT_NTP_SETUP");}
+                if (sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED) { //Actions required as the process is aborted
+                  forceNTPCheck=true; //Let's grant NTP check again in the next loop interaction
+                  CloudClockCurrentStatus=previousCloudClockCurrentStatus; //Restore Cloud Clock status 
+                  loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String); //Ends the for loop
+                  //whileFlagOn=false; //Breaks the while loop and continue to the regular loop() flow
+                  auxForLoop=loopCounter;
+                  return(ERROR_ABORT_NTP_SETUP);
+                }
+              break;
+              case 0:
+              default:
+                //Regular exit. Do nothing else
+              break;
+            }
+            //Must the Display be refreshed? This check avoids the display gets blocked during NTP sync
+            if (digitalRead(PIN_TFT_BACKLIGHT)!=LOW &&
+                (
+                  (((loopStartTime+millis()-lastTimeDisplayModeCheck) >= DISPLAY_MODE_REFRESH_PERIOD) && currentState==displayingSequential)
+                  ||
+                  (((loopStartTime+millis()-lastTimeDisplayCheck) >= DISPLAY_REFRESH_PERIOD) && 
+                    (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
+                    currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) )
+                )
+              ) {
+              return (ERROR_BREAK_NTP_SETUP); //Returns to refresh the display
+            }
+          }
+        } //end while() loop
+
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - End of wait - Elapsed Time: "+String(auxTime-whileStartTime));}
+        
+        if (*whileLoopTimeLeft>NTP_CHECK_TIMEOUT) { //Case if while() loop timeout.
+          if ((logsOn && fromSetup) || debugModeOn) {
+            Serial.println("  Time: Failed to get time");
+            Serial.print("[setup] - NTP: ");Serial.println("KO");
+          }
+        }
+        else { 
+          //End of while() due to successful NTP sync
+          // (Button Pressed or Display Refresh force the function to return from the while() loop, 
+          //  so this point is not reached in those cases)
+          if ((logsOn && fromSetup) || debugModeOn) {
+            Serial.print("  Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
+            Serial.print("[setup] - NTP: ");Serial.println("OK");
+          }
+          CloudClockCurrentStatus=CloudClockOnStatus;
+          ntpServerIndex=loopCounter;
+          loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String);
+          memcpy(TZEnvVar,getenv("TZ"),String(getenv("TZ")).length()); //Back Time Zone up to restore it after wakeup
+        }
+      }
+    }//end For() loop
+  }
+
+  //This point is reached if either the while() loop timed out or successful NTP sync
+  // (Button Pressed or Display Refresh force the function to return from the while() loop, 
+  //  so this point is not reached in those cases)
+  
+  //if (CloudClockCurrentStatus==CloudClockOffStatus && whileFlagOn) {
+  if (CloudClockCurrentStatus==CloudClockOffStatus) {
+    //Case for while loop timeout (no successfull NTP sync)
+    errorsNTPCnt++; //Something went wrong. Update error counter for stats   
+    if (auxLoopCounter!=nullptr) *auxLoopCounter=0;                 //To avoid resuming connection the next loop interacion
+    if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;  //To avoid resuming connection the next loop interacion       
+    return(ERROR_NTP_SERVER); //not NTP server connection
+  }
+
+  //Case for successfull NTP sync
+  if (debugModeOn) {
+      Serial.println("    - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck)+", errorsNTPCnt="+String(errorsNTPCnt));
+      Serial.print(String(loopStartTime+millis())+"  - [setupNTPConfig] - Exit - Time:");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
+  }
+
+  if (auxLoopCounter!=nullptr) *auxLoopCounter=0;                 //To avoid resuming connection the next loop interacion
+  if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;  //To avoid resuming connection the next loop interacion       
+  return(NO_ERROR);
 }

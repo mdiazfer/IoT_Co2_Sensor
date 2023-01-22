@@ -74,6 +74,12 @@ extern RTC_DATA_ATTR enum powerModes powerState;
 extern RTC_DATA_ATTR enum batteryChargingStatus batteryStatus;
 extern RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode;
 extern RTC_DATA_ATTR float_t batADCVolt,lastBatCharge,batCharge;
+extern RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];
+extern RTC_DATA_ATTR float_t lastHourTempSamples[3600/SAMPLE_T_LAST_HOUR];
+extern RTC_DATA_ATTR float_t lastHourHumSamples[3600/SAMPLE_T_LAST_HOUR];
+extern RTC_DATA_ATTR float_t lastDayCo2Samples[24*3600/SAMPLE_T_LAST_DAY];
+extern RTC_DATA_ATTR float_t lastDayTempSamples[24*3600/SAMPLE_T_LAST_DAY];
+extern RTC_DATA_ATTR float_t lastDayHumSamples[24*3600/SAMPLE_T_LAST_DAY];
 
 class HorizontalBar {
   public:
@@ -139,5 +145,10 @@ void printGralInfo();
 void printSensorsInfo();
 void printWifiInfo();
 void printNetInfo();
-
+void loadBootImage();
+void showIcons();
+void loadAllIcons();
+void loadAllWiFiIcons();
+void drawGraphLastHourCo2();
+void drawGraphLastDayCo2();
 

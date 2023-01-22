@@ -9,7 +9,8 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.6"
+#define VERSION "0.9.7"
+#define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
 #define _CO2_SENSOR_PARAMETER_(PARAMETER) _CONCATENATE_(_ ## PARAMETER)  // parameters sensor-model-independant
@@ -31,7 +32,7 @@
 #define DEVICE_NAME_PREFIX "co2-sensor"
 #define PIN_TFT_BACKLIGHT 4
 #define DEBUG_MODE_ON true
-#define EEPROM_SIZE 1
+#define EEPROM_SIZE 0x0F
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
@@ -232,6 +233,7 @@
   #define MIN_VOLT  1850  //Min voltage for getting right CO2 sample - millivolts
 #endif
 #define BAT_CHG_THR_FOR_SAVE_ENERGY 25  //Bat. charge threshold to enter in saving energy mode
+#define BAT_CHG_THR_TO_HIBERNATE     2  //Bat. charge threshold to go to hibernate
 
 //Timers and Global stuff
 #define INITIAL_BOOTIME 25  //milliseconds - Time to bootup as per board measurements
@@ -241,7 +243,7 @@
 #define DISPLAY_MODE_REFRESH_PERIOD 5000 //milliseconds
 #define DISPLAY_REFRESH_PERIOD      5000 //milliseconds
 #define FULL_CHARGE_TIME 9000000 //Milliseconds for 100% charge 9000000=2h30m
-#define HTTP_ANSWER_TIMEOUT 7000  //Millisenconds
+#define HTTP_ANSWER_TIMEOUT 20000 //7000  //Millisenconds
 #define ICON_STATUS_REFRESH_PERIOD  DISPLAY_REFRESH_PERIOD  //milliseconds
 #define NTP_KO_CHECK_PERIOD  60000 //Milliseconds. 1 minute
 #define NTP_CHECK_TIMEOUT     5000  //Millisecons. Should have NTP anser within 2 sc.

@@ -206,7 +206,11 @@ void checkButton2() {
       if (stateSelected==confMenuWifi) {wifiEnabled=!wifiEnabled;if (!wifiEnabled ) uploadSamplesEnabled=false; printConfigMenu();}
       else if (stateSelected==confMenuBLE) {bluetoothEnabled=!bluetoothEnabled;printConfigMenu();}
       else if (stateSelected==confMenuUpMeas) {uploadSamplesEnabled=!uploadSamplesEnabled;printConfigMenu();}
-      else if (stateSelected==confMenuSavBatMode) {configSavingEnergyMode=configSavingEnergyMode==reducedEnergy?lowestEnergy:reducedEnergy;energyCurrentMode=configSavingEnergyMode;printConfigMenu();}
+      else if (stateSelected==confMenuSavBatMode) {
+        configSavingEnergyMode=configSavingEnergyMode==reducedEnergy?lowestEnergy:reducedEnergy;
+        if (reducedEnergy==energyCurrentMode) energyCurrentMode=configSavingEnergyMode;
+        printConfigMenu();
+      }
       else { //Back
         currentState=lastState; 
         if (currentState==displayingSampleFixed){forceDisplayRefresh=true;lastDisplayMode=menu;}
@@ -248,7 +252,7 @@ void checkButton2() {
         if (configVariables!=currentConfigVariables) {
           // save the LED state in flash memory
             configVariables=currentConfigVariables;
-            EEPROM.write(0,configVariables);
+            EEPROM.write(0x08,configVariables);
             EEPROM.commit();
         }
       }
@@ -262,7 +266,8 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
 
   //Actions if button1 is pushed. It depens on the current state
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
-  if (button1.pressed() && !buttonWakeUp && !button1Pressed) {
+  //if (button1.pressed() && !buttonWakeUp && !button1Pressed) {
+  if (button1.pressed() && !button1Pressed) { //No need to avoid the first loop interaction just right after wakeup by pressing a button since v0.9.3 as WiFi is no longer blocking buttons
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - button1.pressed, currentState="+String(currentState)+", buttonWakeUp="+String(buttonWakeUp)+", firstBoot="+String(firstBoot));}
 
     //Take time to check if it is long press
@@ -274,7 +279,8 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
       timePressButton1=0;
   }
 
-  if (button1.released() && !buttonWakeUp) {
+  //if (button1.released() && !buttonWakeUp) {
+  if (button1.released()) { //No need to avoid the first loop interaction just right after wakeup by pressing a button since v0.9.3 as WiFi is no longer blocking buttons
     button1Pressed=false;
 
     checkButton1();
@@ -292,7 +298,8 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
 
   //Check if Button1 was long pressed
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
-  if (button1Pressed && timePressButton1!=0 && !buttonWakeUp) {
+  //if (button1Pressed && timePressButton1!=0 && !buttonWakeUp) {
+  if (button1Pressed && timePressButton1!=0) { //No need to avoid the first loop interaction just right after wakeup by pressing a button since v0.9.3 as WiFi is no longer blocking buttons
 
     if ((millis()-timePressButton1) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) {
       //Long press, so toggle going to hibernate
@@ -314,7 +321,8 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
   //Actions if button2 is pushed. It depens on the current state
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
   //nowTimeGlobal=loopStartTime+millis();
-  if (button2.pressed() && !buttonWakeUp) {
+  //if (button2.pressed() && !buttonWakeUp) {
+  if (button2.pressed()) { //No need to avoid the first loop interaction just right after wakeup by pressing a button since v0.9.3 as WiFi is no longer blocking buttons
     if (debugModeOn) {String(loopStartTime+millis())+Serial.println("  - button2.pressed");}
 
     //Take time to check if it is long press
@@ -339,7 +347,8 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
     }
   }
 
-  if (button2.released() && !buttonWakeUp) {
+  //if (button2.released() && !buttonWakeUp) {
+  if (button2.released()) { //No need to avoid the first loop interaction just right after wakeup by pressing a button since v0.9.3 as WiFi is no longer blocking buttons
     button2Pressed=false;
 
     //Specific actions based on where this functions has been called from
@@ -356,7 +365,8 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
 
   //Check if Button2 was long pressed
   //Avoid this action the first loop interaction just right after wakeup by pressing a button
-  if (button2Pressed && timePressButton2!=0 && !buttonWakeUp) { 
+  //if (button2Pressed && timePressButton2!=0 && !buttonWakeUp) { 
+  if (button2Pressed && timePressButton2!=0) { //No need to avoid the first loop interaction just right after wakeup by pressing a button since v0.9.3 as WiFi is no longer blocking buttons
     if ((millis()-timePressButton2) > TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT) {
       //Long press, so toggle autoBackLightOff and display message
       autoBackLightOff=!autoBackLightOff;

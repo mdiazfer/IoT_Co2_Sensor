@@ -23,6 +23,7 @@
 #include "battery.h"
 //#include "esp_wifi.h"
 #include "esp_sntp.h"
+#include "misc.h"
 #include <ESP32Time.h>
 #include <EEPROM.h>
 
@@ -41,12 +42,15 @@
 // RTC memory left:     8000 B - 3819 B = 4181 B
 //
 //EEPROM MAP
-//Address 0: Stores Config Variable Valued (configVariables)
+//Address 0-5: Stores the firmware version char []*
+//Address 6-7: Stores checksum
+//Address 08: Stores Config Variable Valued (configVariables)
 //  - Bit 0: notFirstRun - 1=true, 0=false
 //  - Bit 1: configSavingEnergyMode variable - 1=reduced, 0=lowest
 //  - Bit 2: uploadSamplesEnabled - 1=true, 0=false
 //  - Bit 3: bluetoothEnabled - 1=true, 0=false
 //  - Bit 4: wifiEnabled - 1=true, 0=false
+//Address 09-0C: Stores float_t batCharge - 4 B
 
 RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour C02 values
 RTC_DATA_ATTR float_t lastHourTempSamples[3600/SAMPLE_T_LAST_HOUR];  //4*(3600/60)=240 B - Buffer to record last-hour Temp values
@@ -94,7 +98,7 @@ RTC_DATA_ATTR boolean firstWifiCheck=true,forceWifiReconnect=false,forceGetSampl
 RTC_DATA_ATTR int uploadServerIPAddressOctectArray[4]; // 4*4B = 16B - To store upload server's @IP
 RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
-RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0; //2*4=8B - Error stats
+RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0,webServerError1=0,webServerError2=0,webServerError3=0; //2*4=8B - Error stats
 RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled; //3*1=3B
 RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON; //1*1=1B
 RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus=BLEOffStatus; //1*4=4B
@@ -132,554 +136,121 @@ uint8_t pixelsPerLine,
 uint8_t auxLoopCounter=0,auxLoopCounter2=0,auxCounter=0;
 uint64_t whileLoopTimeLeft=NTP_CHECK_TIMEOUT,whileWebLoopTimeLeft=HTTP_ANSWER_TIMEOUT;
 uint8_t configVariables;
+char firmwareVersion[VERSION_CHAR_LENGTH+1];
 
 
 //Code
-void loadBootImage() {
-  //-->>Load the logo image when booting up
-  
-  return;
-}
 
-void showIcons() {
-  //Load the icons
+void initVariable() {
+  //Global variables init. Needed as they have random values after wakeup from hiberte mode
+  firstBoot=true;
+  nowTimeGlobal=0;timeUSBPowerGlobal=0;loopStartTime=0;loopEndTime=0;
+  lastTimeSampleCheck=0;previousLastTimeSampleCheck=0; lastTimeDisplayCheck=0;lastTimeDisplayModeCheck=0;
+  lastTimeNTPCheck=0;lastTimeVOLTCheck=0;lastTimeHourSampleCheck=0;lastTimeDaySampleCheck=0;
+  lastTimeUploadSampleCheck=0;lastTimeIconStatusRefreshCheck=0;lastTimeTurnOffBacklightCheck=0;
+  lastTimeWifiReconnectionCheck=0;
+  sleepTimer=0;
+  displayMode=bootup;lastDisplayMode=bootup;
+  stateSelected=displayingSampleFixed;currentState=bootupScreen;lastState=currentState;
+  updateHourSample=true;updateDaySample=true;updateHourGraph=true;updateDayGraph=true;
+  autoBackLightOff=true;button1Pressed=false;button2Pressed=false;
+  powerState=off;
+  batteryStatus=battery000;
+  bootCount=0;loopCount=0;
+  circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
+                            CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
+                            CO2_GAUGE_TH1,TFT_YELLOW,CO2_GAUGE_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
+  horizontalBar=HorizontalBar(0,TEMP_BAR_MIN,TEMP_BAR_MAX,TEMP_BAR_X,TEMP_BAR_Y,
+                              TEMP_BAR_LENGTH,TEMP_BAR_HEIGH,TFT_GREEN,TEMP_BAR_TH1,
+                              TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
+  firstWifiCheck=true;forceWifiReconnect=false;forceGetSample=false;forceGetVolt=false;
+  forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;
+  forceWEBCheck=false;forceWEBTestCheck=false;
+  valueCO2=0;valueT=0;valueHum=0;lastValueCO2=-1;tempMeasure=0;
+  errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;webServerError1=0;webServerError2=0;webServerError3=0;
+  error_setup=NO_ERROR;remainingBootupSeconds=0;
+  previousTime=0;remainingBootupTime=BOOTUP_TIMEOUT*1000;
+  static const char hex_digits[] = "0123456789ABCDEF";
+  waitingMessage=true;runningMessage=true;
+  auxLoopCounter=0;auxLoopCounter2=0;auxCounter=0;
+  whileLoopTimeLeft=NTP_CHECK_TIMEOUT;whileWebLoopTimeLeft=HTTP_ANSWER_TIMEOUT;
+  wifiResuming=false;NTPResuming=false;webResuming=false;
+  debugModeOn=DEBUG_MODE_ON;
+  BLEClurrentStatus=BLEOffStatus;
+  
+  //Read from EEPROM the values to be stored in the Config Variables
+  //
+  //EEPROM MAP
+  //Address 0-5: Stores the firmware version char []*
+  //Address 6-7: Stores checksum
+  //Address 08: Stores Config Variable Valued (configVariables)
+  //  - Bit 0: notFirstRun - 1=true, 0=false
+  //  - Bit 1: configSavingEnergyMode variable - 1=reduced, 0=lowest
+  //  - Bit 2: uploadSamplesEnabled - 1=true, 0=false
+  //  - Bit 3: bluetoothEnabled - 1=true, 0=false
+  //  - Bit 4: wifiEnabled - 1=true, 0=false
+  //Address 09-0C: Stores float_t batCharge - 4 B
 
-  tft.setSwapBytes(true);
+  //Check if it is the first run after the very first firmware upload
+  for (int i=0; i<VERSION_CHAR_LENGTH; i++) firmwareVersion[i]=EEPROM.read(i);firmwareVersion[VERSION_CHAR_LENGTH]='\0';
+  uint16_t readChecksum,computedChecksum;
+  readChecksum=EEPROM.read(7);readChecksum=readChecksum<<8;readChecksum|=EEPROM.read(6);
+  computedChecksum=checkSum((byte*)firmwareVersion,VERSION_CHAR_LENGTH);
+  if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [initVariable] - firmwareVersion="+String(firmwareVersion)+", readChecksums="+String(readChecksum)+", computedChecksum="+String(computedChecksum));}
   
-  //Drawign wifi icon
-  switch (wifiCurrentStatus) {
-    case (wifi100Status):
-      tft.pushImage(0,0,24,24,wifi100);
-    break;
-    case (wifi75Status):
-      tft.pushImage(0,0,24,24,wifi075);
-    break;
-    case (wifi50Status):
-      tft.pushImage(0,0,24,24,wifi050);
-    break;
-    case (wifi25Status):
-      tft.pushImage(0,0,24,24,wifi025);
-    break;
-    case (wifi0Status):
-      tft.pushImage(0,0,24,24,wifi000);
-    break;
-    case (wifiOffStatus):
-      tft.pushImage(0,0,24,24,wifiOff);
-    break;
-  }
-  
-  //-->>Get BLE status
-  switch (BLEClurrentStatus) {
-    case BLEOnStatus:
-      tft.pushImage(30,0,24,24,bluetooth);
-    break;
-    case BLEConnectedStatus:
-      tft.pushImage(30,0,24,24,bluetoothConnected);
-    break;
-    case BLEOffStatus:
-      tft.pushImage(30,0,24,24,bluetoothOff);
-    break;
+  if (readChecksum!=computedChecksum) {
+    //It's the first run after the very first firmware upload
+    //Variable inizialization to values configured in global_setup
+
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [initVariable] - first run");}
+
+    //Save version and checksum
+    byte auxBuf[]=VERSION;
+    computedChecksum=checkSum(auxBuf,VERSION_CHAR_LENGTH);
+    for (int i=0; i<VERSION_CHAR_LENGTH; i++) EEPROM.write(i,auxBuf[i]);EEPROM.write(VERSION_CHAR_LENGTH,'\0');
+    EEPROM.write(6,(byte) computedChecksum);
+    computedChecksum=computedChecksum>>8;
+    EEPROM.write(7,(byte) computedChecksum);
+
+    wifiEnabled=WIFI_ENABLED;
+    bluetoothEnabled=BLE_ENABLED;
+    uploadSamplesEnabled=UPLOAD_SAMPLES_ENABLED;
+    configSavingEnergyMode=reducedEnergy; //Default value
     
-  }
-  
-  //-->>Get NTP status
-  switch (CloudClockCurrentStatus) {
-    case (CloudClockOnStatus):
-      tft.pushImage(95,0,24,24,cloudClockOn);
-    break;
-    case (CloudClockOffStatus):
-      tft.pushImage(95,0,24,24,cloudClockOff);
-    break;
-  }
-  
-  //-->>Get Cloud status
-  switch (CloudSyncCurrentStatus) {
-    case (CloudSyncOnStatus):
-      tft.pushImage(125,0,24,24,cloudSyncOn);
-    break;
-    case (CloudSyncOffStatus):
-      tft.pushImage(125,0,24,24,cloudSyncOff);
-    break;
-   }
-  
-  //-->>Get Batery status
-  switch (batteryStatus) {
-    case (batteryCharging000):
-      tft.pushImage(215,0,24,24,StatusBatteryCharging000);
-    break;
-    case (batteryCharging010):
-      tft.pushImage(215,0,24,24,StatusBatteryCharging010);
-    break;
-    case (batteryCharging025):
-      tft.pushImage(215,0,24,24,StatusBatteryCharging025);
-    break;
-    case (batteryCharging050):
-      tft.pushImage(215,0,24,24,StatusBatteryCharging050);
-    break;
-    case (batteryCharging075):
-      tft.pushImage(215,0,24,24,StatusBatteryCharging075);
-    break;
-    case (batteryCharging100):
-      tft.pushImage(215,0,24,24,StatusBatteryCharging100);
-    break;
-    case (battery000):
-      tft.pushImage(215,0,24,24,StatusBattery000);
-    break;
-    case (battery010):
-      tft.pushImage(215,0,24,24,StatusBattery010);
-    break;
-    case (battery025):
-      tft.pushImage(215,0,24,24,StatusBattery025);
-    break;
-    case (battery050):
-      tft.pushImage(215,0,24,24,StatusBattery050);
-    break;
-    case (battery075):
-      tft.pushImage(215,0,24,24,StatusBattery075);
-    break;
-    case (battery100):
-      tft.pushImage(215,0,24,24,StatusBattery100);
-    break;
-  }
-  
-}
+    //Now initialize configVariables
+    configVariables=0x01; //Bit 0, notFirstRun=true
+    if (reducedEnergy==configSavingEnergyMode) configVariables|=0x02; //Bit 1: configSavingEnergyMode
+    if (uploadSamplesEnabled) configVariables|=0x04; //Bit 2: uploadSamplesEnabled
+    if (bluetoothEnabled) configVariables|=0x08; //Bit 3: bluetoothEnabled
+    if (wifiEnabled) configVariables|=0x10; //Bit 4: wifiEnabled
 
-void loadAllIcons() {
-  tft.setSwapBytes(true);
-
-  tft.pushImage(0,0,24,24,StatusBattery000);
-  tft.pushImage(30,0,24,24,StatusBattery010);
-  tft.pushImage(60,0,24,24,StatusBattery025);
-  tft.pushImage(90,0,24,24,StatusBattery050);
-  tft.pushImage(120,0,24,24,StatusBattery075);
-  tft.pushImage(150,0,24,24,StatusBattery100);
+    //Write in EEPROM to be available the next boots up
+    EEPROM.write(0x08,configVariables);
+    EEPROM.commit();
+  }
+  else {
+    //Not the very first run after firmware upgrade.
     
-  tft.pushImage(0,30,24,24,StatusBatteryCharging000);
-  tft.pushImage(30,30,24,24,StatusBatteryCharging010);
-  tft.pushImage(60,30,24,24,StatusBatteryCharging025);
-  tft.pushImage(90,30,24,24,StatusBatteryCharging050);
-  tft.pushImage(120,30,24,24,StatusBatteryCharging075);
-  tft.pushImage(150,30,24,24,StatusBatteryCharging100);
-
-  tft.pushImage(0,60,24,24,wifi000);
-  tft.pushImage(30,60,24,24,wifi025);
-  tft.pushImage(60,60,24,24,wifi050);
-  tft.pushImage(90,60,24,24,wifi075);
-  tft.pushImage(120,60,24,24,wifi100);
-  tft.pushImage(150,60,24,24,wifiOff);
-
-  tft.pushImage(0,90,24,24,bluetooth);
-  tft.pushImage(30,90,24,24,bluetoothConnected);
-  tft.pushImage(60,90,24,24,bluetoothOff);
-
-  tft.pushImage(180,0,24,24,cloudClockOn);
-  tft.pushImage(180,30,24,24,cloudClockOff);
-
-  tft.pushImage(210,0,24,24,cloudSyncOn);
-  tft.pushImage(210,30,24,24,cloudSyncOff);
-  
-  while(true);
-}
-
-void loadAllWiFiIcons() {
-  tft.setSwapBytes(true);
-
-  /*tft.pushImage(0,0,24,24,wifi000_blue);
-  tft.pushImage(30,0,24,24,wifi025_blue);
-  tft.pushImage(60,0,24,24,wifi050_blue);
-  tft.pushImage(90,0,24,24,wifi075_blue);
-  tft.pushImage(120,0,24,24,wifi100_blue);
-  tft.pushImage(150,0,24,24,wifiOff_blue);
-
-  tft.pushImage(0,30,24,24,wifi000_blue_bis);
-  tft.pushImage(30,30,24,24,wifi025_blue_bis);
-  tft.pushImage(60,30,24,24,wifi050_blue_bis);
-  tft.pushImage(90,30,24,24,wifi075_blue_bis);
-  tft.pushImage(120,30,24,24,wifi100_blue);
-  tft.pushImage(150,30,24,24,wifiOff_blue_bis);
-
-  tft.pushImage(0,70,24,24,wifi000_white);
-  tft.pushImage(30,70,24,24,wifi025_white);
-  tft.pushImage(60,70,24,24,wifi050_white);
-  tft.pushImage(90,70,24,24,wifi075_white);
-  tft.pushImage(120,70,24,24,wifi100_white);
-  tft.pushImage(150,70,24,24,wifiOff_white);
-
-  tft.pushImage(0,100,24,24,wifi000_bis3);
-  tft.pushImage(30,100,24,24,wifi025_bis2);
-  tft.pushImage(60,100,24,24,wifi050_bis2);
-  tft.pushImage(90,100,24,24,wifi075_bis2);
-  tft.pushImage(120,100,24,24,wifi100_bis2);
-  tft.pushImage(150,100,24,24,wifiOff);
-  */
-  
-  /*tft.pushImage(0,100,24,24,wifi000_white_bis);
-  tft.pushImage(30,100,24,24,wifi025_white_bis);
-  tft.pushImage(60,100,24,24,wifi050_white_bis);
-  tft.pushImage(90,100,24,24,wifi075_white_bis);
-  tft.pushImage(120,100,24,24,wifi100_white);
-  tft.pushImage(150,100,24,24,wifiOff_white_bis);
-
-  tft.pushImage(0,100,24,24,wifi000_bis);
-  tft.pushImage(30,100,24,24,wifi025_bis);
-  tft.pushImage(60,100,24,24,wifi050_bis);
-  tft.pushImage(90,100,24,24,wifi075_bis);
-  tft.pushImage(120,100,24,24,wifi100);
-  tft.pushImage(150,100,24,24,wifiOff);*/
-  
-  while(true);
-}
-
-void drawGraphLastHourCo2() {
-  //Clean-up display
-  tft.fillScreen(TFT_BLACK);
-
-  //Draw thresholds, axis & legend
-  tft.fillRect(CO2_GRAPH_X,(int32_t)(CO2_GRAPH_Y_END-CO2_GAUGE_TH2*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX),CO2_GRAPH_WIDTH,8,TFT_NAVY);
-  tft.drawFastVLine(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_HEIGH+5,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_X-5,CO2_GRAPH_Y+2,CO2_GRAPH_X+5,CO2_GRAPH_Y+2,TFT_DARKGREY);
-  tft.drawFastHLine(CO2_GRAPH_X,CO2_GRAPH_Y+CO2_GRAPH_HEIGH,CO2_GRAPH_WIDTH,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X_END,CO2_GRAPH_Y_END,CO2_GRAPH_X_END-5,CO2_GRAPH_Y_END-3,CO2_GRAPH_X_END-5,CO2_GRAPH_Y_END+3,TFT_DARKGREY);
-  for (int i=1;i<=12;i++) if (3*(int)(i/3)==i) tft.drawFastVLine(CO2_GRAPH_X+15*i,CO2_GRAPH_Y_END-5,10,TFT_DARKGREY);
-    else tft.drawFastVLine(CO2_GRAPH_X+15*i,CO2_GRAPH_Y_END-2,4,TFT_DARKGREY); 
-  for (int i=0;i<=3;i++) tft.drawFastHLine(CO2_GRAPH_X-5,CO2_GRAPH_Y+25*i,10,TFT_DARKGREY);
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREY,TFT_BLACK);
-  tft.setCursor(CO2_GRAPH_X+35,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-45");
-  tft.setCursor(CO2_GRAPH_X+80,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-30");
-  tft.setCursor(CO2_GRAPH_X+125,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-15");
-  tft.setCursor(CO2_GRAPH_X+170,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("Now");
-  tft.setCursor(CO2_GRAPH_X+190,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("t(m)");
-  tft.setCursor(CO2_GRAPH_X+15,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("Last 60 min   ");
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREEN,TFT_BLACK);tft.print("CO2 (ppm) [0-2000]");
-  tft.setCursor(CO2_GRAPH_X+15,14,TEXT_FONT_BOOT_SCREEN-1);
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_CYAN,TFT_BLACK);tft.print("Temp (C) [0-50] ");
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_MAGENTA,TFT_BLACK);tft.print(" Hum (%) [0-100]");
-
-  //Draw samples
-  int32_t co2Sample,tempSample,humSample,auxCo2Color,auxTempColor=TFT_CYAN,auxHumColor=TFT_MAGENTA;
-  for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++) {
-    co2Sample=(int32_t) (CO2_GRAPH_Y_END-lastHourCo2Samples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX);
-    tempSample=(int32_t) (CO2_GRAPH_Y_END-lastHourTempSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_TEMP_MAX);
-    humSample=(int32_t) (CO2_GRAPH_Y_END-lastHourHumSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_HUM_MAX);
-    if (lastHourCo2Samples[i]<=CO2_GAUGE_TH1) auxCo2Color=TFT_GREEN;
-    else if (CO2_GAUGE_TH1 < lastHourCo2Samples[i] && lastHourCo2Samples[i] <= CO2_GAUGE_TH2) auxCo2Color=TFT_YELLOW;
-    else auxCo2Color=TFT_RED;
-    if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
-    if(lastHourTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_CYAN;
-    if(lastHourHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_MAGENTA;
-    tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
-    tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
-    tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color); //CO2 sample
-  }
-}
-
-void drawGraphLastDayCo2() {
-  //Clean-up display
-  tft.fillScreen(TFT_BLACK);
-
-  tft.fillRect(CO2_GRAPH_X,(int32_t)(CO2_GRAPH_Y_END-CO2_GAUGE_TH2*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX),CO2_GRAPH_WIDTH,8,TFT_NAVY);
-  tft.drawFastVLine(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_HEIGH+5,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X,CO2_GRAPH_Y-5,CO2_GRAPH_X-5,CO2_GRAPH_Y+2,CO2_GRAPH_X+5,CO2_GRAPH_Y+2,TFT_DARKGREY);
-  tft.drawFastHLine(CO2_GRAPH_X,CO2_GRAPH_Y+CO2_GRAPH_HEIGH,CO2_GRAPH_WIDTH+12,TFT_DARKGREY);tft.fillTriangle(CO2_GRAPH_X_END+12,CO2_GRAPH_Y_END,CO2_GRAPH_X_END+12-5,CO2_GRAPH_Y_END-3,CO2_GRAPH_X_END+12-5,CO2_GRAPH_Y_END+3,TFT_DARKGREY);
-  for (int i=1;i<=12;i++) if (3*(int)(i/3)==i) tft.drawFastVLine(CO2_GRAPH_X+16*i,CO2_GRAPH_Y_END-5,10,TFT_DARKGREY);
-    else tft.drawFastVLine(CO2_GRAPH_X+16*i,CO2_GRAPH_Y_END-2,4,TFT_DARKGREY);
-  for (int i=0;i<=3;i++) tft.drawFastHLine(CO2_GRAPH_X-5,CO2_GRAPH_Y+25*i,10,TFT_DARKGREY);
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREY,TFT_BLACK);
-  tft.setCursor(CO2_GRAPH_X+38,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-18");
-  tft.setCursor(CO2_GRAPH_X+86,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-12");
-  tft.setCursor(CO2_GRAPH_X+134,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("-6");
-  tft.setCursor(CO2_GRAPH_X+165,CO2_GRAPH_Y_END+10,TEXT_FONT_BOOT_SCREEN-1);tft.print("Now t(h)");
-  tft.setCursor(CO2_GRAPH_X+15,4,TEXT_FONT_BOOT_SCREEN-1);tft.print("Last 24 h.    ");
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_DARKGREEN,TFT_BLACK);tft.print("CO2 (ppm) [0-2000]");
-  tft.setCursor(CO2_GRAPH_X+15,14,TEXT_FONT_BOOT_SCREEN-1);
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_CYAN,TFT_BLACK);tft.print("Temp (C) [0-50] ");
-  tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.setTextColor(TFT_MAGENTA,TFT_BLACK);tft.print(" Hum (%) [0-100]");
-  //Draw samples
-  int32_t co2Sample,tempSample,humSample,auxCo2Color,auxTempColor=TFT_CYAN,auxHumColor=TFT_MAGENTA;
-  for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY); i++)
-  {
-    co2Sample=(int32_t) (CO2_GRAPH_Y_END-lastDayCo2Samples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_CO2_MAX);
-    tempSample=(int32_t) (CO2_GRAPH_Y_END-lastDayTempSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_TEMP_MAX);
-    humSample=(int32_t) (CO2_GRAPH_Y_END-lastDayHumSamples[i]*CO2_GRAPH_HEIGH/CO2_SENSOR_HUM_MAX);
-    if (lastDayCo2Samples[i]<=CO2_GAUGE_TH1) auxCo2Color=TFT_GREEN;
-    else if (CO2_GAUGE_TH1 < lastDayCo2Samples[i] && lastDayCo2Samples[i] <= CO2_GAUGE_TH2) auxCo2Color=TFT_YELLOW;
-    else auxCo2Color=TFT_RED;
-    if (co2Sample==CO2_GRAPH_Y_END) auxCo2Color=TFT_DARKGREY;
-    if(lastDayTempSamples[i]==0) auxTempColor=TFT_DARKGREY; else auxTempColor=TFT_CYAN;
-    if(lastDayHumSamples[i]==0) auxHumColor=TFT_DARKGREY; else auxHumColor=TFT_MAGENTA;
-    tft.drawPixel(i+CO2_GRAPH_X,humSample,auxHumColor); //Hum sample
-    tft.drawPixel(i+CO2_GRAPH_X,tempSample,auxTempColor); //Temp sample
-    tft.drawPixel(i+CO2_GRAPH_X,co2Sample,auxCo2Color);   //CO2 sample
-  }
-}
-
-String roundFloattoString(float_t number, uint8_t decimals) {
-  //Round float to "decimals" decimals in String format
-  String myString;  
-
-  int ent,dec,auxEnt,auxDec,aux1,aux2;
-
-  if (decimals==1) {
-    //Better precision operating without pow()
-    aux1=number*100;
-    ent=aux1/100;
-    aux2=ent*100;
-    dec=aux1-aux2; if (dec<0) dec=-dec;
-  }
-  else 
-    if (decimals==2) {
-      //Better precision operating without pow()
-      aux1=number*1000;
-      ent=aux1/1000;
-      aux2=ent*1000;
-      dec=aux1-aux2; if (dec<0) dec=-dec;
+    //Update the firmware version in EEPROM if needed
+    if (String(firmwareVersion).compareTo(String(VERSION))!=0) {
+      byte auxBuf[]=VERSION;
+      computedChecksum=checkSum(auxBuf,VERSION_CHAR_LENGTH);
+      for (int i=0; i<VERSION_CHAR_LENGTH; i++) EEPROM.write(i,auxBuf[i]);EEPROM.write(VERSION_CHAR_LENGTH,'\0');
+      EEPROM.write(6,(byte) computedChecksum);
+      computedChecksum=computedChecksum>>8;
+      EEPROM.write(7,(byte) computedChecksum);
+      EEPROM.commit();
     }
-    else {
-      ent=int(number);
-      dec=abs(number*pow(10,decimals+1)-ent*pow(10,decimals+1));
-    }
-  auxEnt=int(float(dec/10));
-  if (auxEnt>=10) auxEnt=9; //Need adjustment for wrong rounds in xx.98 or xx.99
-  auxDec=abs(auxEnt*10-dec);
-  if (auxDec>=5) auxEnt++;
-  if (auxEnt>=10) {auxEnt=0; ent++;}
-
-  if (decimals==0) myString=String(number).toInt(); 
-  else myString=String(ent)+"."+String(auxEnt);
-
-  return myString;
-}
-
-void go_to_hibernate() {
-  //Going to hibernate (switch the device off)
-  if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - [go_to_hibernate] - Time: ");Serial.println("    - Setting up Power Domains OFF before going into Deep Sleep");}
     
-  //Set all the power domains OFF
-  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH,   ESP_PD_OPTION_OFF);
-  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
-  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
-  esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL,         ESP_PD_OPTION_OFF);
-  #if SOC_PM_SUPPORT_CPU_PD
-    esp_sleep_pd_config(ESP_PD_DOMAIN_CPU,         ESP_PD_OPTION_OFF);
-  #endif
-  esp_sleep_pd_config(ESP_PD_DOMAIN_RTC8M,         ESP_PD_OPTION_OFF);
-  esp_sleep_pd_config(ESP_PD_DOMAIN_VDDSDIO,       ESP_PD_OPTION_OFF);
-
-  //Set ext1 trigger to wake up.
-  if (debugModeOn) {Serial.println("    - Setup ESP32 to wake up when ext1 GPIO "+String(GPIO_NUM_35)+" is LOW");}
-  esp_sleep_enable_ext1_wakeup(0x800000000, ESP_EXT1_WAKEUP_ALL_LOW); //GPIO_NUM_35=2^35 mask //Button1
-  
-  loopEndTime=loopStartTime+millis();
-  if (debugModeOn) {Serial.println(String(loopEndTime)+"    - Going to sleep now");}
-  esp_deep_sleep_start();
-}
-
-void go_to_sleep(void) {
-  //Timer is a wake up source. We set our ESP32 to wake up periodically
-  //Firts let's set the timer based on the Saving Energy Mode
-  //and also the period variable to take actions next wakeup period
-  loopEndTime=loopStartTime+millis();
-
-  if (debugModeOn) {Serial.println(String(loopEndTime)+"  - [go_to_sleep] - loopStartTime="+String(loopStartTime));}
-  
-  switch (energyCurrentMode) {
-    case fullEnergy:
-      sleepTimer=TIME_TO_SLEEP_FULL_ENERGY>(loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000?TIME_TO_SLEEP_FULL_ENERGY-(loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000:TIME_TO_SLEEP_FULL_ENERGY;
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
-      samplePeriod=SAMPLE_PERIOD;
-      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
-    break;
-    case reducedEnergy:
-      sleepTimer=TIME_TO_SLEEP_REDUCED_ENERGY>((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000)?TIME_TO_SLEEP_REDUCED_ENERGY-((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000):TIME_TO_SLEEP_REDUCED_ENERGY;
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //Keeping it for future. In this verstion No BAT checks in Reduce Engergy Mode to save energy
-      samplePeriod=SAMPLE_PERIOD_RE;
-      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
-    break;
-    case lowestEnergy:
-      sleepTimer=TIME_TO_SLEEP_SAVE_ENERGY>((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000)?TIME_TO_SLEEP_SAVE_ENERGY-((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000):TIME_TO_SLEEP_SAVE_ENERGY;
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //Keeping in for future. In this version No BAT checks in Save Engergy Mode to save energy
-      samplePeriod=SAMPLE_PERIOD_SE;
-      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
-    break;
+    //Get the rest of variables from EEPROM
+    configVariables=EEPROM.read(0x08);
+    configSavingEnergyMode=configVariables & 0x02?reducedEnergy:lowestEnergy;
+    uploadSamplesEnabled=configVariables & 0x04;
+    bluetoothEnabled=configVariables & 0x08;
+    wifiEnabled=configVariables & 0x10;
   }
-  
-  //Going to sleep
-  esp_sleep_enable_timer_wakeup(sleepTimer);
-  if (debugModeOn) {
-    Serial.print(String(loopEndTime)+"  - [go_to_sleep] - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");
-    Serial.println("    - Setup ESP32 to wake up in "+String(sleepTimer/uS_TO_S_FACTOR)+" Seconds");
-    }
-  
-  //We set our ESP32 to wake up for an external ext0 trigger.
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_35,0); //1 = High, 0 = Low
-  if (debugModeOn) {Serial.println("    - Setup ESP32 to wake up when ext0 GPIO "+String(GPIO_NUM_35)+" is LOW");}
-  esp_deep_sleep_start();
+  if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [initVariable] - configVariables="+String(configVariables));}
 
-  /*esp_err_t err = esp_wifi_stop();
-  if (debugModeOn) {Serial.println("    - esp_wifi_stop(), err= "+String(err));}
-  ESP_ERROR_CHECK(esp_light_sleep_start());
-  err = esp_wifi_start();
-  if (debugModeOn) {Serial.println("    - esp_wifi_start(), err= "+String(err));}
-  */
-}
-
-//void setupNTPConfig(boolean fromSetup) {
-uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,uint64_t* whileLoopTimeLeft=nullptr) {
-  //If function called fron firstSetup(), then logs are displayed
-  // and buttons are checked during NTP Sync handshake
-  // Parameters:
-  // - fromSetup: where the function was called from. Diferent prints out are done base on its value
-  //      Value false: from main loop
-  //      Value true:  from the firstSetup() function
-  // - *auxLoopCounter is a pointer for the index of the NTP server array to check. It's sent from the main loop
-  //      Value 0: The NTP sync will start from the very first NTP server - First call to the funcion
-  //      Value other: The NTP sync will resume the sync with the same NTP server used in the previous interaction
-  //          which was stoped due to either Button Pressed (ABORT) or Display Refresh (BREAK)
-  // - *whileLoopTimeLeft is the pointer for the time of while() loop to stop checking the index of
-  //   the NTP server array. It's sent from the main loop
-  //      Value NTP_CHECK_TIMEOUT: The NTP sync will start from the beginig - First call to the funcion
-  //      Value other: The NTP sync will resume the sync at the same point where the previous interaction
-  //          was stoped due to either Button Pressed (ABORT) or Display Refresh (BREAK)
-  // *auxLoopCounter and *whileLoopTimeLeft are global variables. They are modified in here. The calling function
-  //   just send them to this function.
-
-  if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - [setupNTPConfig] - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", errorsNTPCnt="+String(errorsNTPCnt)+", auxLoopCounter="+String(*auxLoopCounter)+", whileLoopTimeLeft="+String(*whileLoopTimeLeft));}
-
-  //to avoid pointer issues
-  if (auxLoopCounter==nullptr || whileLoopTimeLeft==nullptr) {
-    errorsNTPCnt++; //Something went wrong. Update error counter for stats
-    return(ERROR_NTP_SERVER);
-  }
-  
-  CloudClockStatus previousCloudClockCurrentStatus=CloudClockCurrentStatus;
-  CloudClockCurrentStatus=CloudClockOffStatus;
-  //User credentials definition
-  ntpServers[0]="\0";ntpServers[1]="\0";ntpServers[2]="\0";ntpServers[3]="\0";
-  #ifdef NTP_SERVER
-    ntpServers[0]=NTP_SERVER;
-  #endif
-  #ifdef NTP_SERVER2
-    ntpServers[1]=NTP_SERVER2;
-  #endif
-  #ifdef NTP_SERVER3
-    ntpServers[2]=NTP_SERVER3;
-  #endif
-  #ifdef NTP_SERVER4
-    ntpServers[3]=NTP_SERVER4;
-  #endif
-
-  //boolean whileFlagOn=true;
-  if (wifiCurrentStatus!=wifiOffStatus) {
-    uint32_t previousError_Setup=error_setup;
-    uint8_t auxForLoop;
-    for (uint8_t loopCounter=*auxLoopCounter; loopCounter<(uint8_t)sizeof(ntpServers)/sizeof(String); loopCounter++) {
-      error_setup|=ERROR_NTP_SERVER;
-      if (ntpServers[loopCounter].charAt(0)=='\0') loopCounter++;
-      else {
-        if ((logsOn && fromSetup) || debugModeOn) {Serial.println("[setup - NTP] Connecting to NTP Server: "+ntpServers[loopCounter]);}
-        if (!NTPResuming) { //Only calling configXTime() for new checks
-          #ifdef NTP_TZ_ENV_VARIABLE
-            configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
-          #else
-            configTime(gmtOffset_sec, daylightOffset_sec, ntpServers[loopCounter].c_str());
-          #endif
-        }
-
-        *auxLoopCounter=loopCounter;
-        uint64_t whileStartTime=loopStartTime+millis(),auxTime=whileStartTime;
-        if (*whileLoopTimeLeft>=NTP_CHECK_TIMEOUT) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;
-
-        if (debugModeOn) {Serial.println("    - whileStartTime="+String(whileStartTime)+", *whileLoopTimeLeft="+String(*whileLoopTimeLeft)+", *auxLoopCounter="+String(*auxLoopCounter)+", loopCounter="+String(loopCounter)+", waiting for NTPStatus=SNTP_SYNC_STATUS_COMPLETED");}
-        while ( sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED &&
-               //*whileLoopTimeLeft<=NTP_CHECK_TIMEOUT && whileFlagOn) {
-              *whileLoopTimeLeft<=NTP_CHECK_TIMEOUT) {
-          *whileLoopTimeLeft=*whileLoopTimeLeft-(loopStartTime+millis()-auxTime);
-          auxTime=loopStartTime+millis();
-          delay(50);
-          //Check if buttons are pressed during NTP sync handshake (if not in the first Setup)
-          if (!fromSetup) {
-            switch (checkButtonsActions(ntpcheck)) {
-              case 1:
-              case 2:
-              case 3:
-                //Button1 or Button2 pressed or released. NTP Sync process aborted if not Sync is completed
-                if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - checkButtonsActions() returns 1, 2 or 3 - Returning with ERROR_ABORT_NTP_SETUP");}
-                if (sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED) { //Actions required as the process is aborted
-                  forceNTPCheck=true; //Let's grant NTP check again in the next loop interaction
-                  CloudClockCurrentStatus=previousCloudClockCurrentStatus; //Restore Cloud Clock status 
-                  error_setup=previousError_Setup;                         //Restore previous error - Mainly for firstSetup()
-                  loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String); //Ends the for loop
-                  //whileFlagOn=false; //Breaks the while loop and continue to the regular loop() flow
-                  auxForLoop=loopCounter;
-                  return(ERROR_ABORT_NTP_SETUP);
-                }
-              break;
-              case 0:
-              default:
-                //Regular exit. Do nothing else
-              break;
-            }
-            //Must the Display be refreshed? This check avoids the display gets blocked during NTP sync
-            if (digitalRead(PIN_TFT_BACKLIGHT)!=LOW &&
-                (
-                  (((loopStartTime+millis()-lastTimeDisplayModeCheck) >= DISPLAY_MODE_REFRESH_PERIOD) && currentState==displayingSequential)
-                  ||
-                  (((loopStartTime+millis()-lastTimeDisplayCheck) >= DISPLAY_REFRESH_PERIOD) && 
-                    (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
-                    currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) )
-                )
-              ) {
-              return (ERROR_BREAK_NTP_SETUP); //Returns to refresh the display
-            }
-          }
-        } //end while() loop
-
-        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - End of wait - Elapsed Time: "+String(auxTime-whileStartTime));}
-        
-        if (*whileLoopTimeLeft>NTP_CHECK_TIMEOUT) { //Case if while() loop timeout.
-          if ((logsOn && fromSetup) || debugModeOn) {
-            Serial.println("  Time: Failed to get time");
-            Serial.print("[setup] - NTP: ");Serial.println("KO");
-          }
-        }
-        else { 
-          //End of while() due to successful NTP sync
-          // (Button Pressed or Display Refresh force the function to return from the while() loop, 
-          //  so this point is not reached in those cases)
-          if ((logsOn && fromSetup) || debugModeOn) {
-            Serial.print("  Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
-            Serial.print("[setup] - NTP: ");Serial.println("OK");
-          }
-          CloudClockCurrentStatus=CloudClockOnStatus;
-          ntpServerIndex=loopCounter;
-          error_setup=previousError_Setup;
-          loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String);
-          memcpy(TZEnvVar,getenv("TZ"),String(getenv("TZ")).length()); //Back Time Zone up to restore it after wakeup
-        }
-      }
-    }//end For() loop
-  }
-
-  //This point is reached if either the while() loop timed out or successful NTP sync
-  // (Button Pressed or Display Refresh force the function to return from the while() loop, 
-  //  so this point is not reached in those cases)
-  
-  //if (CloudClockCurrentStatus==CloudClockOffStatus && whileFlagOn) {
-  if (CloudClockCurrentStatus==CloudClockOffStatus) {
-    //Case for while loop timeout (no successfull NTP sync)
-    errorsNTPCnt++; //Something went wrong. Update error counter for stats   
-    if (auxLoopCounter!=nullptr) *auxLoopCounter=0;                 //To avoid resuming connection the next loop interacion
-    if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;  //To avoid resuming connection the next loop interacion       
-    return(ERROR_NTP_SERVER); //not NTP server connection
-  }
-
-  //Case for successfull NTP sync
-  if (debugModeOn) {
-      Serial.println("    - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck)+", errorsNTPCnt="+String(errorsNTPCnt));
-      Serial.print(String(loopStartTime+millis())+"  - [setupNTPConfig] - Exit - Time:");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
-  }
-
-  if (auxLoopCounter!=nullptr) *auxLoopCounter=0;                 //To avoid resuming connection the next loop interacion
-  if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;  //To avoid resuming connection the next loop interacion       
-  if (fromSetup) return(error_setup); //return previous error - Mainly for firstSetup()
-  else return(NO_ERROR);
 }
 
 void firstSetup() {
@@ -900,7 +471,7 @@ void firstSetup() {
   stext1.setCursor(cuX,cuY);
 
   if (wifiEnabled) {//Only if WiFi is enabled
-    error_setup|=wifiConnect(true,true,&auxLoopCounter,&auxCounter);
+    error_setup|=wifiConnect(true,true,false,&auxLoopCounter,&auxCounter);
 
     //print Logs
     if ((error_setup & ERROR_WIFI_SETUP)==0 ) { 
@@ -1092,7 +663,8 @@ void firstSetup() {
     }
 
     //Take BAT ADC for setup powerState
-    batCharge=0;lastBatCharge=0;
+    //lastBatCharge is initiated in setup() as the value depends on the wakup reason
+    batCharge=0;
     digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
     batADCVolt=0; for (u8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
     digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE);
@@ -1139,11 +711,11 @@ void firstSetup() {
 
   if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
-  #if BUILD_ENV_NAME!=BUILD_TYPE_DEVELOPMENT
-    return;  //Development doesn't have CO2 sensor
-  #else
-    error_setup&=~ERROR_SENSOR_CO2_SETUP; //Clean up ERROR_SENSOR_CO2_SETUP for development
+  #if BUILD_ENV_NAME==BUILD_TYPE_DEVELOPMENT
+    //Clean up ERROR_SENSOR_CO2_SETUP for development as there's no CO2 sensor
+    error_setup&=~ERROR_SENSOR_CO2_SETUP; 
   #endif
+
   if ((error_setup & DEAD_ERRORS)!=0) {
     Serial.println("[setup] - There are dead errors. Can't continue. STOP");
     if ((error_setup & ERROR_DISPLAY_SETUP)!=0) Serial.println("  - ERROR_DISPLAY_SETUP");
@@ -1178,12 +750,12 @@ void firstSetup() {
     case reducedEnergy:
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //Keeping it for future. In this version No BAT checks in Reduce Engergy Mode to save energy
       samplePeriod=SAMPLE_PERIOD_RE;
-      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
     break;
     case lowestEnergy:
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //Keeping it for future. In this version No BAT checks in Save Engergy Mode to save energy
       samplePeriod=SAMPLE_PERIOD_SE;
-      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+      uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
     break;
   }
   
@@ -1316,81 +888,6 @@ boolean warmingUp() {
   return (false);
 }
 
-void initVariable() {
-  //Global variables init. Needed as they have random values after wakeup from hiberte mode
-  firstBoot=true;
-  nowTimeGlobal=0;timeUSBPowerGlobal=0;loopStartTime=0;loopEndTime=0;
-  lastTimeSampleCheck=0;previousLastTimeSampleCheck=0; lastTimeDisplayCheck=0;lastTimeDisplayModeCheck=0;
-  lastTimeNTPCheck=0;lastTimeVOLTCheck=0;lastTimeHourSampleCheck=0;lastTimeDaySampleCheck=0;
-  lastTimeUploadSampleCheck=0;lastTimeIconStatusRefreshCheck=0;lastTimeTurnOffBacklightCheck=0;
-  lastTimeWifiReconnectionCheck=0;
-  sleepTimer=0;
-  displayMode=bootup;lastDisplayMode=bootup;
-  stateSelected=displayingSampleFixed;currentState=bootupScreen;lastState=currentState;
-  updateHourSample=true;updateDaySample=true;updateHourGraph=true;updateDayGraph=true;
-  autoBackLightOff=true;button1Pressed=false;button2Pressed=false;
-  powerState=off;
-  batteryStatus=battery000;
-  bootCount=0;loopCount=0;
-  circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
-                            CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
-                            CO2_GAUGE_TH1,TFT_YELLOW,CO2_GAUGE_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
-  horizontalBar=HorizontalBar(0,TEMP_BAR_MIN,TEMP_BAR_MAX,TEMP_BAR_X,TEMP_BAR_Y,
-                              TEMP_BAR_LENGTH,TEMP_BAR_HEIGH,TFT_GREEN,TEMP_BAR_TH1,
-                              TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
-  firstWifiCheck=true;forceWifiReconnect=false;forceGetSample=false;forceGetVolt=false;
-  forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;
-  forceWEBCheck=false;forceWEBTestCheck=false;
-  valueCO2=0;valueT=0;valueHum=0;lastValueCO2=-1;tempMeasure=0;
-  errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;
-  error_setup=NO_ERROR;remainingBootupSeconds=0;
-  previousTime=0;remainingBootupTime=BOOTUP_TIMEOUT*1000;
-  static const char hex_digits[] = "0123456789ABCDEF";
-  waitingMessage=true;runningMessage=true;
-  auxLoopCounter=0;auxLoopCounter2=0;auxCounter=0;
-  whileLoopTimeLeft=NTP_CHECK_TIMEOUT;whileWebLoopTimeLeft=HTTP_ANSWER_TIMEOUT;
-  wifiResuming=false;NTPResuming=false;webResuming=false;
-  debugModeOn=DEBUG_MODE_ON;
-  BLEClurrentStatus=BLEOffStatus;
-  
-  //Read from EEPROM the values to be stored in the Config Variables
-  //
-  //EEPROM MAP
-  //Address 0: Stores Config Variable Valued (configVariables)
-  //  - Bit 0: notFirstRun - 1=true, 0=false
-  //  - Bit 1: configSavingEnergyMode variable - 1=reduced, 0=lowest
-  //  - Bit 2: uploadSamplesEnabled - 1=true, 0=false
-  //  - Bit 3: bluetoothEnabled - 1=true, 0=false
-  //  - Bit 4: wifiEnabled - 1=true, 0=false
-  configVariables=EEPROM.read(0);
-  if ((configVariables & 0x01)==0) {
-    //It's supposed that after factory, flash is set to 0, so this should be
-    // the very first run after firmware upload
-    //Variable inizialization to values configured in global_setup
-    wifiEnabled=WIFI_ENABLED;
-    bluetoothEnabled=BLE_ENABLED;
-    uploadSamplesEnabled=UPLOAD_SAMPLES_ENABLED;
-    configSavingEnergyMode=reducedEnergy; //Default value
-    
-    //Now initialize configVariables
-    if (reducedEnergy==configSavingEnergyMode) configVariables|=0x02; //Bit 1: configSavingEnergyMode
-    if (uploadSamplesEnabled) configVariables|=0x04; //Bit 2: uploadSamplesEnabled
-    if (bluetoothEnabled) configVariables|=0x08; //Bit 3: bluetoothEnabled
-    if (wifiEnabled) configVariables|=0x10; //Bit 4: wifiEnabled
-
-    //Write in EEPROM to be available the next boots up
-    EEPROM.write(0,configVariables);
-    EEPROM.commit();
-  }
-  else {
-    configSavingEnergyMode=configVariables & 0x02?reducedEnergy:lowestEnergy;
-    uploadSamplesEnabled=configVariables & 0x04;
-    bluetoothEnabled=configVariables & 0x08;
-    wifiEnabled=configVariables & 0x10;
-  }
-  if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [initVariable] - configVariables=0x01. configVariables="+String(configVariables));}
-}
-
 void setup() {
   loopStartTime=loopEndTime+millis()+sleepTimer/1000;
   nowTimeGlobal=loopStartTime;
@@ -1406,7 +903,7 @@ void setup() {
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   switch(wakeup_reason)
   {
-    case ESP_SLEEP_WAKEUP_EXT1: //Wake from Hibernate Mode by pressing Button1
+    case ESP_SLEEP_WAKEUP_EXT1: //Wake from Hibernate Mode by long pressing Button1
       initVariable(); //Init Global variables after hibernate mode
       loopStartTime=millis();loopEndTime=0;sleepTimer=0;nowTimeGlobal=loopStartTime;
       bootCount=0;
@@ -1423,6 +920,14 @@ void setup() {
       
       if (debugModeOn) {Serial.println("    - Time elapsed: "+String(millis()-nowTimeGlobal)+" ms");}
       if ((millis()-nowTimeGlobal) > TIME_LONG_PRESS_BUTTON1_HIBERNATE) { //Hard bootup - Run global setup from scratch
+        
+        //Getting the last known value of Bat charge when waken up from hibernation
+        uint32_t auxBatCharge=0;
+        for (int i=(9+sizeof(auxBatCharge)-1); i>=9; i--) {auxBatCharge=auxBatCharge<<8;auxBatCharge|=EEPROM.read(i);}
+        lastBatCharge=(float_t)auxBatCharge;
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"    - afte wakeup, lastBatCharge="+String(lastBatCharge));}
+
+        buttonWakeUp=true;
         firstSetup();
         nowTimeGlobal=loopStartTime+millis();
         return;
@@ -1433,6 +938,7 @@ void setup() {
       } 
     break;
     case ESP_SLEEP_WAKEUP_EXT0: //Wake from Deep Sleep Mode by pressing Button1
+      // No need to initit lastBatCharge
       if (debugModeOn) {
         Serial.println("  - Wakeup caused by external signal using RTC_IO - Ext0");
         Serial.println("    - setting things up back again after deep sleep specific for ad-hod wakeup");
@@ -1454,6 +960,7 @@ void setup() {
       if (debugModeOn) {Serial.println("    - end");}
     break;
     case ESP_SLEEP_WAKEUP_TIMER : 
+      // No need to initit lastBatCharge
       if (debugModeOn) {
         Serial.println("  - Wakeup caused by timer");
         Serial.println("    - setting things up back again after deep sleep specific for periodic wakeup");
@@ -1464,6 +971,7 @@ void setup() {
     break;
     default:
       if (debugModeOn) {Serial.println("  - Wakeup was not caused by deep sleep: "+String(wakeup_reason)+" (0=POWERON_RESET, including HW Reset)");}
+      lastBatCharge=0; //Can't be initiated in initVariable() as the value depends on the reason to wakeup.
       initVariable(); //Init Global variables (it makes sure configVariables take the values stored in EEPROM)
       firstSetup(); //Hard bootup - Run global setup during the first boot (HW reset or power ON)
       nowTimeGlobal=loopStartTime+millis();
@@ -1857,7 +1365,7 @@ void loop() {
     if (debugModeOn) {Serial.println("    - auxLoopCounter="+String(auxLoopCounter)+", auxCounter="+String(auxCounter));}
     
     forceWEBTestCheck=false; //If WiFi reconnection is successfull, then check WEB server to update ICON. Decision is done below, if NO_ERROR
-    switch(wifiConnect(debugModeOn,false,&auxLoopCounter,&auxCounter)) {
+    switch(wifiConnect(false,false,true,&auxLoopCounter,&auxCounter)) {
       case ERROR_ABORT_WIFI_SETUP: //Button pressed. WiFi reconnection aborted. Exit now but force reconnection next loop interaction
         wifiCurrentStatus=previousWifiCurrentStatus;
         forceWifiReconnect=true; //Force WiFi reconnection in the next loop interaction
@@ -2003,11 +1511,13 @@ void loop() {
     //GET /lar-co2/?device=co2-sensor&local_ip_address=192.168.100.192&co2=543&temp_by_co2_sensor=25.6&hum_by_co2_sensor=55&temp_co2_sensor=28.7
     if (forceWEBTestCheck) {httpRequest=httpRequest+"test HTTP/1.1";forceWEBTestCheck=false;}
     else httpRequest=httpRequest+"device="+device+"&local_ip_address="+
-      IpAddress2String(WiFi.localIP())+"&co2="+valueCO2+"&temp_by_co2_sensor="+valueT+"&hum_by_co2_sensor="+
-      valueHum+"&temp_co2_sensor="+co2Sensor.getTemperature(true,true)+"&powerState="+powerState+
+      IpAddress2String(WiFi.localIP())+"&version="+String(VERSION)+
+      "&co2="+valueCO2+"&temp_by_co2_sensor="+valueT+"&hum_by_co2_sensor="+valueHum+
+      "&temp_co2_sensor="+co2Sensor.getTemperature(true,true)+"&powerState="+powerState+
       "&batADCVolt="+batADCVolt+"&batCharge="+batCharge+"&batteryStatus="+batteryStatus+
       "&energyCurrentMode="+energyCurrentMode+"&errorsWiFiCnt="+errorsWiFiCnt+
-      "&errorsSampleUpts="+errorsSampleUpts+"&errorsNTPCnt="+errorsNTPCnt+" HTTP/1.1";
+      "&errorsSampleUpts="+errorsSampleUpts+"&errorsNTPCnt="+errorsNTPCnt+"&webServerError1="+webServerError1+
+      "&webServerError2="+webServerError2+"&webServerError3="+webServerError3+" HTTP/1.1";
 
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - serverToUploadSamplesIPAddress="+String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
                    ", httpRequest="+String(httpRequest));}
@@ -2042,7 +1552,11 @@ void loop() {
   if (firstBoot) firstBoot=false;
   if (buttonWakeUp) buttonWakeUp=false;
 
-  //Going to sleep, but only if the display if OFF and not in Full Energy Mode (USB powered)
+  //Go to hibernate if battery is ran out
+  if (batCharge<=BAT_CHG_THR_TO_HIBERNATE && onlyBattery==powerState) go_to_hibernate();
+
+  //Going to sleep, but only if the display if OFF and not there's Battery power
   //if (LOW==digitalRead(PIN_TFT_BACKLIGHT)) go_to_sleep();
-  if (LOW==digitalRead(PIN_TFT_BACKLIGHT) && energyCurrentMode!=fullEnergy) go_to_sleep();
+  //if (LOW==digitalRead(PIN_TFT_BACKLIGHT) && energyCurrentMode!=fullEnergy) go_to_sleep();
+  if (LOW==digitalRead(PIN_TFT_BACKLIGHT) && onlyBattery==powerState) go_to_sleep();
 }

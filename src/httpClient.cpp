@@ -86,7 +86,7 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
   //      Value other: The HTTP connection monitoring will resume the last try at the same point where the previous interaction
   //          was stoped due to either Button Pressed (ABORT) or Display Refresh (BREAK)
   // *whileLoopTimeLeft is a global variable. It is modified in here. The calling function
-  //   just send it to this function.
+  //   just sends it to this function.
   
   logsOn=true;
   
@@ -98,6 +98,8 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
   //to avoid pointer issues
   if (whileLoopTimeLeft==nullptr) {
     errorsSampleUpts++; //Something went wrong. Update error counter for stats
+    webServerError1++;
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError1="+String(webServerError1)+" - Returning with ERROR_WEB_SERVER");}
     return(ERROR_WEB_SERVER);
   }
   
@@ -117,10 +119,12 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
     }
     else {
       errorsSampleUpts++;  //Something went wrong. Update error counter for stats
+      webServerError2++;
       if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=HTTP_ANSWER_TIMEOUT;  //To avoid resuming connection the next loop interacion       
       forceWEBCheck=false;
       webResuming=false;
       if (logsOn) {Serial.println("[sendAsyncHttpRequest] - Not connected, errorsSampleUpts="+String(errorsSampleUpts));}
+      if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError2="+String(webServerError2)+" - Returning with ERROR_WEB_SERVER");}
       return(ERROR_WEB_SERVER); //not WEB server connection
     }
   }
@@ -205,9 +209,11 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
   if (CloudSyncCurrentStatus==CloudSyncOffStatus) {
     //Case for while loop timeout (no successfull WEB connection)
     errorsSampleUpts++; //Something went wrong. Update error counter for stats   
+    webServerError3++;
     if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=HTTP_ANSWER_TIMEOUT;  //To avoid resuming connection the next loop interacion       
     forceWEBCheck=false;
     webResuming=false;
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError3="+String(webServerError3)+" - Returning with ERROR_WEB_SERVER");}
     return(ERROR_WEB_SERVER); //not WEB server connection
   }
   else {

@@ -1,12 +1,26 @@
 Change Log
 ----------------------------------------------
 BAT duration
-- Version 0.9.4     
+- Version 0.9.6		  ~ 4 days (91 h) (Saving Energy Mode = Lowest) (from 17/Jan ~ 08.00 am. to 21/Jan 02.44 am)
+- Version 0.9.4     ~ 4 days (89 h) (Saving Energy Mode = Reduced)
 - Version 0.9.0     ~ 4 days (90 h)
 - Version < 0.9     ~19 hours
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.9.7 XX/Ene/2023   - Wifi icons changed
+                      - WiFi disconnection just right before going to sleep
+                      - Bug fixing
+                        + No Display Switch off when setting up Saving Energy Mode to Lowest during USB power
+                        + No button action just rith after Button1 wakes up the CPU
+                        + Wrong uploadSamplesPeriod value when USB power if compilation is with BUILD_ENV_NAME!=BUILD_TYPE_SENSOR_CASE 
+                      - Added more logs for WEB_ERROR case
+                      - Going go hibernate if Battery charge is below BAT_CHG_THR_TO_HIBERNATE threshold
+                      - batCharge is saved in EEPROM before going to hibernate and restore it as lastBatCharge value 
+                        after waking up from hibernation
+                      - Firmware version & Checksum saved in EEPROM to detect first rung after firmware upgrade
+                      - Firmware version included in the GET sample upload
+                      - Functions Carve-out in main.cpp to put them in different files (misc.cpp, wifiConnection.cpp, etc)
 - 0.9.6 15/Ene/2023   - Config Menu for: WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF, Saving Battery Mode Reduced/Lowest
                       - Writting in EEPROM the Config Variables values to make them permanent
                       - Bug fixing:

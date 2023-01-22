@@ -4,7 +4,7 @@
 
 extern boolean logsOn,webResuming,forceWEBCheck,forceWEBTestCheck;
 extern RTC_DATA_ATTR CloudSyncStatus CloudSyncCurrentStatus; //Struct to store WiFi parameters
-extern RTC_DATA_ATTR int errorsSampleUpts;
+extern RTC_DATA_ATTR int errorsSampleUpts,webServerError1,webServerError2,webServerError3;
 
 String IpAddress2String(const IPAddress& ipAddress);
 uint8_t sendHttpRequest (boolean logsOn, IPAddress server, uint16_t port, String httpRequest);
