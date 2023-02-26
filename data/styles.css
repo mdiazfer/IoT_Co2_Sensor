@@ -1,0 +1,141 @@
+body {
+  font-size: 90%;
+  font-family: "Helvetica";
+}
+
+img {
+  max-width: 100%;
+  width: 175px;
+  height: 36.8887px;
+}
+
+input, select, button, textarea {
+  max-width: 100%;
+}
+
+meter, progress, output {
+  max-width: 100%;
+}
+
+div#tswsidecol {
+  float: right;
+  width: 27%;
+  color: white;
+  background-color: #34383b;
+}
+
+div#tswcontent {
+  float: right;
+  width: 70%;
+  color: white;
+  background-color: #34383b;
+}
+
+@media only screen and ( max-width : 629px ) {
+  div#tswsidecol {
+    float: none;
+    width: 100%;
+  }
+  div#tswcontent {
+    float: none;
+    width: 100%;
+  }
+}
+
+div#tswcontproper {
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+div#tswcontainer {
+  background-color: #1d2324;
+}
+
+div#tswsideproper, div#tswothersideproper {
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+div#tswheader {
+  color: white;
+  background-color: #34383b;
+}
+
+div#tswfooter {
+  color: white;
+  background-color: #34383b;
+}
+
+#logo {
+  display: block;
+  float: left;
+  padding-top: 2%;
+}
+
+#tswcontainer {
+  width: 800px;
+  margin: auto;
+}
+
+#tswcontent {
+  margin: auto auto auto 0%;
+}
+
+#tswsidecol {
+  margin-left: 0%;
+  margin-right: 3%;
+}
+
+#tswcontproper {
+  min-height: 280px;
+}
+
+#tswwificredentials {
+  display: block;
+  float: left;
+  width: 50%;
+}
+
+#tswntpservers {
+  display: block;
+}
+
+#tswdevice {
+  float: left;
+  width: 45%;
+  padding-right: 5%;
+  clear: left;
+}
+
+#tswsamples {
+  width: 45%;
+  float: left;
+  padding-right: 5%;
+  padding-bottom: 5%;
+}
+
+#tswnetinfo {
+  float: left;
+  clear: right;
+  padding-top: 5%;
+  padding-bottom: 5%;
+  width: 50%;
+}
+
+#tswmiscinfoleft {
+  float: left;
+}
+
+#tswmiscinforight {
+  clear: right;
+  position: relative;
+  left: 5%;
+  float: left;
+}
+
+#tswmiscinfo {
+  float: left;
+  width: 100%;
+  padding-top: 5%;
+}
+

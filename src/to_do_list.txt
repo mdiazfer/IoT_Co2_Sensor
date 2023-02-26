@@ -1,12 +1,27 @@
 To do list
 -----------
+- Web server to display results and configuration
+  + webServerEnable variable in EEPROM
+    * config in menu and web (?)
+  + AP mode to provide first SSID in WiFi Menu
+  + Factory Reset in Config Menu and Web
+  + Cloud services URL variable in EEPROM
+  + Check box in sites to upload samples from
+    * Store info in EEPROM
+  + Re-start web server if:
+    * Wifi goes OFF -> ON
+    * Wake-up (timer or button)
+  + variable to store TimeZone in human format
+  + Pop-up if disable WiFi or Web Server to warn about
+  + Info errors
 - Troubleshoot
+  + webServer doen't begin after SSID update & reconnection
+    * SSID1: madnetot -> madLar-II-V (OK) -> madnetot (KO)
+    * SSID1: madnetot -> madnetotx and SSID2 xxxx->madLar-II-V (KO)
+  + WebServer doesn't begin randomly (after firmware upload???)
   + WiFi connection failures
   + No button action after wakingup with button
   + After battery is ran out, pluging USB power doesn't take effect in the IoT
-- Web server to display results
-- Web server for configuration
-- AP mode to provide first SSID
 - BLE sutff
 - Get info about bluetooth to update icons
 - Icon for the bootup screen

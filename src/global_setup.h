@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.7"
+#define VERSION "0.9.8"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -32,7 +32,7 @@
 #define DEVICE_NAME_PREFIX "co2-sensor"
 #define PIN_TFT_BACKLIGHT 4
 #define DEBUG_MODE_ON true
-#define EEPROM_SIZE 0x0F
+#define EEPROM_SIZE 0x300
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
@@ -88,12 +88,11 @@
 #define ERROR_SENSOR_TEMP_HUM_SETUP   0x00000002
 #define ERROR_SENSOR_CO2_SETUP        0x00000004
 #define ERROR_BUTTONS_SETUP           0x00000008
-#define DEAD_ERRORS                   0x0000000F //ERROR_DISPLAY_SETUP OR ERROR_SENSOR_CO2_SETUP OR ERROR_SENSOR_TEMP_HUM_SETUP OR ERROR_BUTTONS_SETUP
 #define ERROR_WIFI_SETUP              0x00000010
 #define ERROR_BLE_SETUP               0x00000020
 #define ERROR_SSID_CONNECTION         0x00000040
 #define ERROR_NTP_SERVER              0x00000080
-#define ERROR_WEB_SERVER              0x00000100
+#define ERROR_CLOUD_SERVER            0x00000100
 #define ERROR_BAT_ADC                 0x00000200
 #define ERROR_ABORT_WIFI_SETUP        0x00000400
 #define ERROR_BREAK_WIFI_SETUP        0x00000800
@@ -101,6 +100,9 @@
 #define ERROR_BREAK_NTP_SETUP         0x00002000
 #define ERROR_ABORT_WEB_SETUP         0x00004000
 #define ERROR_BREAK_WEB_SETUP         0x00008000
+#define ERROR_SPIFFS_SETUP            0x00010000
+#define ERROR_WEB_SERVER              0x00020000
+#define DEAD_ERRORS                   0x0001000F //ERROR_DISPLAY_SETUP OR ERROR_SENSOR_CO2_SETUP OR ERROR_SENSOR_TEMP_HUM_SETUP OR ERROR_BUTTONS_SETUP OR ERROR_SPIFFS_SETUP
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240
@@ -172,7 +174,8 @@
 //WiFi stuff
 #define WIFI_ENABLED  true
 #define MAX_CONNECTION_ATTEMPTS 10
-#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
+#define NTP_SERVER_NAME_MAX_LENGTH 64
+/*#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
   #define NTP_SERVER  "10.88.50.5"
   #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
   #define NTP_SERVER3  "time4.google.com"  //216.239.35.12
@@ -180,13 +183,14 @@
 #endif
 #if BUILD_ENV_NAME==BUILD_TYPE_DEVELOPMENT
   #define NTP_SERVER  "10.88.50.5"
-  #define NTP_SERVER2  "time2.googles.com"  //216.239.35.4
+  #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
   #define NTP_SERVER3  "time4.google.com"  //216.239.35.12
   #define NTP_SERVER4  "time.apple.com"
 #endif
 #ifndef NTP_SERVER
   #define NTP_SERVER  "time.google.com"
 #endif
+*/
 #define NTP_TZ_ENV_VARIABLE "CET-1CEST,M3.5.0,M10.5.0/3"  //POSIX.1 format for Europe/Madrid TZ env variable
 #ifndef NTP_TZ_ENV_VARIABLE //Use GNUB Time Zone format if not POSI.1 one is provided with
   #define GMT_OFFSET_SEC 3600
@@ -211,6 +215,22 @@
 #define WIFI_050_RSSI -80  //RSSI > -80 dBm Good - Consider 50% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 #define WIFI_025_RSSI -90  //RSSI > -90 dBm Low - Consider 25% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
 #define WIFI_000_RSSI -100 //RSSI < -100 dBm No Signal - Lower values mean no SSID visibiliy, 0% signal strength - https://www.netspotapp.com/wifi-signal-strength/what-is-rssi-level.html
+#define WIFI_MAX_SSID_LENGTH  33 //32 CHAR + NULL
+#define WIFI_MAX_PSSW_LENGTH  64 //63 CHAR + NULL
+#define WIFI_MAX_SITE_LENGTH  11 //10 CHAR + NULL
+
+
+//WEB SERVER Stuff
+#define WEBSERVER_ENABLED true
+#define WEBSERVER_PORT 80
+#define WEBSERVER_CSSSTYLES_PAGE "/styles.css"
+#define WEBSERVER_CSSNAVBAR_PAGE "/tswnavbar.css"
+#define WEBSERVER_LOGO_ICON "/The_IoT_Factory.png"
+#define WEBSERVER_INDEX_PAGE "/index.html"
+#define WEBSERVER_BASICCONFIG_PAGE "/basic.html"
+#define WEBSERVER_CLOUDCONFIG_PAGE "/cloud.html"
+#define WEBSERVER_BLUETOOTHCONFIG_PAGE "/bluetooth.html"
+
 
 //BLE stuff
 #define BLE_ENABLED  false

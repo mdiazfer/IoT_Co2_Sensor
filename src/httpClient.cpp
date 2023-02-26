@@ -99,8 +99,8 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
   if (whileLoopTimeLeft==nullptr) {
     errorsSampleUpts++; //Something went wrong. Update error counter for stats
     webServerError1++;
-    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError1="+String(webServerError1)+" - Returning with ERROR_WEB_SERVER");}
-    return(ERROR_WEB_SERVER);
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError1="+String(webServerError1)+" - Returning with ERROR_CLOUD_SERVER");}
+    return(ERROR_CLOUD_SERVER);
   }
   
   CloudSyncStatus previousCloudSyncCurrentStatus=CloudSyncCurrentStatus;
@@ -124,8 +124,8 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
       forceWEBCheck=false;
       webResuming=false;
       if (logsOn) {Serial.println("[sendAsyncHttpRequest] - Not connected, errorsSampleUpts="+String(errorsSampleUpts));}
-      if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError2="+String(webServerError2)+" - Returning with ERROR_WEB_SERVER");}
-      return(ERROR_WEB_SERVER); //not WEB server connection
+      if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError2="+String(webServerError2)+" - Returning with ERROR_CLOUD_SERVER");}
+      return(ERROR_CLOUD_SERVER); //not WEB server connection
     }
   }
 
@@ -213,8 +213,8 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
     if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=HTTP_ANSWER_TIMEOUT;  //To avoid resuming connection the next loop interacion       
     forceWEBCheck=false;
     webResuming=false;
-    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError3="+String(webServerError3)+" - Returning with ERROR_WEB_SERVER");}
-    return(ERROR_WEB_SERVER); //not WEB server connection
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError3="+String(webServerError3)+" - Returning with ERROR_CLOUD_SERVER");}
+    return(ERROR_CLOUD_SERVER); //not WEB server connection
   }
   else {
     //Case for successfull WEB connection

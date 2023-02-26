@@ -208,7 +208,9 @@ void checkButton2() {
       else if (stateSelected==confMenuUpMeas) {uploadSamplesEnabled=!uploadSamplesEnabled;printConfigMenu();}
       else if (stateSelected==confMenuSavBatMode) {
         configSavingEnergyMode=configSavingEnergyMode==reducedEnergy?lowestEnergy:reducedEnergy;
-        if (reducedEnergy==energyCurrentMode) energyCurrentMode=configSavingEnergyMode;
+        //if currently lowestEnergy, don't change it as charge <= Threshold
+        //if currently fullEnegegy, don't change it as USB is plugged
+        if (reducedEnergy==energyCurrentMode) energyCurrentMode=configSavingEnergyMode; 
         printConfigMenu();
       }
       else { //Back

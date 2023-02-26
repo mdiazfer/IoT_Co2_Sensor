@@ -8,7 +8,20 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
-- 0.9.7 XX/Ene/2023   - Wifi icons changed
+- 0.9.8 18/Feb/2023   - Added SPIFFS and built-in AsyncWebServer for info and config stuff
+                          + Variables stored in EEPPROM
+                            * wifiCred[]
+                            * ntpServers[]
+                            * webServerEnable
+                          + Info webpage
+                          + Basic conf (WiFi SSID, NTP Servers)
+                            * WiFi Reconnection and NTP Re-sync
+                            * Display Auto AutoSwitchOff, Battery Mode and Display Mode
+                      - Re-name ERROR_WEB_SERVER by ERROR_CLOUD_SERVER in several files. ERROR_WEB_SERVER is now
+                        intended for the built-in AsynWebServer
+                      - Bug fix
+                        + TZEnvVar backup - TZEnvVar not fully init to '\0' before memcpy - wifiConnection.cpp:384
+- 0.9.7 22/Ene/2023   - Wifi icons changed
                       - WiFi disconnection just right before going to sleep
                       - Bug fixing
                         + No Display Switch off when setting up Saving Energy Mode to Lowest during USB power

@@ -285,7 +285,7 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
   CloudClockStatus previousCloudClockCurrentStatus=CloudClockCurrentStatus;
   CloudClockCurrentStatus=CloudClockOffStatus;
   //User credentials definition
-  ntpServers[0]="\0";ntpServers[1]="\0";ntpServers[2]="\0";ntpServers[3]="\0";
+  /*ntpServers[0]="\0";ntpServers[1]="\0";ntpServers[2]="\0";ntpServers[3]="\0";
   #ifdef NTP_SERVER
     ntpServers[0]=NTP_SERVER;
   #endif
@@ -298,6 +298,7 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
   #ifdef NTP_SERVER4
     ntpServers[3]=NTP_SERVER4;
   #endif
+  */
 
   //boolean whileFlagOn=true;
   if (wifiCurrentStatus!=wifiOffStatus) {
@@ -381,7 +382,10 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
           CloudClockCurrentStatus=CloudClockOnStatus;
           ntpServerIndex=loopCounter;
           loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String);
-          memcpy(TZEnvVar,getenv("TZ"),String(getenv("TZ")).length()); //Back Time Zone up to restore it after wakeup
+          for (int i=0; i<sizeof(TZEnvVar); i++) TZEnvVar[i]='\0';  //Fill null character first to avoid overflow
+          int tzLength=String(getenv("TZ")).length();
+          if (tzLength>sizeof(TZEnvVar)) tzLength=sizeof(TZEnvVar); //Make sure not to overflow TZEnvVar
+          memcpy(TZEnvVar,getenv("TZ"),tzLength); //Back Time Zone up to restore it after wakeup
         }
       }
     }//end For() loop
