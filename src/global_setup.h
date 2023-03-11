@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.8"
+#define VERSION "0.9.9"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -175,14 +175,16 @@
 #define WIFI_ENABLED  true
 #define MAX_CONNECTION_ATTEMPTS 10
 #define NTP_SERVER_NAME_MAX_LENGTH 64
-/*#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
-  #define NTP_SERVER  "10.88.50.5"
+#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
+  //#define NTP_SERVER  "10.88.50.5"
+  #define NTP_SERVER  "time.google.com"
   #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
   #define NTP_SERVER3  "time4.google.com"  //216.239.35.12
   #define NTP_SERVER4  "time.apple.com"
 #endif
 #if BUILD_ENV_NAME==BUILD_TYPE_DEVELOPMENT
-  #define NTP_SERVER  "10.88.50.5"
+  //#define NTP_SERVER  "10.88.50.5"
+  #define NTP_SERVER  "time.google.com"
   #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
   #define NTP_SERVER3  "time4.google.com"  //216.239.35.12
   #define NTP_SERVER4  "time.apple.com"
@@ -190,10 +192,14 @@
 #ifndef NTP_SERVER
   #define NTP_SERVER  "time.google.com"
 #endif
-*/
+
 #define NTP_TZ_ENV_VARIABLE "CET-1CEST,M3.5.0,M10.5.0/3"  //POSIX.1 format for Europe/Madrid TZ env variable
+#define TZ_ENV_VARIABLE_MAX_LENGTH 57 //Including end null
+#define NTP_TZ_NAME "Europe/Madrid"  //POSIX.1 format for Europe/Madrid TZ env variable
+#define TZ_ENV_NAME_MAX_LENGTH 30 //Including end null
 #ifndef NTP_TZ_ENV_VARIABLE //Use GNUB Time Zone format if not POSI.1 one is provided with
-  #define GMT_OFFSET_SEC 3600
+  // --> Not longer used in the code as POSIX.1 format is preferred. Kept it just for documentation
+  #define GMT_OFFSET_SEC 3600                 
   #define DAYLIGHT_OFFSET_SEC 7200 //3600 for CEST
 #endif
 #define UPLOAD_SAMPLES_ENABLED true
@@ -230,6 +236,8 @@
 #define WEBSERVER_BASICCONFIG_PAGE "/basic.html"
 #define WEBSERVER_CLOUDCONFIG_PAGE "/cloud.html"
 #define WEBSERVER_BLUETOOTHCONFIG_PAGE "/bluetooth.html"
+#define WEBSERVER_MAINTENANCE_PAGE "/maintenance.html"
+#define WEBSERVER_CONTAINER_PAGE "/container.html"
 
 
 //BLE stuff
@@ -306,6 +314,7 @@
       String wifiSSIDs[3];
       String wifiPSSWs[3];
       String wifiSITEs[3];
+      bool   SiteAllow[3]; //whether to upload samples from the Site or not
       uint8_t activeIndex;
     } wifiCredentials;  //Struct to store user WiFi credentials    
     
@@ -316,9 +325,6 @@
   wifiCredentials wifiCred;
   String ntpServers[4];
   uint8_t ntpServerIndex;
-  #ifdef NTP_TZ_ENV_VARIABLE
-    String TZEnvVariable=String(NTP_TZ_ENV_VARIABLE);
-  #endif
   
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};

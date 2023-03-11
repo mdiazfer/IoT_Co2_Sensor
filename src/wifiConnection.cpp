@@ -308,11 +308,7 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
       else {
         if ((logsOn && fromSetup) || debugModeOn) {Serial.println("[setup - NTP] Connecting to NTP Server: "+ntpServers[loopCounter]);}
         if (!NTPResuming) { //Only calling configXTime() for new checks
-          #ifdef NTP_TZ_ENV_VARIABLE
-            configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
-          #else
-            configTime(gmtOffset_sec, daylightOffset_sec, ntpServers[loopCounter].c_str());
-          #endif
+          configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
         }
 
         *auxLoopCounter=loopCounter;
@@ -382,7 +378,7 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
           CloudClockCurrentStatus=CloudClockOnStatus;
           ntpServerIndex=loopCounter;
           loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String);
-          for (int i=0; i<sizeof(TZEnvVar); i++) TZEnvVar[i]='\0';  //Fill null character first to avoid overflow
+          memset(TZEnvVar,'\0',sizeof(TZEnvVar)); //Fill null character first to avoid overflow
           int tzLength=String(getenv("TZ")).length();
           if (tzLength>sizeof(TZEnvVar)) tzLength=sizeof(TZEnvVar); //Make sure not to overflow TZEnvVar
           memcpy(TZEnvVar,getenv("TZ"),tzLength); //Back Time Zone up to restore it after wakeup

@@ -30,22 +30,31 @@
           <h1>Cloud Configuration</h1>
             <p></p>
             <label for="CLOUDURL">Cloud Services:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-                <input id="CLOUDURL_id" name="CLOUDURL" size="25" placeholder="http://pandora.the-iotfactory.com" readonly
-
-                  type="text" required><br><br>
-            <form action="cloud" method="get">
-            Enable Cloud
-            Services:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <label for="Cloud_on_id">On</label>
-            <input name="Cloud_enabled" id="Cloud_on_id" value="on" required="required"
-
-              checked="checked" type="radio"> &nbsp;&nbsp;&nbsp;&nbsp; <label for="Cloud_off_id">Off</label>
-            <input name="Cloud_enabled" id="Cloud_off_id" value="off" required="required"
-
-              type="radio"> <br>
-            <br>
-            <p></p>
-            <button type="reset" name="Button_Reset" id="Button_Reset_id">Reset</button>&nbsp;&nbsp;&nbsp;&nbsp;
-            <button type="submit" name="Button_Send" id="Button_Send_id"><strong>Submit</strong></button>
+            <input id="CLOUDURL_id" name="CLOUDURL" size="25" placeholder="http://pandora.the-iotfactory.com"
+              readonly type="text" required>
+            <br><br>
+            <form action="cloud" method="post">
+              Enable Cloud Services:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              <label for="Cloud_on_id">On</label>
+              <input name="Cloud_enabled" id="Cloud_on_id" value="on" required="required" ~CLOUD_ON_CHECKED~ type="radio">
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <label for="Cloud_off_id">Off</label>
+              <input name="Cloud_enabled" id="Cloud_off_id" value="off" required="required" ~CLOUD_OFF_CHECKED~ type="radio">
+              <br><br>
+              Sites allowed to upload measures from:&nbsp;&nbsp;<br><br>
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <label for="SiteAllowed_id">~SITE_ALLOW_NAME~</label>&nbsp;&nbsp;&nbsp;&nbsp;
+              <input name="SITE_ALLOW_NAME" id="SiteAllowed_id" value="site_allowed" ~SITE_ALLOW_CHECKED~ type="checkbox"><br>
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <label for="SiteBk1Allowed_id">~SITE_BK1_ALLOW_NAME~</label>&nbsp;&nbsp;&nbsp;&nbsp;
+              <input name="SITE_BK1_ALLOW_NAME" id="SiteBk1Allowed_id" value="site_bk1_allowed" ~SITE_BK1_ALLOW_CHECKED~ type="checkbox"><br>
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <label for="SiteBk2Allowed_id">~SITE_BK2_ALLOW_NAME~</label>&nbsp;&nbsp;&nbsp;&nbsp;
+              <input name="SITE_BK2_ALLOW_NAME" id="SiteBk2Allowed_id" value="site_bk2_allowed" ~SITE_BK2_ALLOW_CHECKED~ type="checkbox">&nbsp;&nbsp;&nbsp;&nbsp;
+              <br><br>
+              <p></p>
+              <button type="reset" name="Button_Reset" id="Button_Reset_id">Reset</button>&nbsp;&nbsp;&nbsp;&nbsp;
+              <button type="submit" name="Button_Send" id="Button_Send_id"><strong>Submit</strong></button>
           </form>
           <!-- end of content column: put your content above this line --> </div>
       </div>
@@ -69,6 +78,7 @@
               <li><a href="basic.html">Basic conf</a></li>
               <li><a href="cloud.html">Cloud conf</a></li>
               <li><a href="bluetooth.html">Bluetooth conf</a></li>
+              <li><a href="maintenance.html">Maint. & Troubleshoot</a></li>
             </ul>
           </div>
           <!-- end of side column: put your navigation menu, etc, above this line -->

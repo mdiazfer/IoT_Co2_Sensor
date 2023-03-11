@@ -251,6 +251,7 @@ void checkButton2() {
         if (uploadSamplesEnabled) currentConfigVariables|=0x04;
         if (bluetoothEnabled) currentConfigVariables|=0x08;
         if (wifiEnabled) currentConfigVariables|=0x10;
+        if (webServerEnabled) currentConfigVariables|=0x20;
         if (configVariables!=currentConfigVariables) {
           // save the LED state in flash memory
             configVariables=currentConfigVariables;

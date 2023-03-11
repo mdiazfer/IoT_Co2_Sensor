@@ -20,13 +20,13 @@ There are 4 different Saving Energy modes:
  Taking Measurement                   |          SAMPLE_PERIOD         |       SAMPLE_PERIOD_RE       |       SAMPLE_PERIOD_RE         |
  (SAMPLE_PERIOD)                      |              20 s              |             60 s             |             5 min              |
 +-------------------------------------+--------------------------------+------------------------------+--------------------------------+
- Checking WiFi signal strength        |   ICON_STATUS_REFRESH_PERIOD   |           NOT DONE           |           NOT DONE             |
+ Checking WiFi signal strength        |   ICON_STATUS_REFRESH_PERIOD   |  NOT DONE if Display is off  |   NOT DONE if Display is off   |
  (ICON_STATUS_REFRESH_PERIOD)         |               5 s              |                              |                                |
 +-------------------------------------+--------------------------------+------------------------------+--------------------------------+
- Select the screen (only Seq. Mode)   |   DISPLAY_MODE_REFRESH_PERIOD  |           NOT DONE           |           NOT DONE             |
+ Select the screen (only Seq. Mode)   |   DISPLAY_MODE_REFRESH_PERIOD  |  NOT DONE if Display is off  |   NOT DONE if Display is off   |
  (DISPLAY_MODE_REFRESH_PERIOD)        |               5 s              |                              |                                |
 +-------------------------------------+--------------------------------+------------------------------+--------------------------------+
- Update Screen                        |     DISPLAY_REFRESH_PERIOD     |           NOT DONE           |           NOT DONE             |
+ Update Screen                        |     DISPLAY_REFRESH_PERIOD     |  NOT DONE if Display is off  |   NOT DONE if Display is off   |
  (DISPLAY_REFRESH_PERIOD)             |               5 s              |                              |                                |
 +-------------------------------------+--------------------------------+------------------------------+--------------------------------+
  Checking WiFi Connection             |     WIFI_RECONNECT_PERIOD      |            same              |            same                |

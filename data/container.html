@@ -7,55 +7,41 @@
     <link rel="stylesheet" type="text/css" media="all" href="styles.css">
     <link type="text/css" rel="stylesheet" href="tswnavbar.css" title="Side Menu CSS">
   </head>
-  <body style="      background-color: #1d2324; color: white;">
+  <body style="background-color: #1d2324; color: white;">
     <div id="tswcontainer">
       <div id="tswheader">
         <!-- start of header section: insert your logo, etc, here -->
-        <p style="text-align: center; font-size: 1%; vertical-align: 210px;"> <a
-
-            href="http://the-iotfactory.com" title="The IoT Factory" target="_blank"><img
-
-              src="The_IoT_Factory.png" alt="The IoT Factory Logo" title="Logo"
-
-              id="logo" style="width: 215px; height: 45.3204px;"></a></p>
-        <p>&nbsp;</p>
-        <p style="text-align: center; font-size: larger;">Sensor CO2 by The IoT
-          Factory (C). </p>
-        <p style="text-align: center; font-size: smaller;"><br>
+        <p style="text-align: center; font-size: 1%; vertical-align: 210px;">
+          <a href="http://the-iotfactory.com" title="The IoT Factory" target="_blank">
+            <img src="The_IoT_Factory.png" alt="The IoT Factory Logo" title="Logo"
+              id="logo" style="width: 215px; height: 45.3204px;">
+          </a>
         </p>
+        <p>&nbsp;</p>
+        <p style="text-align: center; font-size: larger;">Sensor CO2 by The IoT Factory (C). </p>
+        <p style="text-align: center; font-size: smaller;"><br></p>
       </div>
       <div id="tswcontent">
         <div id="tswcontproper">
           <!-- start of content column: insert your content here -->
-          <h1>Bluetooth Configuration</h1>
+          <h1>~CONTAINER_HEAD~</h1>
           <p></p>
-            <form action="bluetooth" method="post">
-            Enable Bluetooth:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-            <label for="Bluetooth_on_id">On</label>	
-            <input name="Bluetooth_enabled" id="Bluetooth_on_id" value="on" required="required" ~BLUETOOTH_ON_CHECKED~  type="radio">
-             &nbsp;&nbsp;&nbsp;&nbsp;
-            <label for="Bluetooth_off_id">Off</label>
-            <input name="Bluetooth_enabled" id="Bluetooth_off_id" value="off" required="required" ~BLUETOOTH_OFF_CHECKED~ type="radio">
-            <br><br>
-            <p></p>
-            <button type="reset" name="Button_Reset" id="Button_Reset_id">Reset</button>&nbsp;&nbsp;&nbsp;&nbsp;
-            <button type="submit" name="Button_Send" id="Button_Send_id"><strong>Submit</strong></button>
-          </form>
-          <!-- end of content column: put your content above this line --> </div>
+          ~CONTAINER_TEXT~
+          <!-- end of content column: put your content above this line -->
+        </div>
       </div>
       <div id="tswsidecol">
         <div id="tswsideproper">
           <!-- start of side column: insert your navigation menu, etc, here -->
           <!-- start of hamburger menu button -->
           <script type="text/javascript">
-                function tsw_expand_navmenu( )
+                function tsw_expand_navmenu()
                 {
                   document.getElementById ( 'tswhamburger' ).style.display = 'none' ;
                   document.getElementById( 'tswcssbuttons' ).style.display = 'block' ;
                 }
-              </script> <button type="button" id="tswhamburger" title="Click to expand menu"
-
-            onclick="tsw_expand_navmenu();">≡</button>
+          </script>
+          <button type="button" id="tswhamburger" title="Click to expand menu" onclick="tsw_expand_navmenu();">≡</button>
           <!-- end of hamburger menu button -->
           <div id="tswcssbuttons">
             <ul>
@@ -73,9 +59,9 @@
       <div id="tswfooter">
         <!-- start of footer section: insert your copyright notice, etc, here -->
         <p style="font-size: 80%; text-align: center;">The IoT Factory ©</p>
-        <p style="font-size: 55%; text-align: center;"><a href="http://the-iotfactory.com"
-
-            title="The IoT Factory" target="_blank">https://panadora.sytes.net/theiotfactory</a></p>
+        <p style="font-size: 55%; text-align: center;">
+          <a href="http://the-iotfactory.com" title="The IoT Factory" target="_blank">https://panadora.sytes.net/theiotfactory</a>
+        </p>
         <!-- end of footer section: insert your copyright notice, etc, above this line -->
       </div>
     </div>

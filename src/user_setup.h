@@ -2,7 +2,7 @@
   Definition of user configuration parameters
 */
 
-/*#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_OFI
+#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_OFI
   #define WIFI_SSID_CREDENTIALS "ALE"
   #define WIFI_PW_CREDENTIALS "ALE@Madrid-1"
 #endif
@@ -17,7 +17,6 @@
   #define WIFI_PW_CREDENTIALS_BK2 "madwep6wepmad"
   #define WIFI_SITE_BK2 "pare. home"
 #endif
-*/
 
 
 

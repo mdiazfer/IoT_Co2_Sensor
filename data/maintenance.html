@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <title>Basic Configuration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" media="all" href="styles.css">
+    <link type="text/css" rel="stylesheet" href="tswnavbar.css" title="Side Menu CSS">
+  </head>
+  <body style="background-color: #1d2324; color: white;">
+    <div id="tswcontainer">
+      <div id="tswheader">
+        <!-- start of header section: insert your logo, etc, here -->
+        <p style="text-align: center; font-size: 1%; vertical-align: 210px;">
+          <a href="http://the-iotfactory.com" title="The IoT Factory" target="_blank">
+            <img src="The_IoT_Factory.png" alt="The IoT Factory Logo" title="Logo"
+              id="logo" style="width: 215px; height: 45.3204px;">
+          </a>
+        </p>
+        <p>&nbsp;</p>
+        <p style="text-align: center; font-size: larger;">Sensor CO2 by The IoT Factory (C). </p>
+        <p style="text-align: center; font-size: smaller;"><br></p>
+      </div>
+      <div id="tswcontent">
+        <div id="tswcontproper">
+          <!-- start of content column: insert your content here -->
+          <h1>Maintenance</h1>
+          <p></p>
+          <form action="maintenance_default_values" method="post">
+            Factory Default Configuration:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      
+            <button type="submit" name="Maintenance_Default_Send" id="Maintenance_Default_id"
+              onClick="return confirm('Configuration of variables will be lost and set to factory values.\n\nAll the network services, including the web access, will be not longer available. You will need to setup WiFi again to recover the network services.\n\nAre you sure to continue?')">
+              <strong>Reset Config</strong>
+            </button>
+          </form>
+          <br><br>
+          <form action="maintenance_device_reset" method="post">
+            Device Reset:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+            <button type="submit" name="Maintenance_Reset_Send" id="Maintenance_Reset_Send_id"
+              onClick="return confirm('Device will be reset.\n\nAre you sure to continue?')">
+              <strong>Reset Device</strong>
+            </button>
+          </form>
+          <p></p>
+          <br><br>
+          <div id="tswerrors">
+            <fieldset name="Errors"> <legend> Error Info</legend>
+              <p></p>
+              <p>Setup Error:&nbsp; ~SETUPERRORS~</p>
+              <p>WiFi Connection Errors:&nbsp; ~WIFIERRORS~</p>
+              <p>Sample Update Errors:&nbsp; ~SAMPLEUPDTERRORS~</p>
+              <p>NTP Sync Errors:&nbsp; ~NTPERRORS~</p>
+            </fieldset>
+          </div>
+          <!-- end of content column: put your content above this line -->
+        </div>
+      </div>
+      <div id="tswsidecol">
+        <div id="tswsideproper">
+          <!-- start of side column: insert your navigation menu, etc, here -->
+          <!-- start of hamburger menu button -->
+          <script type="text/javascript">
+                function tsw_expand_navmenu()
+                {
+                  document.getElementById ( 'tswhamburger' ).style.display = 'none' ;
+                  document.getElementById( 'tswcssbuttons' ).style.display = 'block' ;
+                }
+          </script>
+          <button type="button" id="tswhamburger" title="Click to expand menu" onclick="tsw_expand_navmenu();">≡</button>
+          <!-- end of hamburger menu button -->
+          <div id="tswcssbuttons">
+            <ul>
+              <li><a href="index.html">Info</a></li>
+              <li><a href="basic.html">Basic conf</a></li>
+              <li><a href="cloud.html">Cloud conf</a></li>
+              <li><a href="bluetooth.html">Bluetooth conf</a></li>
+              <li><a href="maintenance.html">Maint. & Troubleshoot</a></li>
+            </ul>
+          </div>
+          <!-- end of side column: put your navigation menu, etc, above this line -->
+        </div>
+      </div>
+      <div style="clear: both;"></div>
+      <div id="tswfooter">
+        <!-- start of footer section: insert your copyright notice, etc, here -->
+        <p style="font-size: 80%; text-align: center;">The IoT Factory ©</p>
+        <p style="font-size: 55%; text-align: center;"><a href="http://the-iotfactory.com"
+
+            title="The IoT Factory" target="_blank">https://panadora.sytes.net/theiotfactory</a></p>
+        <!-- end of footer section: insert your copyright notice, etc, above this line -->
+      </div>
+    </div>
+  </body>
+</html>

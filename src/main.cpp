@@ -40,10 +40,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   850 B
+// RTC memory variables:                   887 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     3906 B
-// RTC memory left:     8000 B - 3906 B = 4094 B
+// RTC memorty TOTAL:                     3947 B
+// RTC memory left:     8000 B - 3947 B = 4053 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -69,6 +69,13 @@
 //Address 191-1D0: NTP2 char []* (63 B+null=64 B)
 //Address 1D1-210: NTP3 char []* (63 B+null=64 B)
 //Address 211-250: NTP4 char []* (63 B+null=64 B)
+//Address 251-289: TZEnvVar char []* (56 B+null=57 B)
+//Address 28A-2A7: TZName char []* (29 B+null=30 B)
+//Address 2A8: Stores Misc Variable Values (1 B)
+//  - Bit 0: siteAllowToUploadSamples - 1=true, 0=false
+//  - Bit 1: siteBk1AllowToUploadSamples - 1=true, 0=false
+//  - Bit 2: siteBk2AllowToUploadSamples - 1=true, 0=false
+
 
 RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour C02 values
 RTC_DATA_ATTR float_t lastHourTempSamples[3600/SAMPLE_T_LAST_HOUR];  //4*(3600/60)=240 B - Buffer to record last-hour Temp values
@@ -89,7 +96,7 @@ RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus; //4 B
 RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus; // 4B
 RTC_DATA_ATTR boolean updateHourSample=true,updateDaySample=true,updateHourGraph=true,updateDayGraph=true,
               autoBackLightOff=true,button1Pressed=false,button2Pressed=false,reconnectWifiAndRestartWebServer=false,
-              resyncNTPServer=false; //10*1=10 B 
+              resyncNTPServer=false,deviceReset=false,factoryReset=false; //12*1=12 B 
 RTC_DATA_ATTR enum powerModes powerState=off; //1*4=4 B
 RTC_DATA_ATTR enum batteryChargingStatus batteryStatus=battery000; //1*4=4 B
 RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode; //2*4=8 B
@@ -105,23 +112,21 @@ RTC_DATA_ATTR HorizontalBar horizontalBar=HorizontalBar(0,TEMP_BAR_MIN,TEMP_BAR_
                                           TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);  //92 B
 RTC_DATA_ATTR Button  button1(BUTTON1); //16 B
 RTC_DATA_ATTR Button  button2(BUTTON2); //16 B
-#ifndef NTP_TZ_ENV_VARIABLE
-  RTC_DATA_ATTR const long gmtOffset_sec=GMT_OFFSET_SEC; //4 B
-  RTC_DATA_ATTR const int daylightOffset_sec=DAYLIGHT_OFFSET_SEC; //4 B
-#endif
-RTC_DATA_ATTR char TZEnvVar[50]="\0"; //50 B Should be enough - To back Time Zone Variable up
+//Since v0.9.9, TZEnvVar might be removed (with a bit re-coding) as TZEnvVariable is got from EEPROM (permanent). It's kept to avoid re-coding
+RTC_DATA_ATTR char TZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH]="\0"; //57 B Should be enough - To back Time Zone Variable up
 RTC_DATA_ATTR struct tm startTimeInfo; //36 B
 RTC_DATA_ATTR boolean firstWifiCheck=true,forceWifiReconnect=false,forceGetSample=false,forceGetVolt=false,
         forceDisplayRefresh=false,forceDisplayModeRefresh=false,forceNTPCheck=false,buttonWakeUp=false,
-        forceWEBCheck=false,forceWEBTestCheck=false; // 11*1=11 B
+        forceWEBCheck=false,forceWEBTestCheck=false,forceWebServerInit=false; // 12*1=12 B
 RTC_DATA_ATTR int uploadServerIPAddressOctectArray[4]; // 4*4B = 16B - To store upload server's @IP
 RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
 RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0,webServerError1=0,webServerError2=0,webServerError3=0; //2*4=8B - Error stats
-RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled; //4*1=4B
+RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled;//4*1=4B
 RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON; //1*1=1B
 RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus=BLEOffStatus; //1*4=4B
 RTC_DATA_ATTR AsyncWebServer webServer(WEBSERVER_PORT); //1*84=84B
+RTC_DATA_ATTR uint32_t error_setup=NO_ERROR; //1*4=4B
 
 //Global variable definitions stored in regular RAM. 520 KB Max
 TFT_eSPI tft = TFT_eSPI();  // 292 B - Invoke library to manage the display
@@ -133,12 +138,12 @@ SoftwareSerial co2SensorSerialPort(CO2_SENSOR_RX, CO2_SENSOR_TX); //136 B
 #ifdef __SI7021__
   SHT2x tempHumSensor; //36 B
 #endif
-uint32_t error_setup=NO_ERROR,remainingBootupSeconds=0;
+uint32_t remainingBootupSeconds=0;
 int16_t cuX,cuY;
 TFT_eSprite stext1 = TFT_eSprite(&tft); // Sprite object stext1
 ulong previousTime=0,timePressButton1,timeReleaseButton1,timePressButton2,timeReleaseButton2,
       remainingBootupTime=BOOTUP_TIMEOUT*1000;
-String valueString;
+String valueString,TZEnvVariable,TZName;
 String serverToUploadSamplesString(SERVER_UPLOAD_SAMPLES);
 IPAddress serverToUploadSamplesIPAddress; //8 B
 String device(DEVICE_NAME_PREFIX); //16 B
@@ -185,7 +190,7 @@ void initVariable() {
                               TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
   firstWifiCheck=true;forceWifiReconnect=false;forceGetSample=false;forceGetVolt=false;
   forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;
-  forceWEBCheck=false;forceWEBTestCheck=false;
+  forceWEBCheck=false;forceWEBTestCheck=false;forceWebServerInit=false;
   valueCO2=0;valueT=0;valueHum=0;lastValueCO2=-1;tempMeasure=0;
   errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;webServerError1=0;webServerError2=0;webServerError3=0;
   error_setup=NO_ERROR;remainingBootupSeconds=0;
@@ -199,6 +204,10 @@ void initVariable() {
   BLEClurrentStatus=BLEOffStatus;
   reconnectWifiAndRestartWebServer=false;
   resyncNTPServer=false;
+  deviceReset=false;
+  factoryReset=false;
+  error_setup=NO_ERROR;
+  //webServer=AsyncWebServer(WEBSERVER_PORT);
   
   //Read from EEPROM the values to be stored in the Config Variables
   //
@@ -226,6 +235,12 @@ void initVariable() {
   //Address 191-1D0: NTP2 char []* (63 B+null=64 B)
   //Address 1D1-210: NTP3 char []* (63 B+null=64 B)
   //Address 211-250: NTP4 char []* (63 B+null=64 B)
+  //Address 251-289: TZEnvVar char []* (56 B+null=57 B)
+  //Address 28A-2A7: TZName char []* (29 B+null=30 B)
+  //Address 2A8: Stores Misc Variable Values (1 B)
+  //  - Bit 0: siteAllowToUploadSamples - 1=true, 0=false
+  //  - Bit 1: siteBk1AllowToUploadSamples - 1=true, 0=false
+  //  - Bit 2: siteBk2AllowToUploadSamples - 1=true, 0=false
 
   //Check if it is the first run after the very first firmware upload
   for (int i=0; i<VERSION_CHAR_LENGTH; i++) firmwareVersion[i]=EEPROM.read(i);firmwareVersion[VERSION_CHAR_LENGTH]='\0';
@@ -248,121 +263,9 @@ void initVariable() {
     EEPROM.write(6,(byte) computedChecksum);
     computedChecksum=computedChecksum>>8;
     EEPROM.write(7,(byte) computedChecksum);
-
-    wifiEnabled=WIFI_ENABLED;
-    bluetoothEnabled=BLE_ENABLED;
-    uploadSamplesEnabled=UPLOAD_SAMPLES_ENABLED;
-    configSavingEnergyMode=reducedEnergy; //Default value
-    webServerEnabled=WEBSERVER_ENABLED;
     
-    //Now initialize configVariables
-    configVariables=0x01; //Bit 0, notFirstRun=true
-    if (reducedEnergy==configSavingEnergyMode) configVariables|=0x02; //Bit 1: configSavingEnergyMode
-    if (uploadSamplesEnabled) configVariables|=0x04; //Bit 2: uploadSamplesEnabled
-    if (bluetoothEnabled) configVariables|=0x08; //Bit 3: bluetoothEnabled
-    if (wifiEnabled) configVariables|=0x10; //Bit 4: wifiEnabled
-    if (webServerEnabled) configVariables|=0x20; //Bit 5: webServerEnabled
-
-    //Write variables in EEPROM to be available the next boots up
-    EEPROM.write(0x08,configVariables);
-    
-    //Write WiFi Credential-related variables
-    char auxSSID[WIFI_MAX_SSID_LENGTH],auxPSSW[WIFI_MAX_PSSW_LENGTH],auxSITE[WIFI_MAX_SITE_LENGTH],auxNTP[NTP_SERVER_NAME_MAX_LENGTH];
-    //Set variables for SSID or null if no config in global_setup.h file
-    memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
-    memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
-    memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
-    #ifdef WIFI_SSID_CREDENTIALS
-      String(WIFI_SSID_CREDENTIALS).toCharArray(auxSSID,String(WIFI_SSID_CREDENTIALS).length()+1);
-    #endif
-    #ifdef WIFI_PW_CREDENTIALS
-      String(WIFI_PW_CREDENTIALS).toCharArray(auxPSSW,String(WIFI_PW_CREDENTIALS).length()+1);
-    #endif
-    #ifdef WIFI_SITE
-      String(WIFI_SITE).toCharArray(auxSITE,String(WIFI_SITE).length()+1);
-    #endif
-    //Write varialbes in EEPROM to be available the next boots up
-    EEPROM.put(0x0D,auxSSID);wifiCred.wifiSSIDs[0]=auxSSID;
-    EEPROM.put(0x2E,auxPSSW);wifiCred.wifiPSSWs[0]=auxPSSW;
-    EEPROM.put(0x6E,auxSITE);wifiCred.wifiSITEs[0]=auxSITE;
-    
-    if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxSSID='"+String(auxSSID)+"', auxPSSW='"+String(auxPSSW)+"', auxSITE='"+String(auxSITE)+"'");}
-    
-    //Set variables for SSID_BK1 or null if no config in global_setup.h file
-    memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
-    memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
-    memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
-    #ifdef WIFI_SSID_CREDENTIALS_BK1
-      String(WIFI_SSID_CREDENTIALS_BK1).toCharArray(auxSSID,String(WIFI_SSID_CREDENTIALS_BK1).length()+1);
-    #endif
-    #ifdef WIFI_PW_CREDENTIALS_BK1
-      String(WIFI_PW_CREDENTIALS_BK1).toCharArray(auxPSSW,String(WIFI_PW_CREDENTIALS_BK1).length()+1);
-    #endif
-    #ifdef WIFI_SITE_BK1
-      String(WIFI_SITE_BK1).toCharArray(auxSITE,String(WIFI_SITE_BK1).length()+1);
-    #endif
-    //Write varialbes in EEPROM to be available the next boots up
-    EEPROM.put(0x79,auxSSID);wifiCred.wifiSSIDs[1]=auxSSID;
-    EEPROM.put(0x9A,auxPSSW);wifiCred.wifiPSSWs[1]=auxPSSW;
-    EEPROM.put(0xDA,auxSITE);wifiCred.wifiSITEs[1]=auxSITE;
-    
-    if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxSSID='"+String(auxSSID)+"', auxPSSW='"+String(auxPSSW)+"', auxSITE='"+String(auxSITE)+"'");}
-    
-    //Set variables for SSID_BK2 or null if no config in global_setup.h file
-    memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
-    memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
-    memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
-    #ifdef WIFI_SSID_CREDENTIALS_BK2
-      String(WIFI_SSID_CREDENTIALS_BK2).toCharArray(auxSSID,String(WIFI_SSID_CREDENTIALS_BK2).length()+1);
-    #endif
-    #ifdef WIFI_PW_CREDENTIALS_BK2
-      String(WIFI_PW_CREDENTIALS_BK2).toCharArray(auxPSSW,String(WIFI_PW_CREDENTIALS_BK2).length()+1);
-    #endif
-    #ifdef WIFI_SITE_BK2
-      String(WIFI_SITE_BK2).toCharArray(auxSITE,String(WIFI_SITE_BK2).length()+1);
-    #endif
-    //Write varialbes in EEPROM to be available the next boots up
-    EEPROM.put(0xE5,auxSSID);wifiCred.wifiSSIDs[2]=auxSSID;
-    EEPROM.put(0x106,auxPSSW);wifiCred.wifiPSSWs[2]=auxPSSW;
-    EEPROM.put(0x146,auxSITE);wifiCred.wifiSITEs[2]=auxSITE;
-  
-    if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxSSID='"+String(auxSSID)+"', auxPSSW='"+String(auxPSSW)+"', auxSITE='"+String(auxSITE)+"'");}
-
-    memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
-    #ifdef NTP_SERVER
-      String(NTP_SERVER).toCharArray(auxNTP,String(NTP_SERVER).length()+1);
-    #endif
-    //Write varialbes in EEPROM to be available the next boots up
-    EEPROM.put(0x151,auxNTP);ntpServers[0]=auxSSID;
-
-    if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxNTP='"+String(auxNTP)+"'");}
-
-    memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
-    #ifdef NTP_SERVER2
-      String(NTP_SERVER2).toCharArray(auxNTP,String(NTP_SERVER2).length()+1);
-    #endif
-    //Write varialbes in EEPROM to be available the next boots up
-    EEPROM.put(0x191,auxNTP);ntpServers[1]=auxSSID;
-
-    if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxNTP='"+String(auxNTP)+"'");}
-
-    memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
-    #ifdef NTP_SERVER3
-      String(NTP_SERVER3).toCharArray(auxNTP,String(NTP_SERVER3).length()+1);
-    #endif
-    //Write varialbes in EEPROM to be available the next boots up
-    EEPROM.put(0x1D1,auxNTP);ntpServers[2]=auxSSID;
-
-    if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxNTP='"+String(auxNTP)+"'");}
-
-    memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
-    #ifdef NTP_SERVER4
-      String(NTP_SERVER4).toCharArray(auxNTP,String(NTP_SERVER4).length()+1);
-    #endif
-    //Write varialbes in EEPROM to be available the next boots up
-    EEPROM.put(0x211,auxNTP);ntpServers[3]=auxSSID;
-
-    if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxNTP='"+String(auxNTP)+"'");}
+    //Writing default values in EEPROM
+    factoryConfReset();
     
     EEPROM.commit();
   }
@@ -389,251 +292,329 @@ void initVariable() {
     webServerEnabled=configVariables & 0x20;
 
     //Get the WiFi Credential-related variables from EEPROM or global_setup.h
-    //If varialbes exist in global_setup.h, then update EEPROM
-    char auxSSID[WIFI_MAX_SSID_LENGTH],auxPSSW[WIFI_MAX_PSSW_LENGTH],auxSITE[WIFI_MAX_SITE_LENGTH],auxNTP[NTP_SERVER_NAME_MAX_LENGTH];
+    //If varialbes exist in global_setup.h and doesn't exit in EEPPROM, then update EEPROM 
+    char auxSSID[WIFI_MAX_SSID_LENGTH],auxPSSW[WIFI_MAX_PSSW_LENGTH],auxSITE[WIFI_MAX_SITE_LENGTH],
+         auxNTP[NTP_SERVER_NAME_MAX_LENGTH],auxTZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH],auxTZName[TZ_ENV_NAME_MAX_LENGTH];
     bool updateEEPROM=false;
   
     memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);EEPROM.get(0x0D,auxSSID);
-    #ifdef WIFI_SSID_CREDENTIALS
-      wifiCred.wifiSSIDs[0]=WIFI_SSID_CREDENTIALS;  
-      //Check if SSID must be updated in EEPROM
-      if (wifiCred.wifiSSIDs[0].compareTo(String(auxSSID))!=0) {
-        uint8_t auxLength=wifiCred.wifiSSIDs[0].length()+1;
-        if (auxLength>WIFI_MAX_SSID_LENGTH-1) { //Substring if greater that max length
-          auxLength=WIFI_MAX_SSID_LENGTH-1;
-          wifiCred.wifiSSIDs[0]=wifiCred.wifiSSIDs[0].substring(0,auxLength);
+    if (String(auxSSID).compareTo("")==0) {
+      #ifdef WIFI_SSID_CREDENTIALS
+        wifiCred.wifiSSIDs[0]=WIFI_SSID_CREDENTIALS;  
+        //Check if SSID must be updated in EEPROM
+        if (wifiCred.wifiSSIDs[0].compareTo(String(auxSSID))!=0) {
+          uint8_t auxLength=wifiCred.wifiSSIDs[0].length()+1;
+          if (auxLength>WIFI_MAX_SSID_LENGTH-1) { //Substring if greater that max length
+            auxLength=WIFI_MAX_SSID_LENGTH-1;
+            wifiCred.wifiSSIDs[0]=wifiCred.wifiSSIDs[0].substring(0,auxLength);
+          }
+          memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
+          memcpy(auxSSID,wifiCred.wifiSSIDs[0].c_str(),auxLength);
+          EEPROM.put(0x0D,auxSSID);
+          updateEEPROM=true;
         }
-        memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
-        memcpy(auxSSID,wifiCred.wifiSSIDs[0].c_str(),auxLength);
-        EEPROM.put(0x0D,auxSSID);
-        updateEEPROM=true;
-      }
-    #else
-      wifiCred.wifiSSIDs[0]=auxSSID;
-    #endif
+      #else
+        wifiCred.wifiSSIDs[0]=auxSSID;
+      #endif
+    } else wifiCred.wifiSSIDs[0]=auxSSID;
     memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);EEPROM.get(0x2E,auxPSSW);
-    #ifdef WIFI_PW_CREDENTIALS
-      wifiCred.wifiPSSWs[0]=WIFI_PW_CREDENTIALS;
-      //Check if PSSW must be updated in EEPROM
-      if (wifiCred.wifiPSSWs[0].compareTo(String(auxPSSW))!=0) {
-        uint8_t auxLength=wifiCred.wifiPSSWs[0].length()+1;
-        if (auxLength>WIFI_MAX_PSSW_LENGTH-1) { //Substring if greater that max length
-          auxLength=WIFI_MAX_PSSW_LENGTH-1;
-          wifiCred.wifiPSSWs[0]=wifiCred.wifiPSSWs[0].substring(0,auxLength);
+    if (String(auxPSSW).compareTo("")==0) {
+      #ifdef WIFI_PW_CREDENTIALS
+        wifiCred.wifiPSSWs[0]=WIFI_PW_CREDENTIALS;
+        //Check if PSSW must be updated in EEPROM
+        if (wifiCred.wifiPSSWs[0].compareTo(String(auxPSSW))!=0) {
+          uint8_t auxLength=wifiCred.wifiPSSWs[0].length()+1;
+          if (auxLength>WIFI_MAX_PSSW_LENGTH-1) { //Substring if greater that max length
+            auxLength=WIFI_MAX_PSSW_LENGTH-1;
+            wifiCred.wifiPSSWs[0]=wifiCred.wifiPSSWs[0].substring(0,auxLength);
+          }
+          memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
+          memcpy(auxPSSW,wifiCred.wifiPSSWs[0].c_str(),auxLength);
+          EEPROM.put(0x2E,auxPSSW);
+          updateEEPROM=true;
         }
-        memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
-        memcpy(auxPSSW,wifiCred.wifiPSSWs[0].c_str(),auxLength);
-        EEPROM.put(0x2E,auxPSSW);
-        updateEEPROM=true;
-      }
-    #else
-      wifiCred.wifiPSSWs[0]=auxPSSW;
-    #endif
+      #else
+        wifiCred.wifiPSSWs[0]=auxPSSW;
+      #endif
+    } else wifiCred.wifiPSSWs[0]=auxPSSW;
     memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);EEPROM.get(0x6E,auxSITE);
-    #ifdef WIFI_SITE
-      wifiCred.wifiSITEs[0]=WIFI_SITE;
-      //Check if SITE must be updated in EEPROM
-      if (wifiCred.wifiSITEs[0].compareTo(String(auxSITE))!=0) { 
-        uint8_t auxLength=wifiCred.wifiSITEs[0].length()+1;
-        if (auxLength>WIFI_MAX_SITE_LENGTH-1) { //Substring if greater that max length
-          auxLength=WIFI_MAX_SITE_LENGTH-1;
-          wifiCred.wifiSITEs[0]=wifiCred.wifiSITEs[0].substring(0,auxLength);
+    if (String(auxSITE).compareTo("")==0) { 
+      #ifdef WIFI_SITE
+        wifiCred.wifiSITEs[0]=WIFI_SITE;
+        //Check if SITE must be updated in EEPROM
+        if (wifiCred.wifiSITEs[0].compareTo(String(auxSITE))!=0) { 
+          uint8_t auxLength=wifiCred.wifiSITEs[0].length()+1;
+          if (auxLength>WIFI_MAX_SITE_LENGTH-1) { //Substring if greater that max length
+            auxLength=WIFI_MAX_SITE_LENGTH-1;
+            wifiCred.wifiSITEs[0]=wifiCred.wifiSITEs[0].substring(0,auxLength);
+          }
+          memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
+          memcpy(auxSITE,wifiCred.wifiSITEs[0].c_str(),auxLength);
+          EEPROM.put(0x6E,auxSITE);
+          updateEEPROM=true;
         }
-        memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
-        memcpy(auxSITE,wifiCred.wifiSITEs[0].c_str(),auxLength);
-        EEPROM.put(0x6E,auxSITE);
-        updateEEPROM=true;
-      }
-    #else
-      wifiCred.wifiSITEs[0]=auxSITE;
-    #endif
+      #else
+        wifiCred.wifiSITEs[0]=auxSITE;
+      #endif
+    } else wifiCred.wifiSITEs[0]=auxSITE;
     memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);EEPROM.get(0x79,auxSSID);
-    #ifdef WIFI_SSID_CREDENTIALS_BK1
-      wifiCred.wifiSSIDs[1]=WIFI_SSID_CREDENTIALS_BK1;
-      //Check if SSID_BK1 must be updated in EEPROM
-      if (wifiCred.wifiSSIDs[1].compareTo(String(auxSSID))!=0) {
-        uint8_t auxLength=wifiCred.wifiSSIDs[1].length()+1;
-        if (auxLength>WIFI_MAX_SSID_LENGTH-1) { //Substring if greater that max length
-          auxLength=WIFI_MAX_SSID_LENGTH-1;
-          wifiCred.wifiSSIDs[1]=wifiCred.wifiSSIDs[1].substring(0,auxLength);
+    if (String(auxSSID).compareTo("")==0) { 
+      #ifdef WIFI_SSID_CREDENTIALS_BK1
+        wifiCred.wifiSSIDs[1]=WIFI_SSID_CREDENTIALS_BK1;
+        //Check if SSID_BK1 must be updated in EEPROM
+        if (wifiCred.wifiSSIDs[1].compareTo(String(auxSSID))!=0) {
+          uint8_t auxLength=wifiCred.wifiSSIDs[1].length()+1;
+          if (auxLength>WIFI_MAX_SSID_LENGTH-1) { //Substring if greater that max length
+            auxLength=WIFI_MAX_SSID_LENGTH-1;
+            wifiCred.wifiSSIDs[1]=wifiCred.wifiSSIDs[1].substring(0,auxLength);
+          }
+          memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
+          memcpy(auxSSID,wifiCred.wifiSSIDs[1].c_str(),auxLength);
+          EEPROM.put(0x79,auxSSID);
+          updateEEPROM=true;
         }
-        memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
-        memcpy(auxSSID,wifiCred.wifiSSIDs[1].c_str(),auxLength);
-        EEPROM.put(0x79,auxSSID);
-        updateEEPROM=true;
-      }
-    #else
-      wifiCred.wifiSSIDs[1]=auxSSID;
-    #endif
+      #else
+        wifiCred.wifiSSIDs[1]=auxSSID;
+      #endif
+    } else wifiCred.wifiSSIDs[1]=auxSSID;
     memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);EEPROM.get(0x9A,auxPSSW);
-    #ifdef WIFI_PW_CREDENTIALS_BK1
-      wifiCred.wifiPSSWs[1]=WIFI_PW_CREDENTIALS_BK1;
-      //Check if PSSW_BK1 must be updated in EEPROM
-      if (wifiCred.wifiPSSWs[1].compareTo(String(auxPSSW))!=0) {
-         uint8_t auxLength=wifiCred.wifiPSSWs[1].length()+1;
-        if (auxLength>WIFI_MAX_PSSW_LENGTH-1) { //Substring if greater that max length
-          auxLength=WIFI_MAX_PSSW_LENGTH-1;
-          wifiCred.wifiPSSWs[1]=wifiCred.wifiPSSWs[1].substring(0,auxLength);
+    if (String(auxPSSW).compareTo("")==0) { 
+      #ifdef WIFI_PW_CREDENTIALS_BK1
+        wifiCred.wifiPSSWs[1]=WIFI_PW_CREDENTIALS_BK1;
+        //Check if PSSW_BK1 must be updated in EEPROM
+        if (wifiCred.wifiPSSWs[1].compareTo(String(auxPSSW))!=0) {
+          uint8_t auxLength=wifiCred.wifiPSSWs[1].length()+1;
+          if (auxLength>WIFI_MAX_PSSW_LENGTH-1) { //Substring if greater that max length
+            auxLength=WIFI_MAX_PSSW_LENGTH-1;
+            wifiCred.wifiPSSWs[1]=wifiCred.wifiPSSWs[1].substring(0,auxLength);
+          }
+          memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
+          memcpy(auxPSSW,wifiCred.wifiPSSWs[1].c_str(),auxLength);
+          EEPROM.put(0x9A,auxPSSW);
+          updateEEPROM=true;
         }
-        memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
-        memcpy(auxPSSW,wifiCred.wifiPSSWs[1].c_str(),auxLength);
-        EEPROM.put(0x9A,auxPSSW);
-        updateEEPROM=true;
-      }
-    #else
-      wifiCred.wifiPSSWs[1]=auxPSSW;
-    #endif
+      #else
+        wifiCred.wifiPSSWs[1]=auxPSSW;
+      #endif
+    } else wifiCred.wifiPSSWs[1]=auxPSSW;
     memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);EEPROM.get(0xDA,auxSITE);
-    #ifdef WIFI_SITE_BK1
-      wifiCred.wifiSITEs[1]=WIFI_SITE_BK1;
-      //Check if SITE_BK1 must be updated in EEPROM
-      if (wifiCred.wifiSITEs[1].compareTo(String(auxSITE))!=0) { //Substring if greater that max length
-        uint8_t auxLength=wifiCred.wifiSITEs[1].length()+1;
-        if (auxLength>WIFI_MAX_SITE_LENGTH-1) { //Substring if greater that max length
-          auxLength=WIFI_MAX_SITE_LENGTH-1;
-          wifiCred.wifiSITEs[1]=wifiCred.wifiSITEs[1].substring(0,auxLength);
+    if (String(auxSITE).compareTo("")==0) { 
+      #ifdef WIFI_SITE_BK1
+        wifiCred.wifiSITEs[1]=WIFI_SITE_BK1;
+        //Check if SITE_BK1 must be updated in EEPROM
+        if (wifiCred.wifiSITEs[1].compareTo(String(auxSITE))!=0) { //Substring if greater that max length
+          uint8_t auxLength=wifiCred.wifiSITEs[1].length()+1;
+          if (auxLength>WIFI_MAX_SITE_LENGTH-1) { //Substring if greater that max length
+            auxLength=WIFI_MAX_SITE_LENGTH-1;
+            wifiCred.wifiSITEs[1]=wifiCred.wifiSITEs[1].substring(0,auxLength);
+          }
+          memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
+          memcpy(auxSITE,wifiCred.wifiSITEs[1].c_str(),auxLength);
+          EEPROM.put(0xDA,auxSITE);
+          updateEEPROM=true;
         }
-        memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
-        memcpy(auxSITE,wifiCred.wifiSITEs[1].c_str(),auxLength);
-        EEPROM.put(0xDA,auxSITE);
-        updateEEPROM=true;
-      }
-    #else
-      wifiCred.wifiSITEs[1]=auxSITE;
-    #endif
+      #else
+        wifiCred.wifiSITEs[1]=auxSITE;
+      #endif
+    } else wifiCred.wifiSITEs[1]=auxSITE;
     memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);EEPROM.get(0xE5,auxSSID);
-    #ifdef WIFI_SSID_CREDENTIALS_BK2
-      wifiCred.wifiSSIDs[2]=WIFI_SSID_CREDENTIALS_BK2;
-      //Check if SSID_BK2 must be updated in EEPROM
-      if (wifiCred.wifiSSIDs[2].compareTo(String(auxSSID))!=0) {
-        uint8_t auxLength=wifiCred.wifiSSIDs[2].length()+1;
-        if (auxLength>WIFI_MAX_SSID_LENGTH-1) { //Substring if greater that max length
-          auxLength=WIFI_MAX_SSID_LENGTH-1;
-          wifiCred.wifiSSIDs[2]=wifiCred.wifiSSIDs[2].substring(0,auxLength);
+    if (String(auxSSID).compareTo("")==0) { 
+      #ifdef WIFI_SSID_CREDENTIALS_BK2
+        wifiCred.wifiSSIDs[2]=WIFI_SSID_CREDENTIALS_BK2;
+        //Check if SSID_BK2 must be updated in EEPROM
+        if (wifiCred.wifiSSIDs[2].compareTo(String(auxSSID))!=0) {
+          uint8_t auxLength=wifiCred.wifiSSIDs[2].length()+1;
+          if (auxLength>WIFI_MAX_SSID_LENGTH-1) { //Substring if greater that max length
+            auxLength=WIFI_MAX_SSID_LENGTH-1;
+            wifiCred.wifiSSIDs[2]=wifiCred.wifiSSIDs[2].substring(0,auxLength);
+          }
+          memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
+          memcpy(auxSSID,wifiCred.wifiSSIDs[2].c_str(),auxLength);
+          EEPROM.put(0xE5,auxSSID);
+          updateEEPROM=true;
         }
-        memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
-        memcpy(auxSSID,wifiCred.wifiSSIDs[2].c_str(),auxLength);
-        EEPROM.put(0xE5,auxSSID);
-        updateEEPROM=true;
-      }
-    #else
-      wifiCred.wifiSSIDs[2]=auxSSID;
-    #endif
+      #else
+        wifiCred.wifiSSIDs[2]=auxSSID;
+      #endif
+    } else wifiCred.wifiSSIDs[2]=auxSSID;
     memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);EEPROM.get(0x106,auxPSSW);
-    #ifdef WIFI_PW_CREDENTIALS_BK2
-      wifiCred.wifiPSSWs[2]=WIFI_PW_CREDENTIALS_BK2;
-      //Check if PSSW_BK2 must be updated in EEPROM
-      if (wifiCred.wifiPSSWs[2].compareTo(String(auxPSSW))!=0) {
-        uint8_t auxLength=wifiCred.wifiPSSWs[2].length()+1;
-        if (auxLength>WIFI_MAX_PSSW_LENGTH-1) { //Substring if greater that max length
-          auxLength=WIFI_MAX_PSSW_LENGTH-1;
-          wifiCred.wifiPSSWs[2]=wifiCred.wifiPSSWs[2].substring(0,auxLength);
+    if (String(auxPSSW).compareTo("")==0) { 
+      #ifdef WIFI_PW_CREDENTIALS_BK2
+        wifiCred.wifiPSSWs[2]=WIFI_PW_CREDENTIALS_BK2;
+        //Check if PSSW_BK2 must be updated in EEPROM
+        if (wifiCred.wifiPSSWs[2].compareTo(String(auxPSSW))!=0) {
+          uint8_t auxLength=wifiCred.wifiPSSWs[2].length()+1;
+          if (auxLength>WIFI_MAX_PSSW_LENGTH-1) { //Substring if greater that max length
+            auxLength=WIFI_MAX_PSSW_LENGTH-1;
+            wifiCred.wifiPSSWs[2]=wifiCred.wifiPSSWs[2].substring(0,auxLength);
+          }
+          memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
+          memcpy(auxPSSW,wifiCred.wifiPSSWs[2].c_str(),auxLength);
+          EEPROM.put(0x106,auxPSSW);
+          updateEEPROM=true;
         }
-        memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
-        memcpy(auxPSSW,wifiCred.wifiPSSWs[2].c_str(),auxLength);
-        EEPROM.put(0x106,auxPSSW);
-        updateEEPROM=true;
-      }
-    #else
-      wifiCred.wifiPSSWs[2]=auxPSSW;
-    #endif
+      #else
+        wifiCred.wifiPSSWs[2]=auxPSSW;
+      #endif
+    } else wifiCred.wifiPSSWs[2]=auxPSSW;
     memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);EEPROM.get(0x146,auxSITE);
-    #ifdef WIFI_SITE_BK2
-      wifiCred.wifiSITEs[2]=WIFI_SITE_BK2;
-      //Check if SITE_BK2 must be updated in EEPROM
-      if (wifiCred.wifiSITEs[2].compareTo(String(auxSITE))!=0) {
-        uint8_t auxLength=wifiCred.wifiSITEs[2].length()+1;
-        if (auxLength>WIFI_MAX_SITE_LENGTH-1) { //Substring if greater that max length
-          auxLength=WIFI_MAX_SITE_LENGTH-1;
-          wifiCred.wifiSITEs[2]=wifiCred.wifiSITEs[2].substring(0,auxLength);
+    if (String(auxSITE).compareTo("")==0) { 
+      #ifdef WIFI_SITE_BK2
+        wifiCred.wifiSITEs[2]=WIFI_SITE_BK2;
+        //Check if SITE_BK2 must be updated in EEPROM
+        if (wifiCred.wifiSITEs[2].compareTo(String(auxSITE))!=0) {
+          uint8_t auxLength=wifiCred.wifiSITEs[2].length()+1;
+          if (auxLength>WIFI_MAX_SITE_LENGTH-1) { //Substring if greater that max length
+            auxLength=WIFI_MAX_SITE_LENGTH-1;
+            wifiCred.wifiSITEs[2]=wifiCred.wifiSITEs[2].substring(0,auxLength);
+          }
+          memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
+          memcpy(auxSITE,wifiCred.wifiSITEs[2].c_str(),auxLength);
+          EEPROM.put(0x146,auxSITE);
+          updateEEPROM=true;
         }
-        memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
-        memcpy(auxSITE,wifiCred.wifiSITEs[2].c_str(),auxLength);
-        EEPROM.put(0x146,auxSITE);
-        updateEEPROM=true;
-      }
-    #else
-      wifiCred.wifiSITEs[2]=auxSITE;
-    #endif
+      #else
+        wifiCred.wifiSITEs[2]=auxSITE;
+      #endif
+    } else wifiCred.wifiSITEs[2]=auxSITE;
 
     memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x151,auxNTP);
-    #ifdef NTP_SERVER
-      ntpServers[0]=NTP_SERVER;  
-      //Check if NTP must be updated in EEPROM
-      if (ntpServers[0].compareTo(String(auxNTP))!=0) {
-        uint8_t auxLength=ntpServers[0].length()+1;
-        if (auxLength>NTP_SERVER_NAME_MAX_LENGTH-1) { //Substring if greater that max length
-          auxLength=NTP_SERVER_NAME_MAX_LENGTH-1;
-          ntpServers[0]=ntpServers[0].substring(0,auxLength);
+    if (String(auxNTP).compareTo("")==0) { 
+      #ifdef NTP_SERVER
+        ntpServers[0]=NTP_SERVER;  
+        //Check if NTP must be updated in EEPROM
+        if (ntpServers[0].compareTo(String(auxNTP))!=0) {
+          uint8_t auxLength=ntpServers[0].length()+1;
+          if (auxLength>NTP_SERVER_NAME_MAX_LENGTH-1) { //Substring if greater that max length
+            auxLength=NTP_SERVER_NAME_MAX_LENGTH-1;
+            ntpServers[0]=ntpServers[0].substring(0,auxLength);
+          }
+          memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
+          memcpy(auxNTP,ntpServers[0].c_str(),auxLength);
+          EEPROM.put(0x151,auxNTP);
+          updateEEPROM=true;
         }
-        memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
-        memcpy(auxNTP,ntpServers[0].c_str(),auxLength);
-        EEPROM.put(0x151,auxNTP);
-        updateEEPROM=true;
-      }
-    #else
-      ntpServers[0]=auxNTP;
-    #endif
+      #else
+        ntpServers[0]="time.apple.com"; //Always should be one NTP server
+      #endif
+    } else ntpServers[0]=auxNTP;
 
     memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x191,auxNTP);
-    #ifdef NTP_SERVER2
-      ntpServers[0]=NTP_SERVER2;  
-      //Check if NTP must be updated in EEPROM
-      if (ntpServers[1].compareTo(String(auxNTP))!=0) {
-        uint8_t auxLength=ntpServers[1].length()+1;
-        if (auxLength>NTP_SERVER_NAME_MAX_LENGTH-1) { //Substring if greater that max length
-          auxLength=NTP_SERVER_NAME_MAX_LENGTH-1;
-          ntpServers[1]=ntpServers[1].substring(0,auxLength);
+    if (String(auxNTP).compareTo("")==0) { 
+      #ifdef NTP_SERVER2
+        ntpServers[0]=NTP_SERVER2;  
+        //Check if NTP must be updated in EEPROM
+        if (ntpServers[1].compareTo(String(auxNTP))!=0) {
+          uint8_t auxLength=ntpServers[1].length()+1;
+          if (auxLength>NTP_SERVER_NAME_MAX_LENGTH-1) { //Substring if greater that max length
+            auxLength=NTP_SERVER_NAME_MAX_LENGTH-1;
+            ntpServers[1]=ntpServers[1].substring(0,auxLength);
+          }
+          memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
+          memcpy(auxNTP,ntpServers[1].c_str(),auxLength);
+          EEPROM.put(0x191,auxNTP);
+          updateEEPROM=true;
         }
-        memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
-        memcpy(auxNTP,ntpServers[1].c_str(),auxLength);
-        EEPROM.put(0x191,auxNTP);
-        updateEEPROM=true;
-      }
-    #else
-      ntpServers[1]=auxNTP;
-    #endif
+      #else
+        ntpServers[1]=auxNTP;
+      #endif
+    } else ntpServers[1]=auxNTP;
 
     memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x1D1,auxNTP);
-    #ifdef NTP_SERVER3
-      ntpServers[0]=NTP_SERVER3;  
-      //Check if NTP must be updated in EEPROM
-      if (ntpServers[2].compareTo(String(auxNTP))!=0) {
-        uint8_t auxLength=ntpServers[2].length()+1;
-        if (auxLength>NTP_SERVER_NAME_MAX_LENGTH-1) { //Substring if greater that max length
-          auxLength=NTP_SERVER_NAME_MAX_LENGTH-1;
-          ntpServers[2]=ntpServers[2].substring(0,auxLength);
+    if (String(auxNTP).compareTo("")==0) { 
+      #ifdef NTP_SERVER3
+        ntpServers[0]=NTP_SERVER3;  
+        //Check if NTP must be updated in EEPROM
+        if (ntpServers[2].compareTo(String(auxNTP))!=0) {
+          uint8_t auxLength=ntpServers[2].length()+1;
+          if (auxLength>NTP_SERVER_NAME_MAX_LENGTH-1) { //Substring if greater that max length
+            auxLength=NTP_SERVER_NAME_MAX_LENGTH-1;
+            ntpServers[2]=ntpServers[2].substring(0,auxLength);
+          }
+          memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
+          memcpy(auxNTP,ntpServers[2].c_str(),auxLength);
+          EEPROM.put(0x1D1,auxNTP);
+          updateEEPROM=true;
         }
-        memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
-        memcpy(auxNTP,ntpServers[2].c_str(),auxLength);
-        EEPROM.put(0x1D1,auxNTP);
-        updateEEPROM=true;
-      }
-    #else
-      ntpServers[2]=auxNTP;
-    #endif
+      #else
+        ntpServers[2]=auxNTP;
+      #endif
+    } else ntpServers[2]=auxNTP;
 
     memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x211,auxNTP);
-    #ifdef NTP_SERVER4
-      ntpServers[0]=NTP_SERVER4;  
-      //Check if NTP must be updated in EEPROM
-      if (ntpServers[3].compareTo(String(auxNTP))!=0) {
-        uint8_t auxLength=ntpServers[3].length()+1;
-        if (auxLength>NTP_SERVER_NAME_MAX_LENGTH-1) { //Substring if greater that max length
-          auxLength=NTP_SERVER_NAME_MAX_LENGTH-1;
-          ntpServers[3]=ntpServers[3].substring(0,auxLength);
+    if (String(auxNTP).compareTo("")==0) {
+      #ifdef NTP_SERVER4
+        ntpServers[0]=NTP_SERVER4;  
+        //Check if NTP must be updated in EEPROM
+        if (ntpServers[3].compareTo(String(auxNTP))!=0) {
+          uint8_t auxLength=ntpServers[3].length()+1;
+          if (auxLength>NTP_SERVER_NAME_MAX_LENGTH-1) { //Substring if greater that max length
+            auxLength=NTP_SERVER_NAME_MAX_LENGTH-1;
+            ntpServers[3]=ntpServers[3].substring(0,auxLength);
+          }
+          memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
+          memcpy(auxNTP,ntpServers[3].c_str(),auxLength);
+          EEPROM.put(0x211,auxNTP);
+          updateEEPROM=true;
         }
-        memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
-        memcpy(auxNTP,ntpServers[3].c_str(),auxLength);
-        EEPROM.put(0x211,auxNTP);
-        updateEEPROM=true;
-      }
-    #else
-      ntpServers[3]=auxNTP;
-    #endif
+      #else
+        ntpServers[3]=auxNTP;
+      #endif
+    }
+    else ntpServers[3]=auxNTP;
 
+    /*memset(auxTZEnvVar,'\0',TZ_ENV_VARIABLE_MAX_LENGTH);EEPROM.get(0x251,auxTZEnvVar);
+    memset(auxTZName,'\0',TZ_ENV_NAME_MAX_LENGTH);EEPROM.get(0x28A,auxTZName);
+    if (String(auxTZEnvVar).compareTo("")==0) {
+      //Take the value from global_setup.h
+      #ifdef NTP_TZ_ENV_VARIABLE
+        TZEnvVariable=String(NTP_TZ_ENV_VARIABLE);
+        //Check if TZEnvVariable must be updated in EEPROM
+        if (TZEnvVariable.compareTo(String(auxTZEnvVar))!=0) {
+          uint8_t auxLength=TZEnvVariable.length()+1;
+          if (auxLength>TZ_ENV_VARIABLE_MAX_LENGTH-1) { //Substring if greater that max length
+            auxLength=TZ_ENV_VARIABLE_MAX_LENGTH-1;
+            TZEnvVariable=TZEnvVariable.substring(0,auxLength);
+          }
+          memset(auxTZEnvVar,'\0',TZ_ENV_VARIABLE_MAX_LENGTH);
+          memcpy(auxTZEnvVar,TZEnvVariable.c_str(),auxLength);
+          EEPROM.put(0x251,auxTZEnvVar);
+          updateEEPROM=true;
+        }
+
+        TZName=String(NTP_TZ_NAME);
+        //Check if TZName must be updated in EEPROM
+        if (TZName.compareTo(String(auxTZName))!=0) {
+          uint8_t auxLength=TZName.length()+1;
+          if (auxLength>TZ_ENV_NAME_MAX_LENGTH-1) { //Substring if greater that max length
+            auxLength=TZ_ENV_NAME_MAX_LENGTH-1;
+            TZName=TZName.substring(0,auxLength);
+          }
+          memset(auxTZName,'\0',TZ_ENV_NAME_MAX_LENGTH);
+          memcpy(auxTZName,TZName.c_str(),auxLength);
+          EEPROM.put(0x28A,auxTZEnvVar);
+          updateEEPROM=true;
+        }
+      #else
+        //TZEnvVariable=String(auxTZEnvVar);
+        TZEnvVariable=String("CET-1CEST,M3.5.0,M10.5.0/3");
+        TZName=String("Europe/Madrid");
+      #endif
+    }
+    else {
+      TZEnvVariable=String(auxTZEnvVar);
+      TZName=String(auxTZName);
+    }*/
+    updateEEPROM|=initTZVariables();
+
+    //Get the rest of wifiCred.SiteAllow variables from EEPROM
+    configVariables=EEPROM.read(0x2A8);
+    wifiCred.SiteAllow[0]=configVariables & 0x01;
+    wifiCred.SiteAllow[1]=configVariables & 0x02;
+    wifiCred.SiteAllow[2]=configVariables & 0x04;
+    
     if (updateEEPROM) {
-      if (debugModeOn) {Serial.println(" [initVariable] - Update EEPROM with WiFi credentials from global_setup.h");}
+      if (debugModeOn) {Serial.println(" [initVariable] - Update EEPROM variables with values taken from global_setup.h");}
       EEPROM.commit();
     }
   }
@@ -642,6 +623,8 @@ void initVariable() {
   if (debugModeOn) {Serial.println(" [initVariable] - wifiCred.wifiSSIDs[1]='"+wifiCred.wifiSSIDs[1]+"', wifiCred.wifiPSSWs[1]='"+wifiCred.wifiPSSWs[1]+"', wifiCred.wifiSITEs[1]='"+wifiCred.wifiSITEs[1]+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - wifiCred.wifiSSIDs[2]='"+wifiCred.wifiSSIDs[2]+"', wifiCred.wifiPSSWs[2]='"+wifiCred.wifiPSSWs[2]+"', wifiCred.wifiSITEs[2]='"+wifiCred.wifiSITEs[2]+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - ntpServers[0]='"+ntpServers[0]+"', ntpServers[1]='"+ntpServers[1]+"', ntpServers[2]='"+ntpServers[2]+"', ntpServers[3]='"+ntpServers[3]+"'");}
+  if (debugModeOn) {Serial.println(" [initVariable] - TZEnvVariable='"+TZEnvVariable+"'");}
+  if (debugModeOn) {Serial.println(" [initVariable] - wifiCred.SiteAllow[0]='"+String(wifiCred.SiteAllow[0])+"'"+", wifiCred.SiteAllow[1]='"+String(wifiCred.SiteAllow[1])+"'"+", wifiCred.SiteAllow[2]='"+String(wifiCred.SiteAllow[2])+"'");}
 }
 
 void firstSetup() {
@@ -875,6 +858,48 @@ void firstSetup() {
 
   if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
+  //WEB SERVER
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - WEB SERVER: [");
+  if (wifiEnabled & webServerEnabled) {//Only if both Wifi WebServer is enabled
+  //if (wifiEnabled & true) {//Only if both Wifi WebServer is enabled
+    //error_setup|=initWebServer(webServer);
+    error_setup|=initWebServer();
+    
+    //print Logs
+    if ((error_setup & ERROR_WEB_SERVER)==0 ) { 
+      if (logsOn) Serial.println("[setup] - WEB SERVER: OK");
+      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    } else {
+      if (logsOn) {Serial.println("[setup] - WEB SERVER: KO");}
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    }
+  }
+  else {//If either WiFi or webServer is not enabled, then inform
+    if (logsOn) Serial.println("[setup] - WEB SERVER: N/E");
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("N/E");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  }
+
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  
+  //SPIFFS
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - SPIFFS: [");
+  if(!SPIFFS.begin(true)){
+    error_setup|=ERROR_SPIFFS_SETUP;
+    if (logsOn) {Serial.println("[setup] - SPIFFS: KO");}
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  }
+  else {
+    if (logsOn) Serial.println("[setup] - SPIFFS: OK");
+    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  }
+
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  
   //Pre-setting up URL things to upload samples to an external server
   //Converting SERVER_UPLOAD_SAMPLES into IPAddress variable
   char charToTest;
@@ -977,48 +1002,6 @@ void firstSetup() {
   else {
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("No WiFi");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-  }
-
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
-
-  //WEB SERVER
-  if (wifiEnabled & webServerEnabled) {//Only if both Wifi WebServer is enabled
-  //if (wifiEnabled & true) {//Only if both Wifi WebServer is enabled
-    //error_setup|=initWebServer(webServer);
-    error_setup|=initWebServer();
-    stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - WEB SERVER: [");
-    
-    //print Logs
-    if ((error_setup & ERROR_WEB_SERVER)==0 ) { 
-      if (logsOn) Serial.println("[setup] - WEB SERVER: OK");
-      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
-      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    } else {
-      if (logsOn) {Serial.println("[setup] - WEB SERVER: KO");}
-      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
-      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    }
-  }
-  else {//If either WiFi or webServer is not enabled, then inform
-    if (logsOn) Serial.println("[setup] - WEB SERVER: N/E");
-    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("N/E");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-  }
-
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
-  
-  //SPIFFS
-  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - SPIFFS: [");
-  if(!SPIFFS.begin(true)){
-    error_setup|=ERROR_SPIFFS_SETUP;
-    if (logsOn) {Serial.println("[setup] - SPIFFS: KO");}
-    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-  }
-  else {
-    if (logsOn) Serial.println("[setup] - SPIFFS: OK");
-    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
   if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
@@ -1310,7 +1293,7 @@ void setup() {
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
   switch(wakeup_reason)
   {
-    case ESP_SLEEP_WAKEUP_EXT1: //Wake from Hibernate Mode by long pressing Button1
+    case ESP_SLEEP_WAKEUP_EXT1: //Wake up from Hibernate Mode by long pressing Button1
       initVariable(); //Init Global variables after hibernate mode
       loopStartTime=millis();loopEndTime=0;sleepTimer=0;nowTimeGlobal=loopStartTime;
       bootCount=0;
@@ -1344,13 +1327,16 @@ void setup() {
         go_to_hibernate();
       } 
     break;
-    case ESP_SLEEP_WAKEUP_EXT0: //Wake from Deep Sleep Mode by pressing Button1
+    case ESP_SLEEP_WAKEUP_EXT0: //Wake up from Deep Sleep Mode by pressing Button1
       // No need to initit lastBatCharge
       if (debugModeOn) {
         Serial.println("  - Wakeup caused by external signal using RTC_IO - Ext0");
         Serial.println("    - setting things up back again after deep sleep specific for ad-hod wakeup");
         Serial.println("      - TFT init");
       }
+      initTZVariables(); //To make sure that both NTP sync and NTP info in web are right
+      CloudClockCurrentStatus=CloudClockOffStatus; //To update icons as WiFi is disconnect
+      CloudSyncCurrentStatus=CloudSyncOffStatus; //To update icons as WiFi is disconnect
       //Display init
       pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
       tft.init();
@@ -1360,6 +1346,7 @@ void setup() {
       if (debugModeOn) {Serial.println("      - checkButton1() & buttonWakeUp=true");}
       checkButton1();
       buttonWakeUp=true;
+      //buttonWakeUp is used for Web Server init and SPFIS init in the next WiFi interaction
       nowTimeGlobal=loopStartTime+millis();
       lastTimeTurnOffBacklightCheck=nowTimeGlobal; //To avoid TIME_TURN_OFF_BACKLIGHT 
       displayMode=sampleValue;  //To force refresh TFT with the sample value Screen
@@ -1419,12 +1406,22 @@ void setup() {
   memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);EEPROM.get(0x106,auxPSSW);wifiCred.wifiPSSWs[2]=auxPSSW;
   memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);EEPROM.get(0x146,auxSITE);wifiCred.wifiSITEs[2]=auxSITE;
 
-  //NTP servers definition - Not run if waking up either from button or timer
+  //NTP servers definition - Not run if waking up from either button or timer
   char auxNTP[NTP_SERVER_NAME_MAX_LENGTH];
   memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x151,auxNTP);ntpServers[0]=auxNTP;
   memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x191,auxNTP);ntpServers[1]=auxNTP;
   memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x1D1,auxNTP);ntpServers[2]=auxNTP;
   memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x211,auxNTP);ntpServers[3]=auxNTP;
+
+  //TZEnvVariable definition - Not run if waking up from either button or timer
+  char auxTZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH];
+  memset(auxTZEnvVar,'\0',TZ_ENV_VARIABLE_MAX_LENGTH);EEPROM.get(0x251,auxTZEnvVar);TZEnvVariable=String(auxTZEnvVar);
+
+  //wifiCred.SiteAllow definition  - Not run if waking up from either button or timer
+  configVariables=EEPROM.read(0x2A8);
+  wifiCred.SiteAllow[0]=configVariables & 0x01;
+  wifiCred.SiteAllow[1]=configVariables & 0x02;
+  wifiCred.SiteAllow[2]=configVariables & 0x04;
 
   if (debugModeOn) {Serial.println("      - wifiCurrentStatus=wifiOffStatus till WiFi reconnection");}
   wifiCurrentStatus=wifiOffStatus;
@@ -1751,7 +1748,11 @@ void loop() {
     if (!wifiResuming) lastTimeWifiReconnectionCheck=nowTimeGlobal; //Only if the WiFi reconnection didn't ABORT or BREAK in the previous interaction
     
     wifiStatus previousWifiCurrentStatus=wifiCurrentStatus;
-    if(forceWifiReconnect) forceWifiReconnect=false;
+    if(forceWifiReconnect) {
+      forceWifiReconnect=false;
+      forceNTPCheck=true; //v0.9.9 - Force NTP sync after WiFi Connection
+      if (buttonWakeUp) forceWebServerInit=true; //v0.9.9 - Force Web Server Init after waking up from sleep
+    }
     
     //If WiFi disconnected (wifiOffStatus), then re-connect
     //Conditions for wifiCurrentStatus==wifiOffStatus
@@ -1789,6 +1790,7 @@ void loop() {
         else if (WiFi.RSSI()>=WIFI_050_RSSI) wifiCurrentStatus=wifi50Status;
         else if (WiFi.RSSI()>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
         else if (WiFi.RSSI()<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
+        if (forceWifiReconnect) forceNTPCheck=true; //v0.9.9 - Force NTP sync after WiFi Connection
         forceWifiReconnect=false;
         wifiResuming=false;
         //Send HttpRequest to check the server status
@@ -1796,6 +1798,20 @@ void loop() {
         //if (uploadSamplesEnabled) 
         forceWEBTestCheck=true; //Will check CLOUD server in the next loop() interaction
         if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with NO_ERROR. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect)+", forceWEBTestCheck="+String(forceWEBTestCheck));}
+        if (forceWebServerInit) { //v0.9.9 - Re-init the built-in WebServer after waking up from sleep
+          forceWebServerInit=false;
+          //webServer=AsyncWebServer(WEBSERVER_PORT);
+          if (wifiEnabled & webServerEnabled) {//Only if both Wifi WebServer is enabled
+            if(SPIFFS.begin(true)) {
+              if (logsOn) Serial.println("    - wifiConnect()  - SPIFFS.begin() OK");
+              initWebServer();
+              //webServer.begin();
+              if (logsOn) Serial.println("    - wifiConnect()  - initWebServer");
+            }
+            else 
+              if (logsOn) Serial.println("    - wifiConnect()  - SPIFFS.begin() KO");
+          }
+        }
       break;
     } 
 
@@ -1862,6 +1878,8 @@ void loop() {
         break;
       }
     }
+    else
+      if( wifiCurrentStatus==wifiOffStatus || !wifiEnabled) if (forceNTPCheck) forceNTPCheck=false; //v0.9.9 If no WiFi, don't enter in NTP_KO_CHECK_PERIOD even if it was BREAK or ABORT in previous intercation
     
     if (debugModeOn) {
       Serial.println(String(loopStartTime+millis())+"      - errorsNTPCnt="+String(errorsNTPCnt)+", CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck));
@@ -1870,7 +1888,7 @@ void loop() {
   }
   
   //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
-  //WiFi SITE must be UPLOAD_SAMPLES_FROM_SITE (case sensitive), otherwise sample is not uploaded
+  //wifiCred.SiteAllow[wifiCred.activeIndex] must be set, otherwise samples are not uploaded
   //forceWEBCheck is set when in the previous interaction the WEB connection was either:
   // ABORTED (Button Pressed) or
   // BREAK  (Display Refresh)
@@ -1880,8 +1898,8 @@ void loop() {
   // has higher priority in order to send the samples on time.
   nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeUploadSampleCheck) >= uploadSamplesPeriod) || firstBoot || forceWEBCheck || forceWEBTestCheck) && uploadSamplesEnabled &&
-      wifiCurrentStatus!=wifiOffStatus && wifiEnabled &&
-      (0==wifiCred.wifiSITEs[wifiCred.activeIndex].compareTo(UPLOAD_SAMPLES_FROM_SITE)) ) {
+      wifiCurrentStatus!=wifiOffStatus && wifiEnabled && wifiCred.SiteAllow[wifiCred.activeIndex] ) {
+      //(0==wifiCred.wifiSITEs[wifiCred.activeIndex].compareTo(UPLOAD_SAMPLES_FROM_SITE)) ) {
     
     //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
     if (!webResuming && !forceWEBTestCheck) lastTimeUploadSampleCheck=nowTimeGlobal; //Only if the HTTP connection didn't ABORT or BREAK in the previous interaction

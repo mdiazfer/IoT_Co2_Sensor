@@ -36,6 +36,7 @@
       String wifiSSIDs[3];
       String wifiPSSWs[3];
       String wifiSITEs[3];
+      bool   SiteAllow[3]; //whether to upload samples from the Site or not
       uint8_t activeIndex;
     } wifiCredentials;  //Struct to store user WiFi credentials    
 

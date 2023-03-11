@@ -8,6 +8,18 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.9.9 11/Mar/2023   - WebServer init after Button1 wakes up the ESP from sleep
+                      - Show errors in web, including error_setup 
+                      - New TZName and mechanism to send TZEnvVariable & TZName values from the web form
+                      - TZEnvVariable
+                        + is read/written rightly in EEPROM
+                        + TZEnvVariable updated from web form
+                      - NTP server config with the new TimeZone
+                      - Check box in sites to upload samples from
+                        + Store info in EEPROM
+                      - Reset config to factory
+                      - Reset device
+                      - Pop-up to warn before resets
 - 0.9.8 18/Feb/2023   - Added SPIFFS and built-in AsyncWebServer for info and config stuff
                           + Variables stored in EEPPROM
                             * wifiCred[]

@@ -20,6 +20,7 @@
       String wifiSSIDs[3];
       String wifiPSSWs[3];
       String wifiSITEs[3];
+      bool   SiteAllow[3]; //whether to upload samples from the Site or not
       uint8_t activeIndex;
     } wifiCredentials;  //Struct to store user WiFi credentials    
 
@@ -45,7 +46,7 @@ extern RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus;
 extern RTC_DATA_ATTR int errorsNTPCnt;
 extern boolean NTPResuming;
 extern RTC_DATA_ATTR struct tm startTimeInfo;
-extern RTC_DATA_ATTR char TZEnvVar[50];
+extern RTC_DATA_ATTR char TZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH];
 extern RTC_DATA_ATTR uint64_t lastTimeNTPCheck;
 
 void printNetData();

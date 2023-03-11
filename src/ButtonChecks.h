@@ -35,7 +35,7 @@ extern RTC_DATA_ATTR Button  button1; //16 B
 extern RTC_DATA_ATTR Button  button2;
 extern RTC_DATA_ATTR boolean debugModeOn;
 extern RTC_DATA_ATTR boolean firstBoot;
-extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled;
+extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled;
 extern RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus;
 extern RTC_DATA_ATTR enum wifiStatus wifiCurrentStatus;
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
