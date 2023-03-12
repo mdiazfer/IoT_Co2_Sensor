@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.9"
+#define VERSION "0.9.A"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -225,6 +225,12 @@
 #define WIFI_MAX_PSSW_LENGTH  64 //63 CHAR + NULL
 #define WIFI_MAX_SITE_LENGTH  11 //10 CHAR + NULL
 
+//AP MODE Stuff
+#define APMODE_LOCAL_IP_ADDRESS "192.168.44.1"
+#define APMODE_GATEWAY_ADDRESS "192.168.44.1"
+#define APMODE_SUBNETWORK_MASK "255.255.255.0"
+#define APMODE_SSID "IOT_FACTORY"
+#define APMODE_PSSW "TheIoTFactory"
 
 //WEB SERVER Stuff
 #define WEBSERVER_ENABLED true
@@ -238,6 +244,8 @@
 #define WEBSERVER_BLUETOOTHCONFIG_PAGE "/bluetooth.html"
 #define WEBSERVER_MAINTENANCE_PAGE "/maintenance.html"
 #define WEBSERVER_CONTAINER_PAGE "/container.html"
+#define WEBSERVER_APINDEX_PAGE "/apindex.html"
+#define WEBSERVER_APCONTAINER_PAGE "/apcontainer.html"
 
 
 //BLE stuff
@@ -327,8 +335,8 @@
   uint8_t ntpServerIndex;
   
   #ifndef _DISPLAYSUPPORTINFO_
-    enum displayModes {bootup,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
-    enum availableStates {bootupScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+    enum displayModes {bootup,bootAP,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
+    enum availableStates {bootupScreen,bootAPScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode};
     RTC_DATA_ATTR enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
     enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
@@ -351,7 +359,7 @@
   #endif
 
   #ifndef _BUTTONSFRAMEWORK_
-    enum callingAction {mainloop,ntpcheck,wificheck,webcheck};
+    enum callingAction {mainloop,askAPloop,ntpcheck,wificheck,webcheck};
     #define _BUTTONSFRAMEWORK_
   #endif
 

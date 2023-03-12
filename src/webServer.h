@@ -71,4 +71,6 @@ extern RTC_DATA_ATTR int errorsWiFiCnt,errorsSampleUpts,errorsNTPCnt;
 extern wifiCredentials wifiCred;
 
 String processor(const String& var);
+String processorAP(const String& var);
 uint32_t initWebServer();
+uint32_t initAPWebServer();

@@ -42,3 +42,4 @@ String roundFloattoString(float_t number, uint8_t decimals);
 uint16_t checkSum(byte *addr, uint32_t count);
 void factoryConfReset();
 bool initTZVariables();
+IPAddress stringToIPAddress(String stringIPAddress);

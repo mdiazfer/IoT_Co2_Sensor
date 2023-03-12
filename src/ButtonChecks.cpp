@@ -27,6 +27,7 @@ void checkButton1() {
   //Actions are different based on the current state
   switch(currentState) {
     case bootupScreen:
+    case bootAPScreen:
     break;
     case mainMenu:
     //Changing Menus: Main Menu -> What to Show Menu -> Display Gral. Info -> back
@@ -296,6 +297,9 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
       case wificheck:
         return(1);
       break;
+      case askAPloop:
+        return(4);
+      break;
     }
   }
 
@@ -347,6 +351,9 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
       case wificheck:
         return(2);
       break;
+      case askAPloop:
+        return(5);
+      break;
     }
   }
 
@@ -357,6 +364,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
     //Specific actions based on where this functions has been called from
     switch (fromAction) {
       case mainloop:
+      case askAPloop:
         //Do nothing else
       break;
       case ntpcheck:

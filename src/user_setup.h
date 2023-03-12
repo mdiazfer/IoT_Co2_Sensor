@@ -18,7 +18,5 @@
   #define WIFI_SITE_BK2 "pare. home"
 #endif
 
-
-
 #define MQTT_USER_CREDENTIAL "admin"
 #define MQTT_PW_CREDENTIAL "adminCO2"

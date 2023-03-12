@@ -3,7 +3,7 @@ To do list
 - Web server to display results and configuration
   + Enable WiFi ON/OFF and webServer ON/OFF in the web menu (?)
     * Pop-up if disable WiFi or Web Server to warn about
-  + AP mode to provide first SSID in WiFi Menu
+  v AP mode to provide first SSID in WiFi Menu
   + https
 - Troubleshoot
   + WebServer doesn't begin randomly (after firmware upload???)

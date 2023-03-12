@@ -148,7 +148,7 @@ String serverToUploadSamplesString(SERVER_UPLOAD_SAMPLES);
 IPAddress serverToUploadSamplesIPAddress; //8 B
 String device(DEVICE_NAME_PREFIX); //16 B
 static const char hex_digits[] = "0123456789ABCDEF";
-boolean waitingMessage=true,runningMessage=true,wifiResuming=false,NTPResuming=false,webResuming=false;
+boolean waitingMessage=true,runningMessage=true,wifiResuming=false,NTPResuming=false,webResuming=false,startAPMode=false;
 uint8_t pixelsPerLine,
     spL,            //Number of Lines in the Sprite
     scL,            //Number of Lines in the Scroll
@@ -207,6 +207,7 @@ void initVariable() {
   deviceReset=false;
   factoryReset=false;
   error_setup=NO_ERROR;
+  startAPMode=false;
   //webServer=AsyncWebServer(WEBSERVER_PORT);
   
   //Read from EEPROM the values to be stored in the Config Variables
@@ -563,48 +564,7 @@ void initVariable() {
     }
     else ntpServers[3]=auxNTP;
 
-    /*memset(auxTZEnvVar,'\0',TZ_ENV_VARIABLE_MAX_LENGTH);EEPROM.get(0x251,auxTZEnvVar);
-    memset(auxTZName,'\0',TZ_ENV_NAME_MAX_LENGTH);EEPROM.get(0x28A,auxTZName);
-    if (String(auxTZEnvVar).compareTo("")==0) {
-      //Take the value from global_setup.h
-      #ifdef NTP_TZ_ENV_VARIABLE
-        TZEnvVariable=String(NTP_TZ_ENV_VARIABLE);
-        //Check if TZEnvVariable must be updated in EEPROM
-        if (TZEnvVariable.compareTo(String(auxTZEnvVar))!=0) {
-          uint8_t auxLength=TZEnvVariable.length()+1;
-          if (auxLength>TZ_ENV_VARIABLE_MAX_LENGTH-1) { //Substring if greater that max length
-            auxLength=TZ_ENV_VARIABLE_MAX_LENGTH-1;
-            TZEnvVariable=TZEnvVariable.substring(0,auxLength);
-          }
-          memset(auxTZEnvVar,'\0',TZ_ENV_VARIABLE_MAX_LENGTH);
-          memcpy(auxTZEnvVar,TZEnvVariable.c_str(),auxLength);
-          EEPROM.put(0x251,auxTZEnvVar);
-          updateEEPROM=true;
-        }
-
-        TZName=String(NTP_TZ_NAME);
-        //Check if TZName must be updated in EEPROM
-        if (TZName.compareTo(String(auxTZName))!=0) {
-          uint8_t auxLength=TZName.length()+1;
-          if (auxLength>TZ_ENV_NAME_MAX_LENGTH-1) { //Substring if greater that max length
-            auxLength=TZ_ENV_NAME_MAX_LENGTH-1;
-            TZName=TZName.substring(0,auxLength);
-          }
-          memset(auxTZName,'\0',TZ_ENV_NAME_MAX_LENGTH);
-          memcpy(auxTZName,TZName.c_str(),auxLength);
-          EEPROM.put(0x28A,auxTZEnvVar);
-          updateEEPROM=true;
-        }
-      #else
-        //TZEnvVariable=String(auxTZEnvVar);
-        TZEnvVariable=String("CET-1CEST,M3.5.0,M10.5.0/3");
-        TZName=String("Europe/Madrid");
-      #endif
-    }
-    else {
-      TZEnvVariable=String(auxTZEnvVar);
-      TZName=String(auxTZName);
-    }*/
+    //Update volatile TZEnvVariable & TZName. Same function is called after waking up from sleep if pushed button1
     updateEEPROM|=initTZVariables();
 
     //Get the rest of wifiCred.SiteAllow variables from EEPROM
@@ -623,8 +583,11 @@ void initVariable() {
   if (debugModeOn) {Serial.println(" [initVariable] - wifiCred.wifiSSIDs[1]='"+wifiCred.wifiSSIDs[1]+"', wifiCred.wifiPSSWs[1]='"+wifiCred.wifiPSSWs[1]+"', wifiCred.wifiSITEs[1]='"+wifiCred.wifiSITEs[1]+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - wifiCred.wifiSSIDs[2]='"+wifiCred.wifiSSIDs[2]+"', wifiCred.wifiPSSWs[2]='"+wifiCred.wifiPSSWs[2]+"', wifiCred.wifiSITEs[2]='"+wifiCred.wifiSITEs[2]+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - ntpServers[0]='"+ntpServers[0]+"', ntpServers[1]='"+ntpServers[1]+"', ntpServers[2]='"+ntpServers[2]+"', ntpServers[3]='"+ntpServers[3]+"'");}
-  if (debugModeOn) {Serial.println(" [initVariable] - TZEnvVariable='"+TZEnvVariable+"'");}
+  if (debugModeOn) {Serial.println(" [initVariable] - TZEnvVariable='"+TZEnvVariable+"', TZName='"+TZName+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - wifiCred.SiteAllow[0]='"+String(wifiCred.SiteAllow[0])+"'"+", wifiCred.SiteAllow[1]='"+String(wifiCred.SiteAllow[1])+"'"+", wifiCred.SiteAllow[2]='"+String(wifiCred.SiteAllow[2])+"'");}
+
+  //If no SSID is setup, display message to warn and run AP mode
+  if (wifiCred.wifiSSIDs[0]=="" && wifiEnabled) startAPMode=true;
 }
 
 void firstSetup() {
@@ -643,29 +606,24 @@ void firstSetup() {
   if (logsOn) {Serial.println("[setup] - Initial date set to 1st Jan 2022 00:00:00");}
   error_setup=NO_ERROR;
 
+  //-->>Buttons init
+  if (logsOn) Serial.print("[setup] - Buttons: ");
+  button1.begin();
+  button2.begin();
+  if ((error_setup & ERROR_BUTTONS_SETUP)==0) { 
+    if (logsOn) Serial.println("OK");
+  } else {
+    if (logsOn) {Serial.println("KO"); Serial.println("Can't continue. STOP");}
+  }
+
+  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+
   //Display init
   pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
 
-  // Create a sprite for text and initialize sprite parameters
-  stext1.setColorDepth(4);
-  stext1.createSprite(TFT_MAX_X, TFT_MAX_Y*SCROLL_PER_SPRITE);
-  stext1.fillSprite(TFT_BLACK); // Note: Sprite is filled with black when created
-  stext1.setTextColor(TFT_GOLD); // Gold text, no background
-  stext1.setTextSize(TEXT_SIZE_BOOT_SCREEN);
-  stext1.setTextFont(TEXT_FONT_BOOT_SCREEN);
-  pixelsPerLine=tft.fontHeight(TEXT_FONT_BOOT_SCREEN);
-  spL=LINES_PER_TEXT_SPRITE;            //Number of Lines in the Sprite
-  scL=LINES_PER_TEXT_SCROLL;            //Number of Lines in the Scroll
-  spFL=1;                               //Sprite First Line Window
-  spLL=spL;                             //Sprite Last Line Window
-  scFL=(spL-scL)/2+1;                   //Scroll First Line Window
-  scLL=scFL+scL-1;                      //Scroll Last Line Window
-  pFL=scFL;                             //Pointer First Line
-  pLL=pFL;                              //pointer Last Line written
-  
   delay(500);
   //Check out the TFT display
   tft.drawPixel(30,30,wr);
@@ -685,6 +643,52 @@ void firstSetup() {
     if (logsOn) Serial.println("[setup] - Display: OK");
     tft.fillScreen(TFT_BLACK);
   }
+
+  //Start AP Mode to configure WiFi SSIDs
+  if (startAPMode) {
+    if (logsOn) Serial.println(" [setup] - No WiFi configuration. Asking the user what to do.");
+    currentState=bootAPScreen;lastState=bootupScreen;
+    displayMode=bootAP;lastDisplayMode=bootup;
+    
+    //Based on user's entry, AP Mode is run or not
+    if(runAPMode()) {
+      //AP Mode is running
+      if (logsOn) Serial.println(" [setup] - SPIFFS.begin="+String(SPIFFS.begin(true)));
+      if (logsOn) Serial.println(" [setup] - initAPWebServer="+String(initAPWebServer()));
+    
+      //Infinitive loop as ESP web server is running.
+      //The ESP will be restarted by the user when config is finished
+      while (true);
+    }
+
+    //No AP Mode, so there is no WiFi SSIDs. Let's continue.
+    tft.fillScreen(TFT_BLACK);tft.setTextColor(TFT_YELLOW,TFT_BLACK);
+    tft.drawString(" WiFi is disabled as it is not setup",5,45,TEXT_FONT_BOOT_SCREEN);
+    tft.drawString("    Device will be now restarted",5,68,TEXT_FONT_BOOT_SCREEN);
+    for (int i=6; i>0; i--) {tft.drawString("            in "+String(i)+" seconds",5,91,TEXT_FONT_BOOT_SCREEN);delay(1000);}
+    tft.fillScreen(TFT_BLACK);
+    wifiEnabled=false; //No WiFi as there is no SSID configured
+    currentState=bootupScreen;lastState=currentState;
+    displayMode=bootup;lastDisplayMode=bootup;
+    if (logsOn) Serial.println(" [setup] - No AP Mode. WiFi disabled. Continue setup ");
+  }
+
+  // Create a sprite for text and initialize sprite parameters
+  stext1.setColorDepth(4);
+  stext1.createSprite(TFT_MAX_X, TFT_MAX_Y*SCROLL_PER_SPRITE);
+  stext1.fillSprite(TFT_BLACK); // Note: Sprite is filled with black when created
+  stext1.setTextColor(TFT_GOLD); // Gold text, no background
+  stext1.setTextSize(TEXT_SIZE_BOOT_SCREEN);
+  stext1.setTextFont(TEXT_FONT_BOOT_SCREEN);
+  pixelsPerLine=tft.fontHeight(TEXT_FONT_BOOT_SCREEN);
+  spL=LINES_PER_TEXT_SPRITE;            //Number of Lines in the Sprite
+  scL=LINES_PER_TEXT_SCROLL;            //Number of Lines in the Scroll
+  spFL=1;                               //Sprite First Line Window
+  spLL=spL;                             //Sprite Last Line Window
+  scFL=(spL-scL)/2+1;                   //Scroll First Line Window
+  scLL=scFL+scL-1;                      //Scroll Last Line Window
+  pFL=scFL;                             //Pointer First Line
+  pLL=pFL;                              //pointer Last Line written
   
   //-->loadAllIcons();
   //-->loadAllWiFiIcons();
@@ -784,26 +788,6 @@ void firstSetup() {
   for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++)  {lastHourCo2Samples[i]=0;lastHourTempSamples[i]=0;lastHourHumSamples[i]=0;}
   for (int i=0; i<(int)(24*3600/SAMPLE_T_LAST_DAY); i++) {lastDayCo2Samples[i]=0;lastDayTempSamples[i]=0;lastDayHumSamples[i]=0;}
 
-  //-->>Buttons init
-  if (logsOn) Serial.print("[setup] - Buttons: ");
-  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Buttons: [");
-  button1.begin();
-  button2.begin();
-  if ((error_setup & ERROR_BUTTONS_SETUP)==0) { 
-    if (logsOn) Serial.println("OK");
-    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("OK");
-  } else {
-    if (logsOn) {Serial.println("KO"); Serial.println("Can't continue. STOP");}
-    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("KO");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    //stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.print(" ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    //stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Can't continue. STOP");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    //return;
-  }
-  stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
-
   //WiFi init
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - WiFi: ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   cuX=stext1.getCursorX(); cuY= pLL>scLL? stext1.getCursorY()-pixelsPerLine : stext1.getCursorY();
@@ -902,21 +886,7 @@ void firstSetup() {
   
   //Pre-setting up URL things to upload samples to an external server
   //Converting SERVER_UPLOAD_SAMPLES into IPAddress variable
-  char charToTest;
-  uint lastBegin=0,indexArray=0;
-  for (uint i=0; i<=serverToUploadSamplesString.length(); i++) {
-    charToTest=serverToUploadSamplesString.charAt(i);
-    if (charToTest=='.') {    
-      uploadServerIPAddressOctectArray[indexArray]=serverToUploadSamplesString.substring(lastBegin,i).toInt();
-      lastBegin=i+1;
-      if (indexArray==2) {
-        indexArray++;
-        uploadServerIPAddressOctectArray[indexArray]=serverToUploadSamplesString.substring(lastBegin,serverToUploadSamplesString.length()).toInt();
-      }
-      else indexArray++;
-    }
-  }
-  serverToUploadSamplesIPAddress=IPAddress(uploadServerIPAddressOctectArray[0],uploadServerIPAddressOctectArray[1],uploadServerIPAddressOctectArray[2],uploadServerIPAddressOctectArray[3]);
+  serverToUploadSamplesIPAddress=stringToIPAddress(serverToUploadSamplesString);
 
   //Adding the 3 latest mac bytes to the device name (in Hex format)
   WiFi.macAddress(mac);

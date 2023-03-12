@@ -4,6 +4,7 @@
   #include "global_setup.h"
   #include "user_setup.h"
   #include "ButtonChecks.h"
+  #include "misc.h"
 
   extern bool logsOn;
   #ifndef _WIFINETWORKINFO_
@@ -53,3 +54,5 @@ void printNetData();
 wifiNetworkInfo * printCurrentWiFi(boolean logsOn, int16_t *numberWiFiNetworks);
 uint32_t wifiConnect(boolean logsOn,boolean msgTFT,boolean checkButtons,uint8_t* auxLoopCounter,uint8_t* auxCounter);
 uint32_t setupNTPConfig(boolean fromSetup,uint8_t* auxLoopCounter,uint64_t* whileLoopTimeLeft);
+bool runAPMode();
+

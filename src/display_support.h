@@ -15,7 +15,7 @@
   #include "global_setup.h"
   
   #ifndef _DISPLAYSUPPORTINFO_
-    enum availableStates {bootupScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
+    enum availableStates {bootupScreen,bootAPScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     

@@ -783,3 +783,271 @@ uint32_t initWebServer() {
 
   return NO_ERROR;
 }
+
+String processorAP(const String& var) {
+  if (var == "NTP1") {
+    #ifdef NTP_SERVER
+      return String(NTP_SERVER);
+    #else
+      return "Mandatory if WiFi enabled"
+    #endif
+  } else if (var == "NTP1_VALUE") {
+    #ifdef NTP_SERVER
+      return String(NTP_SERVER);
+    #else
+      return String();
+    #endif
+  } else if (var == "NTP2") {
+    #ifdef NTP_SERVER2
+      return String(NTP_SERVER2);
+    #else
+      return String();
+    #endif
+  } else if (var == "NTP2_VALUE") {
+    #ifdef NTP_SERVER2
+      return String(NTP_SERVER2);
+    #else
+      return String();
+    #endif
+  } else if (var == "NTP3") {
+    #ifdef NTP_SERVER3
+      return String(NTP_SERVER3);
+    #else
+      return String();
+    #endif
+  } else if (var == "NTP3_VALUE") {
+    #ifdef NTP_SERVER3
+      return String(NTP_SERVER3);
+    #else
+      return String();
+    #endif
+  } else if (var == "NTP4") {
+  #ifdef NTP_SERVER4
+      return String(NTP_SERVER4);
+    #else
+      return String();
+    #endif
+  } else if (var == "NTP4_VALUE") {
+    #ifdef NTP_SERVER4
+      return String(NTP_SERVER4);
+    #else
+      return String();
+    #endif
+  } else if (var == "CONTAINER_HEAD") {
+    return String("AP Mode");
+  } else if (var == "CONTAINER_TEXT") {
+    if (deviceReset) return String("Rebooting the device....<p></p><br>The device is rebooting and will try to connect to the WiFi as per the saved configuration.<br><br>The remainder configuration can be done through the web browser. The device's IP is shown in the Device Configuration Menu.<br><br>If there is no WiFi connection and you need to setup a new WiFi configuration, then set the Factory Reset Option in the Device Configuration Menu.");
+    else return String("Other");
+  }
+  else {
+    return String();
+  }
+}
+
+uint32_t initAPWebServer() {
+
+   // Route for root / web page
+  webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, WEBSERVER_APINDEX_PAGE, String(), false, processorAP);
+  });
+
+  // Route for root index.html web page
+  webServer.on(WEBSERVER_INDEX_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, WEBSERVER_APINDEX_PAGE, String(), false, processorAP);
+  });
+  
+  // Route to load style.css file
+  webServer.on(WEBSERVER_CSSSTYLES_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, WEBSERVER_CSSSTYLES_PAGE, "text/css");
+  });
+
+  // Route to load tswnavbar.css file
+  webServer.on(WEBSERVER_CSSNAVBAR_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, WEBSERVER_CSSNAVBAR_PAGE, "text/css");
+  });
+
+  // Route to load The_IoT_Factory.png file
+  webServer.on(WEBSERVER_LOGO_ICON, HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, WEBSERVER_LOGO_ICON, "image/png");
+
+    //Wait to disconnect the connection
+    request->onDisconnect([]{
+      //Device reset
+      if (deviceReset) ESP.restart();
+    });
+  });
+
+  webServer.on("/wifibasic", HTTP_POST, [](AsyncWebServerRequest *request) {
+    int params = request->params();
+    bool updateEEPROM=false;
+    char auxSSID[WIFI_MAX_SSID_LENGTH],auxPSSW[WIFI_MAX_PSSW_LENGTH],auxSITE[WIFI_MAX_SITE_LENGTH],
+         auxNTP[NTP_SERVER_NAME_MAX_LENGTH],auxTZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH],auxTZName[TZ_ENV_NAME_MAX_LENGTH];
+    
+    for(int i=0;i<params;i++) {
+      AsyncWebParameter* p = request->getParam(i);
+
+      if(p->isPost()){
+        // HTTP POST SSID value
+        if (String(p->name()).compareTo("SSID")==0) {
+          memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
+          memcpy(auxSSID,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (wifiCred.wifiSSIDs[0].compareTo(auxSSID)!=0) {
+            wifiCred.wifiSSIDs[0]=String(p->value().c_str());
+            EEPROM.put(0x0D,auxSSID);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST PSSW value
+        if (String(p->name()).compareTo("PSSW")==0) {
+          memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
+          memcpy(auxPSSW,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (wifiCred.wifiPSSWs[0].compareTo(auxPSSW)!=0) {
+            wifiCred.wifiPSSWs[0]=String(p->value().c_str());
+            EEPROM.put(0x2E,auxPSSW);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST SITE value
+        if (String(p->name()).compareTo("SITE")==0) {
+          memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
+          memcpy(auxSITE,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (wifiCred.wifiSITEs[0].compareTo(auxSITE)!=0) {
+            wifiCred.wifiSITEs[0]=String(p->value().c_str());
+            EEPROM.put(0x6E,auxSITE);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST SSID_BK1 value
+        if (String(p->name()).compareTo("SSID_BK1")==0) {
+          memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
+          memcpy(auxSSID,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (wifiCred.wifiSSIDs[1].compareTo(auxSSID)!=0) {
+            wifiCred.wifiSSIDs[1]=String(p->value().c_str());
+            EEPROM.put(0x79,auxSSID);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST PSSW_BK1 value
+        if (String(p->name()).compareTo("PSSW_BK1")==0) {
+          memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
+          memcpy(auxPSSW,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (wifiCred.wifiPSSWs[1].compareTo(auxPSSW)!=0) {
+            wifiCred.wifiPSSWs[1]=String(p->value().c_str());
+            EEPROM.put(0x9A,auxPSSW);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST SITE_BK1 value
+        if (String(p->name()).compareTo("SITE_BK1")==0) {
+          memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
+          memcpy(auxSITE,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (wifiCred.wifiSITEs[1].compareTo(auxSITE)!=0) {
+            wifiCred.wifiSITEs[1]=String(p->value().c_str());
+            EEPROM.put(0xDA,auxSITE);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST SSID_BK2 value
+        if (String(p->name()).compareTo("SSID_BK2")==0) {
+          memset(auxSSID,'\0',WIFI_MAX_SSID_LENGTH);
+          memcpy(auxSSID,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (wifiCred.wifiSSIDs[2].compareTo(auxSSID)!=0) {
+            wifiCred.wifiSSIDs[2]=String(p->value().c_str());
+            EEPROM.put(0xE5,auxSSID);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST PSSW_BK2 value
+        if (String(p->name()).compareTo("PSSW_BK2")==0) {
+          memset(auxPSSW,'\0',WIFI_MAX_PSSW_LENGTH);
+          memcpy(auxPSSW,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (wifiCred.wifiPSSWs[2].compareTo(auxPSSW)!=0) {
+            wifiCred.wifiPSSWs[2]=String(p->value().c_str());
+            EEPROM.put(0x106,auxPSSW);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST SITE_BK2 value
+        if (String(p->name()).compareTo("SITE_BK2")==0) {
+          memset(auxSITE,'\0',WIFI_MAX_SITE_LENGTH);
+          memcpy(auxSITE,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (wifiCred.wifiSITEs[2].compareTo(auxSITE)!=0) {
+            wifiCred.wifiSITEs[2]=String(p->value().c_str());
+            EEPROM.put(0x146,auxSITE);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST NTP1 value
+        if (String(p->name()).compareTo("NTP1")==0) {
+          memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
+          memcpy(auxNTP,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (ntpServers[0].compareTo(auxNTP)!=0) {
+            ntpServers[0]=String(p->value().c_str());
+            EEPROM.put(0x151,auxNTP);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST NTP2 value
+        if (String(p->name()).compareTo("NTP2")==0) {
+          memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
+          memcpy(auxNTP,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (ntpServers[1].compareTo(auxNTP)!=0) {
+            ntpServers[1]=String(p->value().c_str());
+            EEPROM.put(0x191,auxNTP);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST NTP3 value
+        if (String(p->name()).compareTo("NTP3")==0) {
+          memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
+          memcpy(auxNTP,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (ntpServers[2].compareTo(auxNTP)!=0) {
+            ntpServers[2]=String(p->value().c_str());
+            EEPROM.put(0x1D1,auxNTP);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST NTP4 value
+        if (String(p->name()).compareTo("NTP4")==0) {
+          memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);
+          memcpy(auxNTP,p->value().c_str(),String(p->value().c_str()).length()); //End null not included
+          if (ntpServers[3].compareTo(auxNTP)!=0) {
+            ntpServers[3]=String(p->value().c_str());
+            EEPROM.put(0x211,auxNTP);
+            updateEEPROM=true;
+          }
+        }
+        // HTTP POST TimeZone value
+        if (String(p->name()).compareTo("TimeZone")==0) {
+          memset(auxTZEnvVar,'\0',TZ_ENV_VARIABLE_MAX_LENGTH);
+          memcpy(auxTZEnvVar,
+                 p->value().substring(p->value().indexOf('$')+1).c_str(),
+                 p->value().substring(p->value().indexOf('$')+1).length()); //End null not included
+          if (TZEnvVariable.compareTo(auxTZEnvVar)!=0) {
+            TZEnvVariable=p->value().substring(p->value().indexOf('$')+1);
+            EEPROM.put(0x251,auxTZEnvVar);
+            updateEEPROM=true;
+          }
+
+          memset(auxTZName,'\0',TZ_ENV_NAME_MAX_LENGTH);
+          memcpy(auxTZName,p->value().substring(0,p->value().indexOf('$')).c_str(),p->value().indexOf('$')); //End null not included
+          if (TZName.compareTo(auxTZName)!=0) {
+            TZName=p->value().substring(0,p->value().indexOf('$'));
+            EEPROM.put(0x28A,auxTZName);
+            updateEEPROM=true;
+          }
+        }
+      }
+    }
+
+    if (updateEEPROM) EEPROM.commit();
+    deviceReset=true;
+    request->send(SPIFFS, WEBSERVER_APCONTAINER_PAGE, String(), false, processorAP);
+    //ESP.restart();
+  });
+
+  // Start server
+  webServer.begin();
+
+  return NO_ERROR;
+}

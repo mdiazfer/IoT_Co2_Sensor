@@ -410,3 +410,60 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
   if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=NTP_CHECK_TIMEOUT;  //To avoid resuming connection the next loop interacion       
   return(NO_ERROR);
 }
+
+bool runAPMode() {
+  bool activeOK=true,auxWileLoop=true;
+  if (logsOn) Serial.println("  [runAPMode] - WiFi Enabled but no WiFi SSID is setup. Asking if run AP.");
+  tft.setTextColor(TFT_YELLOW,TFT_BLACK);
+  tft.drawString("WIFI enabled but no SSID is setup",5,4,TEXT_FONT_BOOT_SCREEN);
+  tft.drawString("To setup device WiFi, connect to:",5,28,TEXT_FONT_BOOT_SCREEN);
+  tft.drawString("    SSID: "+String(APMODE_SSID),5,45,TEXT_FONT_BOOT_SCREEN);
+  tft.drawString("    PSSW: "+String(APMODE_PSSW),5,62,TEXT_FONT_BOOT_SCREEN);
+  tft.drawString("    http://"+String(APMODE_LOCAL_IP_ADDRESS),5,79,TEXT_FONT_BOOT_SCREEN);
+  //While loop, waiting for pushing any button
+  while (auxWileLoop) {
+    switch (checkButtonsActions(askAPloop)) {
+      case 4: //Value return from checkButtonsActions()
+        activeOK=!activeOK;
+      break;
+      case 5: //Value return from checkButtonsActions()
+        auxWileLoop=false;
+      break;
+      default:  //Value return from checkButtonsActions()
+      break;
+    }
+    if (activeOK) {
+      tft.setTextColor(TFT_YELLOW,TFT_BLACK);tft.drawString(" CANCEL ",9,108,TEXT_FONT_BOOT_SCREEN);
+      tft.setTextColor(TFT_BLACK,TFT_YELLOW);tft.drawString(" OK ",70,108,TEXT_FONT_BOOT_SCREEN);
+      tft.setTextColor(TFT_YELLOW,TFT_BLACK);tft.drawString("  (Buttons to select)",100,108,TEXT_FONT_BOOT_SCREEN);
+    }
+    else {
+      tft.setTextColor(TFT_BLACK,TFT_YELLOW);tft.drawString(" CANCEL ",9,108,TEXT_FONT_BOOT_SCREEN);
+      tft.setTextColor(TFT_YELLOW,TFT_BLACK);tft.drawString(" OK ",70,108,TEXT_FONT_BOOT_SCREEN);
+      tft.drawString("  (Buttons to select)",100,108,TEXT_FONT_BOOT_SCREEN);
+    }
+  }
+  
+  if (activeOK) {
+    //Start AP Mode
+    IPAddress APLocalIP=stringToIPAddress(String(APMODE_LOCAL_IP_ADDRESS));
+    IPAddress APLocalGW=stringToIPAddress(String(APMODE_GATEWAY_ADDRESS));
+    IPAddress APLocalSubnetMask=stringToIPAddress(String(APMODE_SUBNETWORK_MASK));
+    WiFi.mode(WIFI_AP);
+    WiFi.softAPConfig(APLocalIP, APLocalGW, APLocalSubnetMask);
+    WiFi.softAP(APMODE_SSID, APMODE_PSSW);
+    if (logsOn) Serial.println("  [runAPMode] - AP IP address: ="+WiFi.softAPIP().toString());
+
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_YELLOW,TFT_BLACK);
+    tft.drawString("AP and Web Server already ENABLED.",5,4,TEXT_FONT_BOOT_SCREEN);
+    tft.drawString("Continue from the browser.",5,21,TEXT_FONT_BOOT_SCREEN);
+    tft.setTextColor(TFT_GREEN,TFT_BLACK);
+    tft.drawString("To setup device WiFi, connect to:",5,45,TEXT_FONT_BOOT_SCREEN);
+    tft.drawString("    SSID: "+String(APMODE_SSID),5,62,TEXT_FONT_BOOT_SCREEN);
+    tft.drawString("    PSSW: "+String(APMODE_PSSW),5,79,TEXT_FONT_BOOT_SCREEN);
+    tft.drawString("    http://"+String(APMODE_LOCAL_IP_ADDRESS),5,96,TEXT_FONT_BOOT_SCREEN);
+  }
+
+  return(activeOK);
+}

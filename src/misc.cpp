@@ -269,7 +269,7 @@ void factoryConfReset() {
   EEPROM.put(0x251,auxTZEnvVar);TZEnvVariable=String(auxTZEnvVar);
   EEPROM.put(0x28A,auxTZName);TZName=String(auxTZName);
 
-  if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxTZEnvVar='"+String(auxTZEnvVar)+"'");}
+  if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxTZEnvVar='"+String(auxTZEnvVar)+"', auxTZName='"+String(auxTZName)+"'");}
 
   //Now initialize wifiCred.SiteAllow variables
   configVariables=0x0; //Bit 0, notFirstRun=true
@@ -326,4 +326,24 @@ bool initTZVariables() {
   }
 
   return updateEEPROM;
+}
+
+IPAddress stringToIPAddress(String stringIPAddress) {
+  char charToTest;
+  uint lastBegin=0,indexArray=0;
+  int IPAddressOctectArray[4];
+  for (uint i=0; i<=stringIPAddress.length(); i++) {
+    charToTest=stringIPAddress.charAt(i);
+    if (charToTest=='.') {    
+      IPAddressOctectArray[indexArray]=stringIPAddress.substring(lastBegin,i).toInt();
+      lastBegin=i+1;
+      if (indexArray==2) {
+        indexArray++;
+        IPAddressOctectArray[indexArray]=stringIPAddress.substring(lastBegin,stringIPAddress.length()).toInt();
+      }
+      else indexArray++;
+    }
+  }
+  
+  return IPAddress(IPAddressOctectArray[0],IPAddressOctectArray[1],IPAddressOctectArray[2],IPAddressOctectArray[3]);
 }
