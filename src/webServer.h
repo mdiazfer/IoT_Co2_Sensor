@@ -9,7 +9,7 @@
 #include <EEPROM.h>
 
 #ifndef _DISPLAYSUPPORTINFO_
-  enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
+  //enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
   enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status};
   enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
   #define _DISPLAYSUPPORTINFO_

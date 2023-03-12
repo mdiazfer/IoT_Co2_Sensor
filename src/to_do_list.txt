@@ -7,6 +7,8 @@ To do list
   + https
   + Firmware upgrade OTA
 - Troubleshoot
+  + Device goes to sleep when starting from battery and doesn't go to usbState when USB plugged
+  + Device wake up becasue USB power, but webServer doen't work
   + WebServer doesn't begin randomly (after firmware upload???)
   + WiFi connection failures
   + No button action after waking up with button

@@ -3,13 +3,15 @@
   #include <TFT_eSPI.h>
   #include "global_setup.h"
   #include "user_setup.h"
-  #include "esp_adc_cal.h"  
+  #include "esp_adc_cal.h"
 
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,bootAP,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
     enum availableStates {bootupScreen,bootAPScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode,factResetMenu,factReset};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
+    enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
+    //#define _DISPLAYSUPPORTINFO_
   #endif
 
   #ifndef _BATTERYFRAMEWORK_
@@ -31,11 +33,15 @@ extern RTC_DATA_ATTR float_t batADCVolt,lastBatCharge,batCharge;
 extern RTC_DATA_ATTR enum powerModes powerState;
 extern RTC_DATA_ATTR enum batteryChargingStatus batteryStatus;
 extern RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode;
-extern RTC_DATA_ATTR boolean autoBackLightOff,forceDisplayModeRefresh,forceDisplayRefresh,forceGetSample;
+extern RTC_DATA_ATTR boolean autoBackLightOff,forceDisplayModeRefresh,forceDisplayRefresh,
+                              forceGetSample,forceWifiReconnect,forceWebServerInit;
 extern RTC_DATA_ATTR enum availableStates stateSelected,currentState;
 extern RTC_DATA_ATTR uint64_t nowTimeGlobal,previousLastTimeSampleCheck,lastTimeTurnOffBacklightCheck;
 extern RTC_DATA_ATTR enum displayModes displayMode,lastDisplayMode;
 extern RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod; //3*4=12B
+extern RTC_DATA_ATTR  enum CloudClockStatus CloudClockCurrentStatus;
+extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
+extern bool initTZVariables();
 
 
 //Function declarations

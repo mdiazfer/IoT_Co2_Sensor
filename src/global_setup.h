@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.B"
+#define VERSION "0.9.C"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some

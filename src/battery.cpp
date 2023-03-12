@@ -184,6 +184,14 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
           displayMode=sampleValue;
           lastDisplayMode=AutoSwitchOffMessage; //Force re-rendering CO2 values in the main screen
         }
+
+        //If the display is off, then coming from sleep, so let's prepare
+        //WiFi-related things to re-init after waking up from sleep
+        forceWifiReconnect=true; //Force WiFi reconnection in the next loop interaction
+        forceWebServerInit=true; //v0.9.C - Next WiFi reconnection, force Web Server Init after waking up from sleep
+        initTZVariables(); //To make sure that both NTP sync and NTP info in web are right
+        CloudClockCurrentStatus=CloudClockOffStatus; //To update icons as WiFi is disconnect
+        CloudSyncCurrentStatus=CloudSyncOffStatus; //To update icons as WiFi is disconnect
       }
     }
     else { //USB power. Let's decide if chargingUSB or noChargingUSB based on USB power time
@@ -210,13 +218,13 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
     if (batCharge>=BAT_CHG_THR_FOR_SAVE_ENERGY) {
       //energyCurrentMode=reducedEnergy;
       energyCurrentMode=configSavingEnergyMode; //Normally reducedEnergy if not changed in the Config Menu
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //Keeping it for future. In this version No BAT checks in Reduce Engergy Mode to save energy
+      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; 
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
     }
     else {
       energyCurrentMode=lowestEnergy;    
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //Keeping it for future. In this version No BAT checks in Save Engergy Mode to save energy
+      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; 
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
     }

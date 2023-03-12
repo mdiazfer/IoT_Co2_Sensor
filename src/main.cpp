@@ -1108,12 +1108,12 @@ void firstSetup() {
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
     break;
     case reducedEnergy:
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //Keeping it for future. In this version No BAT checks in Reduce Engergy Mode to save energy
+      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; 
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
     break;
     case lowestEnergy:
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //Keeping it for future. In this version No BAT checks in Save Engergy Mode to save energy
+      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; 
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
     break;
@@ -1457,9 +1457,15 @@ void loop() {
   // but only if Full Energy Mode (USB power to save energy consume)
   //forceGetVolt==true if buttons are pressed to wakeup CPU
   nowTimeGlobal=loopStartTime+millis();
-  if ( (((nowTimeGlobal-lastTimeVOLTCheck) >= voltageCheckPeriod) && fullEnergy==energyCurrentMode) || forceGetVolt ) {
+  //if ( (((nowTimeGlobal-lastTimeVOLTCheck) >= voltageCheckPeriod) && fullEnergy==energyCurrentMode) || forceGetVolt ) {
+  if (((nowTimeGlobal-lastTimeVOLTCheck) >= voltageCheckPeriod) || forceGetVolt ) {
     if (debugModeOn) {Serial.println("-------------oooooOOOOOOoooooo------------");Serial.println(String(nowTimeGlobal)+"  - VOLTAGE_CHECK_PERIOD");}
-    
+
+    //voltageCheckPeriod:
+    // * energyCurrentMode == fullEnergy    => voltageCheckPeriod=VOLTAGE_CHECK_PERIOD (5 sg)
+    // * energyCurrentMode == reducedEnergy => voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE (5 min)
+    // * energyCurrentMode == lowestEnergy  => voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE (5 min)
+
     //batADCVolt update
     //Power state check and powerState update
     //batteryStatus update
@@ -1721,7 +1727,7 @@ void loop() {
     if(forceWifiReconnect) {
       forceWifiReconnect=false;
       forceNTPCheck=true; //v0.9.9 - Force NTP sync after WiFi Connection
-      if (buttonWakeUp) forceWebServerInit=true; //v0.9.9 - Force Web Server Init after waking up from sleep
+      if (buttonWakeUp) forceWebServerInit=true; //v0.9.9 - Next WiFi reconnection, force Web Server Init after waking up from sleep
     }
     
     //If WiFi disconnected (wifiOffStatus), then re-connect

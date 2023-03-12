@@ -24,6 +24,34 @@ div#tswsidecol {
   background-color: #34383b;
 }
 
+div#tswsidecolindex {
+  float: right;
+  width: 27%;
+  color: white;
+  background-color: #34383b;
+}
+
+div#tswsidecolapindex {
+  float: right;
+  width: 27%;
+  color: white;
+  background-color: #34383b;
+}
+
+div#tswsidecolbasic {
+  float: right;
+  width: 27%;
+  color: white;
+  background-color: #34383b;
+}
+
+div#tswsidecolmaint {
+  float: right;
+  width: 27%;
+  color: white;
+  background-color: #34383b;
+}
+
 div#tswcontent {
   float: right;
   width: 70%;
@@ -33,6 +61,22 @@ div#tswcontent {
 
 @media only screen and ( max-width : 629px ) {
   div#tswsidecol {
+    float: none;
+    width: 100%;
+  }
+  div#tswsidecolindex {
+    float: none;
+    width: 100%;
+  }
+  div#tswsidecolapindex {
+    float: none;
+    width: 100%;
+  }
+  div#tswsidecolbasic {
+    float: none;
+    width: 100%;
+  }
+  div#tswsidecolmaint {
     float: none;
     width: 100%;
   }
@@ -86,6 +130,30 @@ div#tswfooter {
   margin-right: 3%;
 }
 
+#tswsidecolindex {
+  margin-left: 0%;
+  margin-right: 3%;
+  height: 1027px;
+}
+
+#tswsidecolapindex {
+  margin-left: 0%;
+  margin-right: 3%;
+  height: 388px;
+}
+
+#tswsidecolbasic {
+  margin-left: 0%;
+  margin-right: 3%;
+  height: 658px;
+}
+
+#tswsidecolmaint {
+  margin-left: 0%;
+  margin-right: 3%;
+  height: 362px;
+}
+
 #tswcontproper {
   min-height: 280px;
 }
@@ -102,13 +170,13 @@ div#tswfooter {
 
 #tswdevice {
   float: left;
-  width: 45%;
+  width: 50%;
   padding-right: 5%;
   clear: left;
 }
 
 #tswsamples {
-  width: 45%;
+  width: 50%;
   float: left;
   padding-right: 5%;
   padding-bottom: 5%;
@@ -119,7 +187,7 @@ div#tswfooter {
   clear: right;
   padding-top: 5%;
   padding-bottom: 5%;
-  width: 50%;
+  width: 45%;
 }
 
 #tswmiscinfoleft {
