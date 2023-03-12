@@ -8,6 +8,7 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.9.B 12/Mar/2023   - Added Factory Reset to the Config Menu
 - 0.9.A 12/Mar/2023   - AP mode to provide first SSID in WiFi Menu
                         + Added bootAP and bootUPScreen
                         + Added stringToIPAddress() function to create IPAddress object from String

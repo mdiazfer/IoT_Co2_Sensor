@@ -409,20 +409,43 @@ void printMainMenu() {
 
   if (stateSelected==showOptMenu) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(20,40,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Show Options Menu");
+  tft.setCursor(20,34,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Show Options Menu");
   if (stateSelected==infoMenu) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("General Info");
+  tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*1,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("General Info");
   if (stateSelected==configMenu) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Config Menu");
+  tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*2,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Config Menu");
+  if (stateSelected==factResetMenu) {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;} else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Factory Reset");
   //Printing Back option
   if (  (stateSelected==displayingSampleFixed) || (stateSelected==displayingCo2LastHourGraphFixed) ||
         (stateSelected==displayingCo2LastDayGraphFixed) || (stateSelected==displayingSequential) )
         {auxColorFore=MENU_GLOBAL_BACK_COLOR;auxColorBack=MENU_GLOBAL_FORE_COLOR;}
   else {auxColorFore=MENU_GLOBAL_FORE_COLOR;auxColorBack=MENU_GLOBAL_BACK_COLOR;}
   tft.setTextColor(auxColorFore,auxColorBack);
-  tft.setCursor(20,40+(tft.fontHeight(TEXT_FONT_MENU)+5)*3,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Back");
+  tft.setCursor(20,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*4,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Back");
+}
+
+void printFactoryResetMenu() {
+  //Cleaning and printing menu screen
+  tft.fillScreen(MENU_FACT_RESET_BACK_COLOR);
+  uint16_t auxColorFore=TFT_GREEN,auxColorBack=MENU_FACT_RESET_BACK_COLOR;
+  tft.setTextColor(auxColorFore,auxColorBack);
+  tft.setCursor(50,10,TEXT_FONT_MENU);tft.setTextSize(TEXT_SIZE_MENU);tft.println("Factory Reset");
+
+  //Printing the TEXT
+  auxColorFore=MENU_FACT_RESET_FORE_COLOR;auxColorBack=MENU_FACT_RESET_BACK_COLOR;
+  tft.setTextColor(auxColorFore,auxColorBack);tft.setCursor(1,44,TEXT_FONT_BOOT_SCREEN); tft.setTextSize(TEXT_SIZE_BOOT_SCREEN);tft.println("  All network services, including web\n  access, won't be longer available.\n  The WiFi will be setup next bootup.");
+  
+  //Printing first Config Menu Option - WiFi ON/OFF-
+  //tft.setTextColor(auxColorFore,auxColorBack);tft.setCursor(1,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*4,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println(" ");
+  tft.setTextSize(TEXT_SIZE_MENU);
+  tft.setTextColor(auxColorFore,auxColorBack);tft.setCursor(1,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*4,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println("Continue?");
+  if ( (stateSelected==factResetMenu || stateSelected==factReset) ) {auxColorFore=MENU_FACT_RESET_FORE_COLOR;auxColorBack=MENU_FACT_RESET_BACK_COLOR;} else {auxColorFore=MENU_FACT_RESET_BACK_COLOR;auxColorBack=MENU_FACT_RESET_FORE_COLOR;}
+  tft.setTextColor(auxColorFore,auxColorBack);tft.setCursor(110,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*4,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println(" CANCEL ");
+  tft.setTextColor(auxColorBack,auxColorFore);tft.setCursor(200,34+(tft.fontHeight(TEXT_FONT_MENU)+5)*4,TEXT_FONT_MENU); tft.setTextSize(TEXT_SIZE_MENU);tft.println(" OK ");
 }
 
 void printInfoMenu() {

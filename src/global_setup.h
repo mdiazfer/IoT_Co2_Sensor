@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.A"
+#define VERSION "0.9.B"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -128,6 +128,8 @@
 #define MENU_INFO_BACK_COLOR TFT_BLACK
 #define MENU_CONFIG_FORE_COLOR TFT_VIOLET
 #define MENU_CONFIG_BACK_COLOR TFT_BLACK
+#define MENU_FACT_RESET_FORE_COLOR TFT_DARKGREY //TFT_BROWN
+#define MENU_FACT_RESET_BACK_COLOR TFT_BLACK
 #define CO2_GAUGE_X      80
 #define CO2_GAUGE_Y      95
 #define CO2_GAUGE_R      70
@@ -176,15 +178,15 @@
 #define MAX_CONNECTION_ATTEMPTS 10
 #define NTP_SERVER_NAME_MAX_LENGTH 64
 #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
-  //#define NTP_SERVER  "10.88.50.5"
-  #define NTP_SERVER  "time.google.com"
+  #define NTP_SERVER  "10.88.50.5"
+  //#define NTP_SERVER  "time.google.com"
   #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
   #define NTP_SERVER3  "time4.google.com"  //216.239.35.12
   #define NTP_SERVER4  "time.apple.com"
 #endif
 #if BUILD_ENV_NAME==BUILD_TYPE_DEVELOPMENT
-  //#define NTP_SERVER  "10.88.50.5"
-  #define NTP_SERVER  "time.google.com"
+  #define NTP_SERVER  "10.88.50.5"
+  //#define NTP_SERVER  "time.google.com"
   #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
   #define NTP_SERVER3  "time4.google.com"  //216.239.35.12
   #define NTP_SERVER4  "time.apple.com"
@@ -337,7 +339,7 @@
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,bootAP,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
     enum availableStates {bootupScreen,bootAPScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
-                          displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode};
+                          displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode,factResetMenu,factReset};
     RTC_DATA_ATTR enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
     enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};

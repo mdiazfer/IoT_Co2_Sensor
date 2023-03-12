@@ -39,6 +39,9 @@ void checkButton1() {
           stateSelected=configMenu;
         break;
         case configMenu:
+          stateSelected=factResetMenu;
+        break;
+        case factResetMenu:
           stateSelected=lastState;
         break;
         default:
@@ -46,6 +49,18 @@ void checkButton1() {
         break;
       }
       printMainMenu();
+    break;
+    case factResetMenu:
+      switch(stateSelected) {
+        case factReset:
+          stateSelected=mainMenu;
+        break;
+        case factResetMenu:
+        default:
+          stateSelected=factReset;
+        break;
+      }
+      printFactoryResetMenu();
     break;
     case showOptMenu:
     //Changing displayingMode: sampleFixed -> co2LastHourGraphFixe -> co2LastDayGraphFixed -> sequential
@@ -161,10 +176,22 @@ void checkButton2() {
       if (currentState==showOptMenu) {stateSelected=lastState; printshowOptMenu();}
       else if (currentState==infoMenu) {stateSelected=infoMenu1; printInfoMenu();}
       else if (currentState==configMenu) {stateSelected=confMenuWifi;printConfigMenu();}
+      else if (currentState==factResetMenu) {stateSelected=mainMenu;printFactoryResetMenu();} //tateSelected=mainMenu to start in CANCEL
       else if (currentState==displayingSampleFixed){forceDisplayRefresh=true;lastDisplayMode=menu;}
       else if (currentState==displayingCo2LastHourGraphFixed){forceDisplayRefresh=true;updateHourGraph=true;}
       else if (currentState==displayingCo2LastDayGraphFixed){forceDisplayRefresh=true;updateDayGraph=true;}
       else if (currentState==displayingSequential){forceDisplayRefresh=true;forceDisplayModeRefresh=true;lastDisplayMode=menu;displayMode=sampleValue;}
+    break;
+    case factResetMenu:
+      currentState=stateSelected;
+      if (currentState==mainMenu) {currentState=mainMenu;stateSelected=lastState;printMainMenu();}
+      else {
+        //Reset config to Factory values and save in EEPROM
+        factoryConfReset();
+        EEPROM.commit();
+        delay(00); //Time to rightly write EEPROM
+        ESP.restart();
+      }
     break;
     case showOptMenu:
       currentState=stateSelected;
@@ -172,7 +199,6 @@ void checkButton2() {
       forceDisplayModeRefresh=true;
       lastDisplayMode=menu;
       previousLastTimeSampleCheck=nowTimeGlobal-SAMPLE_PERIOD; //Refresh the circular graph for CO2 sample
-      //tft.fillScreen(MENU_BACK_COLOR);
     break;
     case infoMenu:
       currentState=stateSelected;

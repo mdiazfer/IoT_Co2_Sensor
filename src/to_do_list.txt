@@ -3,8 +3,9 @@ To do list
 - Web server to display results and configuration
   + Enable WiFi ON/OFF and webServer ON/OFF in the web menu (?)
     * Pop-up if disable WiFi or Web Server to warn about
-  v AP mode to provide first SSID in WiFi Menu
+  + fix web pages layout for smartphone
   + https
+  + Firmware upgrade OTA
 - Troubleshoot
   + WebServer doesn't begin randomly (after firmware upload???)
   + WiFi connection failures
@@ -18,7 +19,6 @@ To do list
   + Triger alarms
   + Save CO2 samples in cloud to not lose graph pictures when the battery runs out
   + Adding Bootup info Option to the Display Info Menu
-  + Firmware upgrade OTA
 
 
 Done
