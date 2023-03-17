@@ -8,9 +8,22 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 0.9.D 17/Mar/2023   - Added Firmware upgrade OTA
+                      - Added SPIFFSErrors variable for Error statistics. It is sent to Cloud and shown in web page as well.
+                      - Power checks done every VOLTAGE_CHECK_PERIOD seconds while the display is ON, even
+                        if Battery is the power source. This makes the power detection faster and it avoids
+                        going to sleep when USB is unplugged and plugged back again 6 sec. later.
+                      - Bug fixing 
+                        + Boot with Battery -> Go to sleep -> Plug USB -> Timer Wakeup and WebServer doesn't re-init
+                        + No (battery) icon was updated when Co2 measurement screen is selected
+                        + Battery power and configuring Display Mode from the web, don't go to sleep
+                          (autoBackLightOff=false by default in the web form)
+                        + Sleeping with Battery powered -> Button to wakeup -> Display Mode config from Web conf -> USB power -> No detected
+                        + Some times no gauge is drawn when setup fixed sample from web
 - 0.9.C 12/Mar/2023   - Bug fixing 
                         + Device didn't change energyStatus in sleep after plug USB  
                         + Webs server didn't re-init after waking up due to USB power (not button)
+                        + serverToUploadSamplesIPAddress lost after waking up from sleep
 - 0.9.B 12/Mar/2023   - Added Factory Reset to the Config Menu
 - 0.9.A 12/Mar/2023   - AP mode to provide first SSID in WiFi Menu
                         + Added bootAP and bootUPScreen

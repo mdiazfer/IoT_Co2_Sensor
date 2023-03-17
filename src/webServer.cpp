@@ -196,6 +196,30 @@ String processor(const String& var){
     return ntpServers[3]; 
   } else if (var == "NTP4_VALUE") {
     return ntpServers[3];
+  } else if (var == "DISPLAYONCHECKED") {
+    if (autoBackLightOff) return String("checked");
+    else return String("");
+} else if (var == "DISPLAYOFFCHECKED") {
+    if (!autoBackLightOff) return String("checked");
+    else return String("");
+} else if (var == "BATTERYMODEREDUCEDSELECTED") {
+    if (energyCurrentMode == reducedEnergy) return String("checked");
+    else return String("");
+} else if (var == "BATTERYMODELOWESTSELECTED") {
+    if (energyCurrentMode == lowestEnergy) return String("checked");
+    else return String("");
+} else if (var == "DISPLAYMODESAMPLESELECTED") {
+    if (currentState == displayingSampleFixed) return String("selected");
+    else return String("");
+} else if (var == "DISPLAYMODELASTHOURSELECTED") {
+    if (currentState == displayingCo2LastHourGraphFixed) return String("selected");
+    else return String("");
+} else if (var == "DISPLAYMODELASTDAYSELECTED") {
+    if (currentState == displayingCo2LastDayGraphFixed) return String("selected");
+    else return String("");
+} else if (var == "DISPLAYMODESEQUENTIALSELECTED") {
+    if (currentState == displayingSequential) return String("selected");
+    else return String("");
   } else if (var == "CLOUD_ON_CHECKED") {
     if (uploadSamplesEnabled) return String("checked");
     else return String();
@@ -245,6 +269,8 @@ String processor(const String& var){
     return String(errorsSampleUpts);
   } else if (var == "NTPERRORS") {
     return String(errorsNTPCnt);
+  } else if (var == "SPIFFSERRORS") {
+    return String(SPIFFSErrors);
   }
   else {
     return String();
@@ -602,22 +628,22 @@ uint32_t initWebServer() {
         if (String(p->name()).compareTo("DisplayMode")==0) {
           if (String(p->value().c_str()).compareTo("CO2")==0) {
             currentState=displayingSampleFixed;
-            lastDisplayMode=displayMode;
+            lastDisplayMode=co2LastDayGraph; //Force re-rendering CO2 values in the main screen
             displayMode=sampleValue;
           }
           else if (String(p->value().c_str()).compareTo("LastHour")==0) {
             currentState=displayingCo2LastHourGraphFixed;
-            lastDisplayMode=displayMode;
+            lastDisplayMode=sampleValue;
             displayMode=co2LastHourGraph;
           }
           else if (String(p->value().c_str()).compareTo("LastDay")==0) {
             currentState=displayingCo2LastDayGraphFixed;
-            lastDisplayMode=displayMode;
+            lastDisplayMode=co2LastHourGraph;
             displayMode=co2LastDayGraph;
           }
           else if (String(p->value().c_str()).compareTo("Sequential")==0) {
             currentState=displayingSequential;
-            lastDisplayMode=displayMode;
+            lastDisplayMode=co2LastDayGraph; //Force re-rendering CO2 values in the main screen
             displayMode=sampleValue;
           }
           forceDisplayRefresh=true;
@@ -778,7 +804,9 @@ uint32_t initWebServer() {
     }
   });
 
-  // Start server
+  // Start server for OTA
+  AsyncElegantOTA.begin(&webServer);
+  // Start web server
   webServer.begin();
 
   return NO_ERROR;
@@ -1046,6 +1074,8 @@ uint32_t initAPWebServer() {
     //ESP.restart();
   });
 
+  // Start server OTA
+  AsyncElegantOTA.begin(&webServer);
   // Start server
   webServer.begin();
 

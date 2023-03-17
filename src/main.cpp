@@ -29,7 +29,10 @@
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
 #include <SPIFFS.h>
-#include "webServer.h"
+#ifndef AsyncElegantOTA_h
+  #define AsyncElegantOTA_h
+  #include "webServer.h"
+#endif
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -40,10 +43,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   887 B
+// RTC memory variables:                   907 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     3947 B
-// RTC memory left:     8000 B - 3947 B = 4053 B 
+// RTC memorty TOTAL:                     3967 B
+// RTC memory left:     8000 B - 3967 B = 4033 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -121,7 +124,8 @@ RTC_DATA_ATTR boolean firstWifiCheck=true,forceWifiReconnect=false,forceGetSampl
 RTC_DATA_ATTR int uploadServerIPAddressOctectArray[4]; // 4*4B = 16B - To store upload server's @IP
 RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
-RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0,webServerError1=0,webServerError2=0,webServerError3=0; //2*4=8B - Error stats
+RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0,webServerError1=0,
+                  webServerError2=0,webServerError3=0,SPIFFSErrors=0; //7*4=28B - Error stats
 RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled;//4*1=4B
 RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON; //1*1=1B
 RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus=BLEOffStatus; //1*4=4B
@@ -162,6 +166,7 @@ uint8_t auxLoopCounter=0,auxLoopCounter2=0,auxCounter=0;
 uint64_t whileLoopTimeLeft=NTP_CHECK_TIMEOUT,whileWebLoopTimeLeft=HTTP_ANSWER_TIMEOUT;
 uint8_t configVariables;
 char firmwareVersion[VERSION_CHAR_LENGTH+1];
+esp_sleep_wakeup_cause_t wakeup_reason;
 
 
 //Code
@@ -192,7 +197,7 @@ void initVariable() {
   forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;
   forceWEBCheck=false;forceWEBTestCheck=false;forceWebServerInit=false;
   valueCO2=0;valueT=0;valueHum=0;lastValueCO2=-1;tempMeasure=0;
-  errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;webServerError1=0;webServerError2=0;webServerError3=0;
+  errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;webServerError1=0;webServerError2=0;webServerError3=0;SPIFFSErrors=0;
   error_setup=NO_ERROR;remainingBootupSeconds=0;
   previousTime=0;remainingBootupTime=BOOTUP_TIMEOUT*1000;
   static const char hex_digits[] = "0123456789ABCDEF";
@@ -653,7 +658,13 @@ void firstSetup() {
     //Based on user's entry, AP Mode is run or not
     if(runAPMode()) {
       //AP Mode is running
-      if (logsOn) Serial.println(" [setup] - SPIFFS.begin="+String(SPIFFS.begin(true)));
+      if (SPIFFS.begin(true)) {
+        if (logsOn) Serial.println(" [setup] - SPIFFS.begin=OK, SPIFFSErrors="+String(SPIFFSErrors));
+      }
+      else {
+        SPIFFSErrors++;
+        if (logsOn) Serial.println(" [setup] - SPIFFS.begin=KO, SPIFFSErrors="+String(SPIFFSErrors));
+      }
       if (logsOn) Serial.println(" [setup] - initAPWebServer="+String(initAPWebServer()));
     
       //Infinitive loop as ESP web server is running.
@@ -870,14 +881,16 @@ void firstSetup() {
   
   //SPIFFS
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - SPIFFS: [");
+  
   if(!SPIFFS.begin(true)){
     error_setup|=ERROR_SPIFFS_SETUP;
-    if (logsOn) {Serial.println("[setup] - SPIFFS: KO");}
+    SPIFFSErrors++;
+    if (logsOn) Serial.println("[setup] - SPIFFS.begin=KO, SPIFFSErrors="+String(SPIFFSErrors));
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
   else {
-    if (logsOn) Serial.println("[setup] - SPIFFS: OK");
+    if (logsOn) Serial.println("[setup] - SPIFFS.begin=OK, SPIFFSErrors="+String(SPIFFSErrors));
     stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
@@ -1108,12 +1121,18 @@ void firstSetup() {
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
     break;
     case reducedEnergy:
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; 
+      //If TFT is off then sleep mode is active, so let's reduce the VOLTAGE_CHECK_PERIOD period
+      //This makes detection of USB/Battery supply every VOLTAGE_CHECK_PERIOD when the display is ON
+      if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; 
+      else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
     break;
     case lowestEnergy:
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; 
+      //If TFT is off then sleep mode is active, so let's reduce the VOLTAGE_CHECK_PERIOD period
+      //This makes detection of USB/Battery supply every VOLTAGE_CHECK_PERIOD when the display is ON
+      if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; 
+      else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
     break;
@@ -1260,7 +1279,7 @@ void setup() {
   if (debugModeOn) {Serial.println("\n"+String(nowTimeGlobal)+" [SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}
   randomSeed(analogRead(GPIO_NUM_32));
 
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  wakeup_reason = esp_sleep_get_wakeup_cause();
   switch(wakeup_reason)
   {
     case ESP_SLEEP_WAKEUP_EXT1: //Wake up from Hibernate Mode by long pressing Button1
@@ -1383,10 +1402,10 @@ void setup() {
   memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x1D1,auxNTP);ntpServers[2]=auxNTP;
   memset(auxNTP,'\0',NTP_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x211,auxNTP);ntpServers[3]=auxNTP;
 
-  //TZEnvVariable definition - Not run if waking up from either button or timer
+  //TZEnvVariable definition - Not run before if waking up from either button or timer
   char auxTZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH];
   memset(auxTZEnvVar,'\0',TZ_ENV_VARIABLE_MAX_LENGTH);EEPROM.get(0x251,auxTZEnvVar);TZEnvVariable=String(auxTZEnvVar);
-
+  
   //wifiCred.SiteAllow definition  - Not run if waking up from either button or timer
   configVariables=EEPROM.read(0x2A8);
   wifiCred.SiteAllow[0]=configVariables & 0x01;
@@ -1396,11 +1415,12 @@ void setup() {
   if (debugModeOn) {Serial.println("      - wifiCurrentStatus=wifiOffStatus till WiFi reconnection");}
   wifiCurrentStatus=wifiOffStatus;
 
-  if (debugModeOn) {Serial.println("      - serverToUploadSamplesIPAddress & device");}
-  serverToUploadSamplesIPAddress=IPAddress(uploadServerIPAddressOctectArray[0],uploadServerIPAddressOctectArray[1],uploadServerIPAddressOctectArray[2],uploadServerIPAddressOctectArray[3]);
+  //serverToUploadSamplesIPAddress=IPAddress(uploadServerIPAddressOctectArray[0],uploadServerIPAddressOctectArray[1],uploadServerIPAddressOctectArray[2],uploadServerIPAddressOctectArray[3]);
+  serverToUploadSamplesIPAddress=stringToIPAddress(String(SERVER_UPLOAD_SAMPLES)); //v0.9.9.D
   device=device+"-"+String((char)hex_digits[mac[3]>>4])+String((char)hex_digits[mac[3]&15])+
     String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
     String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
+  if (debugModeOn) {Serial.println("      - serverToUploadSamplesIPAddress="+IpAddress2String(serverToUploadSamplesIPAddress)+" & device="+device);}
 
   if (debugModeOn) {Serial.println("      - Restoring TZEnvVar="+String(TZEnvVar));}
   setenv("TZ",TZEnvVar,1); tzset(); //Restore TZ enviroment variable to show the right time
@@ -1703,22 +1723,21 @@ void loop() {
   //forceWifiReconnect==true if:
   // 1) after ICON_STATUS_REFRESH_PERIOD
   // 2) after configuring WiFi = ON in the Config Menu
-  // 3) or buttons are pressed to wake up from sleep
+  // 3) or wake up from sleep (either by pressing buttons or timer)
   // 4) or previous WiFi re-connection try was ABORTED (button pressed) or BREAK (need to refresh display)
   nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeWifiReconnectionCheck) >= WIFI_RECONNECT_PERIOD) || forceWifiReconnect ) && 
       wifiEnabled && !firstBoot && (wifiCurrentStatus==wifiOffStatus || WiFi.status()!=WL_CONNECTED) ) {
      
     if (debugModeOn) {
-      Serial.println(String(nowTimeGlobal)+"  - WIFI_RECONNECT_PERIOD ("+String(WIFI_RECONNECT_PERIOD/1000)+" s)");
+      Serial.println(String(nowTimeGlobal)+"  - nowTimeGlobal-lastTimeWifiReconnectionCheck >= WIFI_RECONNECT_PERIOD ("+String(nowTimeGlobal-lastTimeWifiReconnectionCheck)+" >= "+String(WIFI_RECONNECT_PERIOD/1000)+" s)");
       Serial.println("    - lastTimeWifiReconnectionCheck="+String(lastTimeWifiReconnectionCheck));
-      Serial.println("    - nowTimeGlobal-lastTimeWifiReconnectionCheck="+String(nowTimeGlobal-lastTimeWifiReconnectionCheck));
       Serial.println("    - forceWifiReconnect="+String(forceWifiReconnect));
+      Serial.println("    - forceWebServerInit="+String(forceWebServerInit));
       Serial.println("    - !firstBoot="+String(!firstBoot));
       Serial.println("    - wifiCurrentStatus="+String(wifiCurrentStatus)+", wifiOffStatus=0");
       Serial.println("    - WiFi.status()="+String(WiFi.status())+", WL_CONNECTED=3");
     }
-
 
     //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
     if (!wifiResuming) lastTimeWifiReconnectionCheck=nowTimeGlobal; //Only if the WiFi reconnection didn't ABORT or BREAK in the previous interaction
@@ -1727,7 +1746,6 @@ void loop() {
     if(forceWifiReconnect) {
       forceWifiReconnect=false;
       forceNTPCheck=true; //v0.9.9 - Force NTP sync after WiFi Connection
-      if (buttonWakeUp) forceWebServerInit=true; //v0.9.9 - Next WiFi reconnection, force Web Server Init after waking up from sleep
     }
     
     //If WiFi disconnected (wifiOffStatus), then re-connect
@@ -1771,29 +1789,32 @@ void loop() {
         wifiResuming=false;
         //Send HttpRequest to check the server status
         // The request updates CloudSyncCurrentStatus
-        //if (uploadSamplesEnabled) 
         forceWEBTestCheck=true; //Will check CLOUD server in the next loop() interaction
-        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with NO_ERROR. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect)+", forceWEBTestCheck="+String(forceWEBTestCheck));}
-        if (forceWebServerInit) { //v0.9.9 - Re-init the built-in WebServer after waking up from sleep
-          forceWebServerInit=false;
-          //webServer=AsyncWebServer(WEBSERVER_PORT);
-          if (wifiEnabled & webServerEnabled) {//Only if both Wifi WebServer is enabled
-            if(SPIFFS.begin(true)) {
-              if (logsOn) Serial.println("    - wifiConnect()  - SPIFFS.begin() OK");
-              initWebServer();
-              //webServer.begin();
-              if (logsOn) Serial.println("    - wifiConnect()  - initWebServer");
-            }
-            else 
-              if (logsOn) Serial.println("    - wifiConnect()  - SPIFFS.begin() KO");
-          }
-        }
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with NO_ERROR. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWEBTestCheck="+String(forceWEBTestCheck));}
       break;
     } 
 
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - WIFI_RECONNECT_PERIOD - exit, lastTimeWifiReconnectionCheck="+String(lastTimeWifiReconnectionCheck));}
   }
 
+  //After getting WiFi connection re-init the web server if needed
+  //forceWebServerInit==true if:
+  // 1) wake up from sleep, including hibernate (either by pressing buttons or timer)
+  // 2) WiFi set ON from the config menu
+  if (wifiEnabled && webServerEnabled && WiFi.status()==WL_CONNECTED && forceWebServerInit) { //v0.9.9 - Re-init the built-in WebServer after waking up from sleep
+    if (debugModeOn) Serial.println("    - After leaving WIFI_RECONNECT_PERIOD entering to re-init the Web Server");    
+    if(SPIFFS.begin(true)) {
+      if (debugModeOn) Serial.println("    - wifiConnect()  - SPIFFS.begin() OK, SPIFFSErrors="+String(SPIFFSErrors));
+      initWebServer();
+      forceWebServerInit=false;
+      if (debugModeOn) Serial.println("    - wifiConnect()  - initWebServer");
+    }
+    else {
+      SPIFFSErrors++;
+      if (debugModeOn) Serial.println("    - wifiConnect()  - SPIFFS.begin() KO, SPIFFSErrors="+String(SPIFFSErrors));
+    }
+  }
+  
   //Regular actions every NTP_KO_CHECK_PERIOD seconds. Cheking if NTP is off or should be checked
   //forceNTPCheck is true if:
   // 1) After NTP server config in firstSetup()
@@ -1874,7 +1895,7 @@ void loop() {
   // has higher priority in order to send the samples on time.
   nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeUploadSampleCheck) >= uploadSamplesPeriod) || firstBoot || forceWEBCheck || forceWEBTestCheck) && uploadSamplesEnabled &&
-      wifiCurrentStatus!=wifiOffStatus && wifiEnabled && wifiCred.SiteAllow[wifiCred.activeIndex] ) {
+      wifiCurrentStatus!=wifiOffStatus && wifiEnabled && (forceWEBTestCheck || wifiCred.SiteAllow[wifiCred.activeIndex]) ) {
       //(0==wifiCred.wifiSITEs[wifiCred.activeIndex].compareTo(UPLOAD_SAMPLES_FROM_SITE)) ) {
     
     //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
@@ -1909,9 +1930,9 @@ void loop() {
       "&batADCVolt="+batADCVolt+"&batCharge="+batCharge+"&batteryStatus="+batteryStatus+
       "&energyCurrentMode="+energyCurrentMode+"&errorsWiFiCnt="+errorsWiFiCnt+
       "&errorsSampleUpts="+errorsSampleUpts+"&errorsNTPCnt="+errorsNTPCnt+"&webServerError1="+webServerError1+
-      "&webServerError2="+webServerError2+"&webServerError3="+webServerError3+" HTTP/1.1";
+      "&webServerError2="+webServerError2+"&webServerError3="+webServerError3+"&SPIFFSErrors="+SPIFFSErrors+" HTTP/1.1";
 
-    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - serverToUploadSamplesIPAddress="+String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - serverToUploadSamplesIPAddress="+IpAddress2String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
                    ", httpRequest="+String(httpRequest));}
 
     forceWEBCheck=false;

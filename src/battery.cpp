@@ -146,6 +146,8 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
   //If USB is plugged, timeUSBPower is updated with nowTimeGlobal, to estimate batteryCharge based on time
   //If USB is unplugged, timeUSBPower is set to zero
 
+  
+  Serial.println("    [updateBatteryVoltageAndStatus] - Enter in updateBatteryVoltageAndStatus()");
   //Power state check
   digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
   batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
@@ -153,9 +155,13 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
 
   /*--><--*///batADCVolt=1900;
 
+  Serial.println("    [updateBatteryVoltageAndStatus] - batADCVolt="+String(batADCVolt));
+
   if (batADCVolt >= VOLTAGE_TH_STATE) {
     //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds
 
+    Serial.println("    [updateBatteryVoltageAndStatus] - powerState="+String(powerState));
+    
     if (onlyBattery==powerState) { //Change BAT -> USB power
       powerState=chargingUSB;
       *timeUSBPower=nowTimeGlobal;
@@ -166,6 +172,9 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
       samplePeriod=SAMPLE_PERIOD;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
       autoBackLightOff=false; //update autoBackLightOff if USB power
+      forceDisplayRefresh=true; //force Icon update (if display is ON)
+
+      Serial.println("    [updateBatteryVoltageAndStatus] - wakeup_reason="+String(wakeup_reason));
 
       //If TFT is off, switch it on and and display samples
       if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) {
@@ -185,13 +194,14 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
           lastDisplayMode=AutoSwitchOffMessage; //Force re-rendering CO2 values in the main screen
         }
 
-        //If the display is off, then coming from sleep, so let's prepare
-        //WiFi-related things to re-init after waking up from sleep
+        //If coming from sleep, let's prepare WiFi-related things to re-init after waking up from sleep
         forceWifiReconnect=true; //Force WiFi reconnection in the next loop interaction
         forceWebServerInit=true; //v0.9.C - Next WiFi reconnection, force Web Server Init after waking up from sleep
         initTZVariables(); //To make sure that both NTP sync and NTP info in web are right
         CloudClockCurrentStatus=CloudClockOffStatus; //To update icons as WiFi is disconnect
         CloudSyncCurrentStatus=CloudSyncOffStatus; //To update icons as WiFi is disconnect
+
+        Serial.println("    [updateBatteryVoltageAndStatus] - forceWifiReconnect=true, forceWebServerInit=true, etc.");
       }
     }
     else { //USB power. Let's decide if chargingUSB or noChargingUSB based on USB power time
@@ -206,9 +216,12 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
     powerState=onlyBattery;
     *timeUSBPower=0;
 
+    Serial.println("    [updateBatteryVoltageAndStatus] - energyCurrentMode="+String(energyCurrentMode));
+
     if (fullEnergy==energyCurrentMode) { //Updates if power charged USB -> BAT
       autoBackLightOff=true; //update autoBackLightOff if BAT power
       lastTimeTurnOffBacklightCheck=nowTimeGlobal; //force swiching the Display OFF next check 
+      forceDisplayRefresh=true; //force Icon update (if display is ON)
     }
     
     //Take battery charge when the Battery is plugged
@@ -218,13 +231,19 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
     if (batCharge>=BAT_CHG_THR_FOR_SAVE_ENERGY) {
       //energyCurrentMode=reducedEnergy;
       energyCurrentMode=configSavingEnergyMode; //Normally reducedEnergy if not changed in the Config Menu
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; 
+      //If TFT is off then sleep mode is active, so let's reduce the VOLTAGE_CHECK_PERIOD period
+      //This makes detection of USB/Battery supply every VOLTAGE_CHECK_PERIOD when the display is ON
+      if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE;
+      else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD; 
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
     }
     else {
       energyCurrentMode=lowestEnergy;    
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; 
+      //If TFT is off then sleep mode is active, so let's reduce the VOLTAGE_CHECK_PERIOD period
+      //This makes detection of USB/Battery supply every VOLTAGE_CHECK_PERIOD when the display is ON
+      if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; 
+      else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
     }

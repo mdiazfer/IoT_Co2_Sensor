@@ -3,6 +3,10 @@
 #include "global_setup.h"
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
+#ifndef AsyncElegantOTA_h
+  #include <AsyncElegantOTA.h>
+  #define AsyncElegantOTA_h
+#endif
 #include "misc.h"
 #include "MHZ19.h"
 #include <WiFi.h>
@@ -67,7 +71,7 @@ extern RTC_DATA_ATTR enum wifiStatus wifiCurrentStatus;
 extern RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus;
 extern RTC_DATA_ATTR uint64_t nowTimeGlobal,lastTimeUploadSampleCheck;
 extern RTC_DATA_ATTR ulong uploadSamplesPeriod;
-extern RTC_DATA_ATTR int errorsWiFiCnt,errorsSampleUpts,errorsNTPCnt;
+extern RTC_DATA_ATTR int errorsWiFiCnt,errorsSampleUpts,errorsNTPCnt,SPIFFSErrors;
 extern wifiCredentials wifiCred;
 
 String processor(const String& var);

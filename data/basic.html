@@ -592,25 +592,25 @@
                 Display Auto Switchoff:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 <label for="DisplaySw_on_id">On</label>
                 <input name="DisplaySw_enabled" id="DisplaySw_on_id" value="on" required="required"
-                  type="radio"> 
+                  ~DISPLAYONCHECKED~ type="radio"> 
                    &nbsp;&nbsp;&nbsp;&nbsp; 
                 <label for="DisplaySw_off_id">Off</label>
                 <input name="DisplaySw_enabled" id="DisplaySw_off_id" value="off" required="required"
-                  checked="checked" type="radio"> 
+                  ~DISPLAYOFFCHECKED~ type="radio"> 
                 <br><br>
                 <label for="BatteryMode" id="BatteryMode_id">Battery Mode</label>
                 <select name="BatteryMode">
-                  <option value="Reduced">Reduced</option>
-                  <option value="Lowest">Lowest</option>
+                  <option value="Reduced" ~BATTERYMODEREDUCEDSELECTED~ >Reduced</option>
+                  <option value="Lowest" ~BATTERYMODELOWESTSELECTED~ >Lowest</option>
                 </select>
                 <br>
                 <br>
                 <label for="DisplayMode" id="DisplayMode_id">Display Mode</label>
                 <select name="DisplayMode">
-                  <option value="CO2">CO2 measurements</option>
-                  <option value="LastHour">Last hour graph</option>
-                  <option value="LastDay">Last day graph</option>
-                  <option value="Sequential" selected="selected">Sequentially all</option>
+                  <option value="CO2" ~DISPLAYMODESAMPLESELECTED~ >CO2 measurements</option>
+                  <option value="LastHour" ~DISPLAYMODELASTHOURSELECTED~ >Last hour graph</option>
+                  <option value="LastDay" ~DISPLAYMODELASTDAYSELECTED~ >Last day graph</option>
+                  <option value="Sequential" ~DISPLAYMODESEQUENTIALSELECTED~ >Sequentially all</option>
                 </select>
                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -639,10 +639,10 @@
           <!-- end of hamburger menu button -->
           <div id="tswcssbuttons">
             <ul>
-              <li><a href="index.html">Info</a></li>
-              <li><a href="basic.html">Basic conf</a></li>
-              <li><a href="cloud.html">Cloud conf</a></li>
-              <li><a href="bluetooth.html">Bluetooth conf</a></li>
+              <li><a href="index.html">Global Info</a></li>
+              <li><a href="basic.html">Basic configuration</a></li>
+              <li><a href="cloud.html">Cloud configuration</a></li>
+              <li><a href="bluetooth.html">Bluetooth configuration</a></li>
               <li><a href="maintenance.html">Maint. & Troubleshoot</a></li>
             </ul>
           </div>

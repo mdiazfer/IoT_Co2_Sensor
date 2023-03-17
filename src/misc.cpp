@@ -47,13 +47,13 @@ void go_to_sleep() {
     break;
     case reducedEnergy:
       sleepTimer=TIME_TO_SLEEP_REDUCED_ENERGY>((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000)?TIME_TO_SLEEP_REDUCED_ENERGY-((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000):TIME_TO_SLEEP_REDUCED_ENERGY;
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; 
+      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //It's supposed display is off, so no checks on display
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
     break;
     case lowestEnergy:
       sleepTimer=TIME_TO_SLEEP_SAVE_ENERGY>((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000)?TIME_TO_SLEEP_SAVE_ENERGY-((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000):TIME_TO_SLEEP_SAVE_ENERGY;
-      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; 
+      voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //It's supposed display is off, so no checks on display
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
     break;
@@ -278,7 +278,7 @@ void factoryConfReset() {
 }
 
 bool initTZVariables() {
-  //Init TZVariables - Called from firstInit() and aftwer waking up from sleep
+  //Init TZVariables - Called from firstInit() and aftwer waking up from sleep (button or USB plugged)
   char auxTZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH],auxTZName[TZ_ENV_NAME_MAX_LENGTH];
   bool updateEEPROM=false;
 

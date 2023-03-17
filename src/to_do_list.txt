@@ -1,18 +1,10 @@
 To do list
 -----------
 - Web server to display results and configuration
-  + Enable WiFi ON/OFF and webServer ON/OFF in the web menu (?)
-    * Pop-up if disable WiFi or Web Server to warn about
   + fix web pages layout for smartphone
-  + https
-  + Firmware upgrade OTA
+  + https => No support on AsyncWebServer
 - Troubleshoot
-  + Device goes to sleep when starting from battery and doesn't go to usbState when USB plugged
-  + Device wake up becasue USB power, but webServer doen't work
-  + WebServer doesn't begin randomly (after firmware upload???)
-  + WiFi connection failures
-  + No button action after waking up with button
-  + After battery is ran out, pluging USB power doesn't take effect in the IoT
+  + WiFi connection failures (????)
 - BLE sutff
 - Get info about bluetooth to update icons
 - Icon for the bootup screen
@@ -25,6 +17,86 @@ To do list
 
 Done
 -------
++ Firmware upgrade OTA
+  - Tests WebServer re-init
+  v Battery powered -> boot -> Check whether Web Server inits or not => OK
+  v Battery powered -> boot -> sleep -> plug USB -> Check whether Web Server inits or not => OK
+  v Battery powered -> boot -> sleep -> Button 1 -> Check whether Web Server inits or not => OK
+  ? Battery powered -> boot -> sleep -> Button 2 -> Check whether Web Server inits or not
+    * Button 2 doesn't wake up 
+  v USB powered -> boot -> Check whether Web Server inits or not => OK
+  v USB powered -> boot -> Battery powered -> sleep -> plug USB -> Check whether Web Server inits or not => OK
+  v USB powered -> boot -> Battery powered -> sleep -> Button 1 -> Check whether Web Server inits or not => OK
+  ? USB powered -> boot -> Battery powered -> sleep -> Button 2 -> Check whether Web Server inits or not
+    * Button 2 doesn't wake up 
+  v USB powered -> Hibernate -> Button 1 -> Check whether Web Server inits or not => OK
+  v Battery powered -> Hibernate -> Button 1 -> Check whether Web Server inits or not => OK
+  v Battery powered -> boot -> sleep -> plug USB -> no wifi connection -> wake up -> wifi connection -> Check whether Web Server inits or not => OK
+  v Battery powered -> boot -> sleep -> Button 1 -> no wifi connection -> wake up -> wifi connection -> Check whether Web Server inits or not => OK
+  ? Battery powered -> boot -> sleep -> Button 2 -> no wifi connection -> wifi connection -> Check whether Web Server inits or not
+    * Button 2 doesn't wake up 
+  v Battery powered -> boot -> Hibernate -> Button 1 -> no wifi connection -> wifi connection -> Check whether Web Server inits or not => OK
+  v USB powered -> display off -> Check whether Web Server inits or not => OK
+  v USB powered -> display off -> display on -> Check whether Web Server inits or not => OK
+  v USB powered -> Wifi ON -> WiFi OFF -> WIFI ON -> Check whether Web Server inits or not => OK
++ Bug fixing
+  - Boot with Battery -> Go to sleep -> Plug USB -> Timer Wakeup and WebServer doesn't re-init
++ Added SPIFFSErrors variable for Error statistics. It is sent to Cloud and shown in web page as well.
+  - Power checks done every VOLTAGE_CHECK_PERIOD seconds while the display is ON, even
+    if Battery is the power source. This makes the power detection faster and it avoids
+    going to sleep when USB is unplugged and plugged back again 6 sec. later.
+  - Bug fixing 
+    + No (battery) icon was updated when Co2 measurement screen is selected
+    + Battery power and configuring Display Mode from the web, don't go to sleep
+      (autoBackLightOff=false by default in the web form)
+    + Sleeping with Battery powered -> Button to wakeup -> Display Mode config from Web conf -> USB power -> No detected
+    + Some times no gauge is drawn when setup fixed sample from web
++ Bug fixing 
+  + Device didn't change energyStatus in sleep after plug USB  
+  + Webs server didn't re-init after waking up due to USB power (not button)
+  + serverToUploadSamplesIPAddress lost after waking up from sleep
++ Added Factory Reset to the Config Menu
++ AP mode to provide first SSID in WiFi Menu
+  + Added bootAP and bootUPScreen
+  + Added stringToIPAddress() function to create IPAddress object from String
++ WebServer init after Button1 wakes up the ESP from sleep
++ Show errors in web, including error_setup 
++ New TZName and mechanism to send TZEnvVariable & TZName values from the web form
++ TZEnvVariable
+  + is read/written rightly in EEPROM
+  + TZEnvVariable updated from web form
++ NTP server config with the new TimeZone
++ Check box in sites to upload samples from
+  + Store info in EEPROM
++ Reset config to factory
++ Reset device
++ Pop-up to warn before resets
++ Added SPIFFS and built-in AsyncWebServer for info and config stuff
+  + Variables stored in EEPPROM
+    * wifiCred[]
+    * ntpServers[]
+    * webServerEnable
+  + Info webpage
+  + Basic conf (WiFi SSID, NTP Servers)
+    * WiFi Reconnection and NTP Re-sync
+    * Display Auto AutoSwitchOff, Battery Mode and Display Mode
++ Re-name ERROR_WEB_SERVER by ERROR_CLOUD_SERVER in several files. ERROR_WEB_SERVER is now
+  intended for the built-in AsynWebServer
++ Bug fix
+  + TZEnvVar backup - TZEnvVar not fully init to '\0' before memcpy - wifiConnection.cpp:384
+  + Wifi icons changed
++ WiFi disconnection just right before going to sleep
++ Bug fixing
+  + No Display Switch off when setting up Saving Energy Mode to Lowest during USB power
+  + No button action just rith after Button1 wakes up the CPU
+  + Wrong uploadSamplesPeriod value when USB power if compilation is with BUILD_ENV_NAME!=BUILD_TYPE_SENSOR_CASE 
++ Added more logs for WEB_ERROR case
++ Going go hibernate if Battery charge is below BAT_CHG_THR_TO_HIBERNATE threshold
++ batCharge is saved in EEPROM before going to hibernate and restore it as lastBatCharge value 
+  after waking up from hibernation
++ Firmware version & Checksum saved in EEPROM to detect first rung after firmware upgrade
++ Firmware version included in the GET sample upload
++ Functions Carve-out in main.cpp to put them in different files (misc.cpp, wifiConnection.cpp, etc)
 + Config Menu for simple things: WiFi ON/OFF, SampleUpload ON/OFF, BLE ON/OFF
   + uploadSamplesEnabled should be linked to wifiEnabled in the Config Menu
   + change error_setup values to be mask-oriented and re-code the firstSetup for OR-error_setup and

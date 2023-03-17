@@ -18,7 +18,13 @@ void checkButton1() {
       previousLastTimeSampleCheck=nowTimeGlobal-SAMPLE_PERIOD; //Refresh the circular graph for CO2 sample
       displayMode=sampleValue;
       lastDisplayMode=AutoSwitchOffMessage; //Force re-rendering CO2 values in the main screen
-      if (fullEnergy!=energyCurrentMode) forceWifiReconnect=true; //Force WiFi reconection after wakeup
+      if (fullEnergy!=energyCurrentMode) { //Force things after wakeup
+        forceWifiReconnect=true; //Force WiFi reconection after wakeup
+        forceWebServerInit=true; //v0.9.D - Next WiFi reconnection, force Web Server Init after waking up from sleep
+        initTZVariables(); //v0.9.D - To make sure that both NTP sync and NTP info in web are right
+        CloudClockCurrentStatus=CloudClockOffStatus; //v0.9.D - To update icons as WiFi is disconnect
+        CloudSyncCurrentStatus=CloudSyncOffStatus; //v0.9.D - To update icons as WiFi is disconnect
+      }
     }
 
     return;
@@ -160,7 +166,13 @@ void checkButton2() {
         previousLastTimeSampleCheck=nowTimeGlobal-SAMPLE_PERIOD; //Refresh the circular graph for CO2 sample
         displayMode=sampleValue;
         lastDisplayMode=AutoSwitchOffMessage; //Force re-rendering CO2 values in the main screen
-        if (fullEnergy!=energyCurrentMode) forceWifiReconnect=true; //Force WiFi reconection after wakeup
+        if (fullEnergy!=energyCurrentMode) { //Force things after wakeup
+          forceWifiReconnect=true; //Force WiFi reconection after wakeup
+          forceWebServerInit=true; //v0.9.D - Next WiFi reconnection, force Web Server Init after waking up from sleep
+          initTZVariables(); //v0.9.D - To make sure that both NTP sync and NTP info in web are right
+          CloudClockCurrentStatus=CloudClockOffStatus; //v0.9.D - To update icons as WiFi is disconnect
+          CloudSyncCurrentStatus=CloudSyncOffStatus; //v0.9.D - To update icons as WiFi is disconnect
+        }
       }
 
       return;
@@ -253,6 +265,7 @@ void checkButton2() {
           if(WiFi.status()!=WL_CONNECTED) {
             forceWifiReconnect=true; //Next loop interaction the WiFi connection is done
             forceNTPCheck=true; //Let's force NTP sync
+            forceWebServerInit=true; //v0.9.C - Next WiFi reconnection, force Web Server Init after waking up from sleep
           }
         }
         else {
