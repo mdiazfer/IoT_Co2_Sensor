@@ -62,7 +62,7 @@ void go_to_sleep() {
   //Going to sleep
   esp_sleep_enable_timer_wakeup(sleepTimer);
   if (debugModeOn) {
-    Serial.print(String(loopEndTime)+"  - [go_to_sleep] - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");
+    Serial.print(String(loopEndTime)+"  - [go_to_sleep] - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");
     Serial.println("    - Setup ESP32 to wake up in "+String(sleepTimer/uS_TO_S_FACTOR)+" Seconds");
     }
   
@@ -346,4 +346,123 @@ IPAddress stringToIPAddress(String stringIPAddress) {
   }
   
   return IPAddress(IPAddressOctectArray[0],IPAddressOctectArray[1],IPAddressOctectArray[2],IPAddressOctectArray[3]);
+}
+
+String getFileExt(const String& s) {
+
+   size_t i = s.lastIndexOf('.');
+   if (i != -1) {
+      return(s.substring(i));
+   }
+
+   return("");
+}
+
+size_t getAppOTAPartitionSize(uint8_t type, uint8_t subtype) {
+  //Getting the partition size available for OTA. Should be the maximum binary file size to upload via OTA.
+  esp_partition_iterator_t iter;
+  const esp_partition_t *partition=nullptr;
+
+  switch (type) {
+    case ESP_PARTITION_TYPE_APP:
+    { const esp_partition_t* nonRunningPartition=nullptr;
+      const esp_partition_t* runningPartition=esp_ota_get_running_partition();
+      if (runningPartition==nullptr) {
+        //Something wetn wrong
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Couldn't get the running partition");}
+        return 0;
+      }
+      
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Got the running partition");}
+      
+      //Getting all the APP-type partitions
+      iter = esp_partition_find((esp_partition_type_t) type, (esp_partition_subtype_t) subtype, NULL);
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Name, type, subtype, offset, length");}
+      uint8_t appPartitionNumber=0;
+      while (iter != nullptr)
+      {
+        partition = esp_partition_get(iter);
+        //if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - "+String(partition->label)+" app "+String(partition->subtype)+" 0x"+String(partition->address,HEX)+" 0x"+String(partition->size,HEX)+" ("+String(partition->size)+" B)");}
+        iter = esp_partition_next(iter);
+        appPartitionNumber++;
+      }
+      esp_partition_iterator_release(iter);
+
+      if (appPartitionNumber!=2) {
+        //Wrong number of app partitions by design of this firmware
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Wrong number of APP partitions. It should be 2 rather than "+String(appPartitionNumber));}
+        return 0;
+      }
+
+      //Getting the non-running APP-type partition
+      iter = esp_partition_find((esp_partition_type_t) type, (esp_partition_subtype_t) subtype, NULL);
+      while (iter != nullptr)
+      {
+        partition = esp_partition_get(iter);
+        if (runningPartition!=partition) {
+          nonRunningPartition=partition;
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - "+String(partition->label)+" app "+String(partition->subtype)+" 0x"+String(partition->address,HEX)+" 0x"+String(partition->size,HEX)+" ("+String(partition->size)+" B) is the non-running partition");}
+          break;
+        }
+        else {
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - "+String(partition->label)+" app "+String(partition->subtype)+" 0x"+String(partition->address,HEX)+" 0x"+String(partition->size,HEX)+" ("+String(partition->size)+" B) is the running partition");}
+        }
+        iter = esp_partition_next(iter);
+      }
+      esp_partition_iterator_release(iter);
+
+      if (nonRunningPartition==nullptr) {
+        //Something wetn wrong getting the non-running partion
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Couldn't get the non-running partition");}
+        return 0;
+      }
+
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Got the non-running partition and size "+String(nonRunningPartition->size)+" B");}
+      return nonRunningPartition->size;
+    }  
+    break;
+    case ESP_PARTITION_TYPE_DATA:
+    { if (subtype!=0x82) return 0; //Not SPIFFS partition
+
+      iter = esp_partition_find((esp_partition_type_t) type, (esp_partition_subtype_t) subtype, NULL);
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Name, type, subtype, offset, length");}
+      while (iter != nullptr) //Assuming there is only one SPIFFS partition (Getting the first one)
+      {
+        partition = esp_partition_get(iter);
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - "+String(partition->label)+" app "+String(partition->subtype)+" 0x"+String(partition->address,HEX)+" 0x"+String(partition->size,HEX)+" ("+String(partition->size)+" B) is the SPIFFS partition");}
+        break;  
+        iter = esp_partition_next(iter);
+      }
+      esp_partition_iterator_release(iter);
+
+      if (partition==nullptr) {
+        //Something wetn wrong getting the SPIFFS partion
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Couldn't get the SPIFFS partition");}
+        return 0;
+      }
+
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Got the SPIFFS partition and size "+String(partition->size)+" B");}
+      return partition->size;
+    }
+    break;
+    default:
+      return 0;
+    break;
+  }
+  
+  
+  
+  //Interesting code to get the DATA partition.
+  /*iter = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, NULL);
+  while (iter != nullptr)
+  {
+    const esp_partition_t *partition = esp_partition_get(iter);
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - "+String(partition->label)+" data "+String(partition->subtype)+" 0x"+String(partition->address,HEX)+" 0x"+String(partition->size,HEX)+" ("+String(partition->size)+" B)");}
+    iter = esp_partition_next(iter);
+  }
+  esp_partition_iterator_release(iter);
+  if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Info on running partition");}
+  if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - "+String(partition->label)+" data "+String(partition->subtype)+" 0x"+String(partition->address,HEX)+" 0x"+String(partition->size,HEX)+" ("+String(partition->size)+" B)");}
+  if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Ending partition conde");}
+  */
 }

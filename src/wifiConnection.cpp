@@ -372,7 +372,7 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
           // (Button Pressed or Display Refresh force the function to return from the while() loop, 
           //  so this point is not reached in those cases)
           if ((logsOn && fromSetup) || debugModeOn) {
-            Serial.print("  Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
+            Serial.print("  Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo,"%d/%m/%Y - %H:%M:%S");
             Serial.print("[setup] - NTP: ");Serial.println("OK");
           }
           CloudClockCurrentStatus=CloudClockOnStatus;

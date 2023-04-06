@@ -1,6 +1,6 @@
 /* 
     Definition of global parameters
-    No user modification is required in her
+    No user modification is required in here
 */
 
 #define BUILD_TYPE_DEVELOPMENT  1
@@ -103,6 +103,27 @@
 #define ERROR_SPIFFS_SETUP            0x00010000
 #define ERROR_WEB_SERVER              0x00020000
 #define DEAD_ERRORS                   0x0001000F //ERROR_DISPLAY_SETUP OR ERROR_SENSOR_CO2_SETUP OR ERROR_SENSOR_TEMP_HUM_SETUP OR ERROR_BUTTONS_SETUP OR ERROR_SPIFFS_SETUP
+#define ERROR_UPLOAD_FILE_NOERROR           0x00
+#define ERROR_UPLOAD_FILE_EXTENSION         0x01
+#define ERROR_UPLOAD_FILE_UPDATE_BEGIN      0x02
+#define ERROR_UPLOAD_FILE_UPDATE_WRITE      0x03
+#define ERROR_UPLOAD_FILE_UPDATE_END        0x04
+#define ERROR_UPLOAD_FILE_POST_PRM_NAME     0x05
+#define ERROR_UPLOAD_FILE_POST_PRM_NUMBER   0x06
+#define ERROR_UPLOAD_FILE_MD5_CHECKSUM      0x07
+#define ERROR_UPLOAD_FILE_SIZE              0x08
+#define ERROR_UPLOAD_FILE_NOFILE            0x09
+#define ERROR_UPLOAD_FILE_NOAUTH            0x0A
+#define ERROR_UPLOAD_FILE_WRONG_FILE_NAME   0x0B
+#define ERROR_UPLOAD_FILE_NOFLASHSPACE_LEFT 0x0C
+#define ERROR_UPLOAD_FILE_NOSPIFFSPACE_LEFT 0x0D
+#define ERROR_UPLOAD_FILE_NOBIN_FILE        0x0E
+#define ERROR_UPLOAD_FILE_NOSPIFFS_FILE     0x0F
+#define ERROR_UPLOAD_FILE_NOSPIFFS_FILE_NOSAFE 0x10
+#define ERROR_UPLOAD_FILE_NOCOOKIE          0x11
+#define ERROR_UPLOAD_FILE_BADCOOKIE_FORMAT  0x12
+#define ERROR_UPLOAD_FILE_UPLOAD_ONGOING    0x13
+#define ERROR_UPLOAD_FILE_BADCOOKIE         0x14
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240
@@ -248,6 +269,13 @@
 #define WEBSERVER_CONTAINER_PAGE "/container.html"
 #define WEBSERVER_APINDEX_PAGE "/apindex.html"
 #define WEBSERVER_APCONTAINER_PAGE "/apcontainer.html"
+#define WEBSERVER_UPLOADFILE_PAGE "/maintenance_upload_firmware"
+#define WEBSERVER_FAVICON_ICON "/favicon.ico"
+#define WEBSERVER_JQUERY_JS "/jquery.min.js"
+#define WEBSERVER_FILE_EXTENSION ".bin"
+#define WEBSERVER_DEFAULTCONF_PAGE "/maintenance_default_values"
+#define WEBSERVER_DEVICERESET_PAGE "/maintenance_device_reset"
+#define COOKIE_SIZE 54 //32 Chars + null
 
 
 //BLE stuff
@@ -306,6 +334,18 @@
 #define VOLTAGE_CHECK_PERIOD_RE 300000 //Milliseconds - 5 min in Reduced Energy Mode
 #define VOLTAGE_CHECK_PERIOD_SE 300000 //Milliseconds - 5 min in Save Energy Mode
 #define WIFI_RECONNECT_PERIOD  300000 //milliseconds - 5 min
+
+//Binary header stuff
+//https://github.com/espressif/esp-idf/blob/8fbb63c2a701c22ccf4ce249f43aded73e134a34/components/bootloader_support/include/esp_image_format.h#L58
+#define BINARY_HD_MAGIC_NUMBER       0xE9 //Magic number as per https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/firmware-image-format.html
+#define BINARY_HD_MAGIC_NUMBER_ADDR  0x00 //Address
+#define BINARY_HD_MAGIC_WORD         0xABCD5432 //Magic word as per //https://github.com/espressif/esp-idf/blob/8fbb63c2a701c22ccf4ce249f43aded73e134a34/components/bootloader_support/include/esp_image_format.h#L58
+#define BINARY_HD_MAGIC_WORD_ADDR  0x20 //Address - 32 = 0x20
+
+//SPIFFS stuff
+#define SPIFFS_CFG_LOG_BLOCK_SZ  4096 //Bytes - Size of Logical SPIFFS Blocks
+#define SPIFFS_CFG_LOG_PAGE_SZ  256 //Bytes - Size of Logical SPIFFS Pages
+#define SPIFFS_MAGIC_ADDR SPIFFS_CFG_LOG_PAGE_SZ-4 //Bytes - Address for the magic number to confir it's SPIFFS partition
 
 #ifdef _DECLAREGLOBALPARAMETERS_
   bool logsOn = true;         //Whether enable or not logs on the seriaml line [TRUE | FALSE]
@@ -367,7 +407,5 @@
 
   #undef _DECLAREGLOBALPARAMETERS_
 #endif
-
-
 
 

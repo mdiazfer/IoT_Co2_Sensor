@@ -21,7 +21,6 @@
 #include "httpClient.h"
 #include "icons.h"
 #include "battery.h"
-//#include "esp_wifi.h"
 #include "esp_sntp.h"
 #include "misc.h"
 #include <ESP32Time.h>
@@ -29,10 +28,7 @@
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
 #include <SPIFFS.h>
-#ifndef AsyncElegantOTA_h
-  #define AsyncElegantOTA_h
-  #include "webServer.h"
-#endif
+#include "webServer.h"
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -167,6 +163,18 @@ uint64_t whileLoopTimeLeft=NTP_CHECK_TIMEOUT,whileWebLoopTimeLeft=HTTP_ANSWER_TI
 uint8_t configVariables;
 char firmwareVersion[VERSION_CHAR_LENGTH+1];
 esp_sleep_wakeup_cause_t wakeup_reason;
+uint8_t fileUpdateError=0,errorOnActiveCookie=0,errorOnWrongCookie=0;
+size_t fileUpdateSize=0;
+int updateCommand=-1;
+uint32_t flashSize = ESP.getFlashChipSize();
+uint32_t programSize = ESP.getSketchSize();
+size_t OTAAvailableSize,SPIFFSAvailableSize;
+uint32_t fileSystemSize=0;
+uint32_t fileSystemUsed=0;
+String fileUpdateName;
+struct tm nowTimeInfo; //36 B
+char activeCookie[COOKIE_SIZE];
+char currentSetCookie[COOKIE_SIZE];
 
 
 //Code
@@ -214,6 +222,16 @@ void initVariable() {
   error_setup=NO_ERROR;
   startAPMode=false;
   //webServer=AsyncWebServer(WEBSERVER_PORT);
+  fileUpdateError=0;errorOnActiveCookie=0;errorOnWrongCookie=0;
+  fileUpdateSize=0;
+  updateCommand=-1;
+  flashSize = ESP.getFlashChipSize();
+  programSize = ESP.getSketchSize();
+  OTAAvailableSize=getAppOTAPartitionSize(ESP_PARTITION_TYPE_APP,ESP_PARTITION_SUBTYPE_ANY);
+  SPIFFSAvailableSize=getAppOTAPartitionSize(ESP_PARTITION_TYPE_DATA,0x82);
+  memset(activeCookie,'\0',COOKIE_SIZE); //init variable
+  memset(currentSetCookie,'\0',COOKIE_SIZE); //init variable
+
   
   //Read from EEPROM the values to be stored in the Config Variables
   //
@@ -608,7 +626,8 @@ void firstSetup() {
   // https://stackoverflow.com/questions/72940013/why-getlocaltime-implementation-needs-delay
   ESP32Time timeTest(0);
   timeTest.setTime(0,0,0,1,1,2022);  // 1st Jan 2022 00:00:00
-  if (logsOn) {Serial.println("[setup] - Initial date set to 1st Jan 2022 00:00:00");}
+  if (logsOn) {Serial.println("[setup] - Initial date set to 1st Jan 2022 00:00:00. Will be updated after NTP sync");}
+  getLocalTime(&startTimeInfo); //Getting initial local time. Will be overwritten if NTP sync suceeds
   error_setup=NO_ERROR;
 
   //-->>Buttons init
@@ -660,6 +679,9 @@ void firstSetup() {
       //AP Mode is running
       if (SPIFFS.begin(true)) {
         if (logsOn) Serial.println(" [setup] - SPIFFS.begin=OK, SPIFFSErrors="+String(SPIFFSErrors));
+
+        fileSystemSize = SPIFFS.totalBytes();
+        fileSystemUsed = SPIFFS.usedBytes();
       }
       else {
         SPIFFSErrors++;
@@ -893,6 +915,9 @@ void firstSetup() {
     if (logsOn) Serial.println("[setup] - SPIFFS.begin=OK, SPIFFSErrors="+String(SPIFFSErrors));
     stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+
+    fileSystemSize = SPIFFS.totalBytes();
+    fileSystemUsed = SPIFFS.usedBytes();
   }
 
   if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
@@ -1426,7 +1451,7 @@ void setup() {
   setenv("TZ",TZEnvVar,1); tzset(); //Restore TZ enviroment variable to show the right time
 
   nowTimeGlobal=loopStartTime+millis();
-  if (debugModeOn) {Serial.print(String(nowTimeGlobal)+" [SETUP] - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+  if (debugModeOn) {Serial.print(String(nowTimeGlobal)+" [SETUP] - Exit - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
 }
 
 
@@ -1636,7 +1661,7 @@ void loop() {
 
     switch (displayMode) {
       case  sampleValue:
-        if (debugModeOn) {Serial.print("    - **** displayMode=sampleValue - Rendering only if new sample value - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
+        if (debugModeOn) {Serial.print("    - **** displayMode=sampleValue - Rendering only if new sample value - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
         //Sample values are displayed
         if ((nowTimeGlobal-previousLastTimeSampleCheck)>=samplePeriod || forceDisplayRefresh || firstBoot || lastDisplayMode!=sampleValue) {
           //Display refresh only when a new sample has been taken or during firstBoot
@@ -1697,7 +1722,7 @@ void loop() {
         lastDisplayMode=sampleValue;
       break;
       case co2LastHourGraph:
-        if (debugModeOn) {Serial.print("    - **** displayMode=co2LastHourGraph - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
+        if (debugModeOn) {Serial.print("    - **** displayMode=co2LastHourGraph - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
         //Last Hour graph is displayed
         //Cleaning the screen always the first time in
         if (lastDisplayMode!=co2LastHourGraph) {tft.fillScreen(TFT_BLACK); drawGraphLastHourCo2(); updateHourGraph=false;}
@@ -1706,7 +1731,7 @@ void loop() {
         lastDisplayMode=co2LastHourGraph;
       break;
       case co2LastDayGraph:
-        if (debugModeOn) {Serial.print("    - **** displayMode=co2LastDayGraph - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
+        if (debugModeOn) {Serial.print("    - **** displayMode=co2LastDayGraph - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
         //Last Day graph is displayed
         //Cleaning the screen always the first time in
         if (lastDisplayMode!=co2LastDayGraph) {tft.fillScreen(TFT_BLACK); drawGraphLastDayCo2(); updateDayGraph=false;}
@@ -1808,6 +1833,9 @@ void loop() {
       initWebServer();
       forceWebServerInit=false;
       if (debugModeOn) Serial.println("    - wifiConnect()  - initWebServer");
+      
+      fileSystemSize = SPIFFS.totalBytes();
+      fileSystemUsed = SPIFFS.usedBytes();
     }
     else {
       SPIFFSErrors++;
@@ -1880,7 +1908,7 @@ void loop() {
     
     if (debugModeOn) {
       Serial.println(String(loopStartTime+millis())+"      - errorsNTPCnt="+String(errorsNTPCnt)+", CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck));
-      getLocalTime(&startTimeInfo);Serial.print("  - NTP_KO_CHECK_PERIOD, lastTimeNTPCheck="+String(lastTimeNTPCheck));Serial.println(&startTimeInfo," - Exit - Time: %d/%m/%Y - %H:%M:%S");
+      getLocalTime(&nowTimeInfo);Serial.print("  - NTP_KO_CHECK_PERIOD, lastTimeNTPCheck="+String(lastTimeNTPCheck));Serial.println(&nowTimeInfo," - Exit - Time: %d/%m/%Y - %H:%M:%S");
     }
   }
   
@@ -1904,7 +1932,7 @@ void loop() {
     if (forceWEBTestCheck && ((nowTimeGlobal-lastTimeUploadSampleCheck) >= uploadSamplesPeriod))
      {forceWEBTestCheck=false;} //Timer has priority over WEB test. httpRequest will be setup to send samples 
 
-    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - UPLOAD_SAMPLES_PERIOD - Time: ");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - UPLOAD_SAMPLES_PERIOD - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
     
     String httpRequest=String(GET_REQUEST_TO_UPLOAD_SAMPLES);
 
@@ -1959,7 +1987,7 @@ void loop() {
       break;
     }
   
-    if (debugModeOn) {Serial.print(String(loopStartTime+millis())+"  - UPLOAD_SAMPLES_PERIOD - Exit - Time: ");getLocalTime(&startTimeInfo);Serial.print(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println(", lastTimeUploadSampleCheck="+String(lastTimeUploadSampleCheck));}
+    if (debugModeOn) {Serial.print(String(loopStartTime+millis())+"  - UPLOAD_SAMPLES_PERIOD - Exit - Time: ");getLocalTime(&nowTimeInfo);Serial.print(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println(", lastTimeUploadSampleCheck="+String(lastTimeUploadSampleCheck));}
   }
 
   if (firstBoot) firstBoot=false;

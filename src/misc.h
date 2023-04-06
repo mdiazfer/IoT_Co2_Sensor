@@ -3,6 +3,12 @@
 #include <ESPAsyncWebServer.h>
 #include "global_setup.h"
 #include "battery.h"
+#include <string.h>
+#include <assert.h>
+#include "esp_partition.h"
+#include "esp_log.h"
+#include "esp_ota_ops.h"
+
 
 #ifndef _WIFINETWORKINFO_
   typedef struct {
@@ -35,6 +41,7 @@ extern RTC_DATA_ATTR AsyncWebServer webServer;
 extern wifiCredentials wifiCred;
 extern String TZEnvVariable,TZName;
 extern String ntpServers[4];
+extern struct tm nowTimeInfo;
 
 void go_to_hibernate();
 void go_to_sleep();
@@ -43,3 +50,5 @@ uint16_t checkSum(byte *addr, uint32_t count);
 void factoryConfReset();
 bool initTZVariables();
 IPAddress stringToIPAddress(String stringIPAddress);
+String getFileExt(const String& s);
+size_t getAppOTAPartitionSize(uint8_t type, uint8_t subtype);

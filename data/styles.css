@@ -1,3 +1,15 @@
+a:link {
+  color: lightskyblue;
+  background-color: transparent; 
+  text-decoration: none;
+}
+
+a:visited {
+  color: lightgreen;
+  background-color: transparent;
+  text-decoration: none;
+}
+
 body {
   font-size: 90%;
   font-family: "Helvetica";
@@ -151,7 +163,7 @@ div#tswfooter {
 #tswsidecolmaint {
   margin-left: 0%;
   margin-right: 3%;
-  height: 392px;
+  height: 431px;
 }
 
 #tswcontproper {

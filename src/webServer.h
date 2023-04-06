@@ -3,10 +3,12 @@
 #include "global_setup.h"
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
-#ifndef AsyncElegantOTA_h
+/*#ifndef AsyncElegantOTA_h
   #include <AsyncElegantOTA.h>
   #define AsyncElegantOTA_h
-#endif
+#endif*/
+#include "Update.h"
+//#include "Hash.h"
 #include "misc.h"
 #include "MHZ19.h"
 #include <WiFi.h>
@@ -73,6 +75,16 @@ extern RTC_DATA_ATTR uint64_t nowTimeGlobal,lastTimeUploadSampleCheck;
 extern RTC_DATA_ATTR ulong uploadSamplesPeriod;
 extern RTC_DATA_ATTR int errorsWiFiCnt,errorsSampleUpts,errorsNTPCnt,SPIFFSErrors;
 extern wifiCredentials wifiCred;
+extern uint8_t fileUpdateError,errorOnActiveCookie,errorOnWrongCookie;
+extern size_t fileUpdateSize,OTAAvailableSize,SPIFFSAvailableSize;
+extern int updateCommand;
+extern uint32_t flashSize;
+extern uint32_t programSize;
+extern uint32_t fileSystemSize;
+extern uint32_t fileSystemUsed;
+extern String fileUpdateName;
+extern char activeCookie[],currentSetCookie[];
+
 
 String processor(const String& var);
 String processorAP(const String& var);

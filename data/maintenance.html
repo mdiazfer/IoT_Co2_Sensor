@@ -3,6 +3,7 @@
   <head>
     <meta http-equiv="content-type" content="text/html; charset=UTF-8">
     <title>Basic Configuration</title>
+    <script src='/jquery.min.js'></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" media="all" href="styles.css">
     <link type="text/css" rel="stylesheet" href="tswnavbar.css" title="Side Menu CSS">
@@ -41,6 +42,99 @@
               <strong>Reboot Device</strong>
             </button>
           </form>
+          <br><br>
+
+          <fieldset name="OTA_Upgrade_fieldset"> <legend> OTA Upgrade</legend>
+              File Type (Only .bin extension):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              <label for="OTA_firmware_id">Firmware</label>	
+              <input name="OTA_upgrade" id="OTA_firmware_id" value="off" required="required" type="radio" />
+              &nbsp;&nbsp;
+              <label for="OTA_system_file_id">File System Image</label>
+              <input name="OTA_upgrade" id="OTA_system_file_id" value="on" required="required" checked type="radio" />
+              &nbsp;&nbsp;&nbsp;&nbsp;
+              <br><br>
+              <form method='POST' action='/maintenance_upload_firmware' enctype='multipart/form-data' id='upload_form'>
+                <input type='file' name='select_file' id='select_file_id' style="hidden:visibility" accept=".bin"  />
+                <input type='submit' name='file-upload' id='file-upload_id' style="visibility:hidden" value='Upload File' onClick="return confirm('It mith take a while for the file to upload and to write into the device. Be patient as there is no progress indicator.....\n\nWhen the upload is finished the page will be refreshed and the device will be rebooted.\n\nAre you sure to continue?')">
+                <label id='prg' style="visibility:hidden"></label>
+              </form>
+          </fieldset>
+          
+          <script>            
+            function showHideCheck() {
+
+              if (document.getElementById('select_file_id').value!="") {
+                  document.getElementById('select_file_id').style.visibility = 'hidden';
+                  document.getElementById('prg').style.visibility = 'visible';
+                  document.getElementById('file-upload_id').style.visibility = 'visible';
+                  document.getElementById('OTA_firmware_id').disabled=true;
+                  document.getElementById('OTA_system_file_id').disabled=true;
+              } else {
+                document.getElementById('select_file_id').style.visibility = 'visible';
+                document.getElementById('file-upload_id').style.visibility = 'hidden';
+                document.getElementById('prg').style.visibility = 'hidden';
+                document.getElementById('OTA_firmware_id').disabled=false;
+                document.getElementById('OTA_system_file_id').disabled=false;
+              }
+            }
+
+            /* this function will call when page loaded successfully */
+            $(document).ready(function(){                     
+              /* this function will call when onchange event fired */
+
+              $("#select_file_id").on("change",function(){
+                /* current this object refer to input element */
+                
+                var $input = $(this);
+                
+                /* collect list of files choosen */
+                var files = $input[0].files;
+                var filename = files[0].name;
+
+                /* getting file extenstion eg- .jpg,.png, etc */
+                var extension = filename.substr(filename.lastIndexOf("."));
+                /* define allowed file types */
+                //var allowedExtensionsRegx = /(\.bin|\.bin.gz)$/i;
+                var allowedExtensionsRegx = /(\.bin)$/i;
+                /* testing extension with regular expression */
+                var isAllowed = allowedExtensionsRegx.test(extension);
+                if(isAllowed){
+                    /* file upload logic goes here... */
+                    document.getElementById("prg").innerHTML = filename+" ("+files[0].size+" B)";
+                    const binAvailableSpace=~MAINTENLEFTBINMEM~;
+                    const spiffsAvailableSpace=~MAINTENLEFTSPIFFSMEM~;
+
+                    //Binary firmware file
+                    if (document.getElementById('OTA_firmware_id').checked) {
+                      if ((binAvailableSpace-files[0].size)<0) {
+                        alert("Binary File greater than available space ("+binAvailableSpace+" B)");
+                        return false;  
+                      }
+                    }
+                    //SPIFFS system file
+                    else {
+                      if ((spiffsAvailableSpace-files[0].size)<0) {
+                        alert("System File greater than available space ("+spiffsAvailableSpace+" B)");
+                        return false;  
+                      }
+                    }
+                    showHideCheck();
+                }else{
+                    alert("Only file extension .bin is allowed to be uploaded for either Binary or File Systems.");
+                    return false;
+                }
+              });
+            });
+
+            var fileForm=document.getElementById("upload_form");
+            fileForm.addEventListener("formdata", ({ formData }) => {
+              const file = formData.get("select_file");
+              formData.delete("select_file");
+              if (document.getElementById('OTA_firmware_id').checked) formData.append("select_file", file, "firmware.bin");
+              else formData.append("select_file", file, "filesystem.bin");
+            });
+          </script>
+          
           <p></p>
           <br><br>
           <div id="tswerrors">
@@ -87,7 +181,7 @@
         <p style="font-size: 80%; text-align: center;">The IoT Factory ©</p>
         <p style="font-size: 55%; text-align: center;"><a href="http://the-iotfactory.com"
 
-            title="The IoT Factory" target="_blank">https://panadora.sytes.net/theiotfactory</a></p>
+            title="The IoT Factory" target="_blank">http://the-iotfactory.com</a></p>
         <!-- end of footer section: insert your copyright notice, etc, above this line -->
       </div>
     </div>

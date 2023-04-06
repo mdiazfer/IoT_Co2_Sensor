@@ -1,8 +1,7 @@
 To do list
 -----------
 - Web server to display results and configuration
-  + fix web pages layout for smartphone
-  + https => No support on AsyncWebServer
+  + fix web pages layout for smartphone 
 - Troubleshoot
   + WiFi connection failures (????)
 - BLE sutff
@@ -13,10 +12,56 @@ To do list
   + Triger alarms
   + Save CO2 samples in cloud to not lose graph pictures when the battery runs out
   + Adding Bootup info Option to the Display Info Menu
+  + Check MD5/version to allow upload file (????)
+  + Show graphs in webpage
 
 
 Done
 -------
+- Added Switch off Display option in Web page
+- Tests on OTA
+  + Upload bin file from PC1 browser => Result: OK
+  + Bad cookies
+    + Upload from curl with bad cookie => Result: OK - shows error 0x12 - Bad cookie format
+    + Upload from curl with bad cookie 15 consecutive tries => Result: OK - shows error 0x12 and no pointer exceptions nor server frozen
+  + No authentication
+    + Upload bin file from PC1 browser -> Authentication OK => Result: OK
+    + Upload bin file from PC1 browser -> Authentication Cancel => Result: OK - Container.html shown after a while
+  + Binary File name
+    + Upload from curl with right cookie and bad binary file name => Result: OK - shows error 0x0B - Wrong file name
+  + Binary File size
+    + PC1 Upload bigger bin file => Result: OK - Browser warns about it and stops
+    + Upload from curl with right cookie and bigger binary file name => Result: OK - shows error 0x0C - Wrong file size and no OTA finsished
+  + Wrong Binary File
+    + PC1 Upload wrong bin file => Result: OK - shows error 0x0E
+  + Wrong SPIFS name
+    + Upload from curl with right cookie and bad spiffs file name => Result: OK - shows error 0x0B - Wrong file name
+  + Wrong SPIFFS File
+    + PC1 Upload wrong spiffs file => Result: OK - shows error 0x0F
+  + Abort Uploading from browser
+    + Upload bin file -> abort -> Maintenance.html -> Upload bin file => Result: OK - OTA finishes in the second try
+    + Upload bin file -> abort -> Reset => Result: OK - Safari reboots inmediatly, Chrome after a while
+    + Upload bin file -> Maintenance.html -> Upload bin file => Result: OK - OTA finishes in the second try (Safari)
+  + Concurrent uploads
+    + PC1 Upload bin file and PC2 upload bin file (same time) => Result: OK - PC1 uploads the right file (OTA finished), PC2 shows error 0x13 - Upload ongoing
+    + PC1 load maintenance -> PC2 load maintenance -> PC1 Upload bin file => Result: OK - PC1 shows error 0x14 - Bad cookie
+    + PC1 Upload bin file -> PC2 load maintenance -> Reboot Device (no click on OK) => Result: OK - OTA finished and device reboot
+    + PC1 Upload spiffs file and PC2 upload spiffs file (same time) => Result: OK - PC1 uploads the right file (OTA finished), PC2 shows error 0x14 - Bad cookie cause the upload process ended after the device rebooted
+    + PC1 Upload bin file and PC2 upload spiffs file (same time) => Result: OK - PC1 uploads the right file (OTA finished), PC2 shows error 0x14 - Bad cookie cause the upload process ended after the device rebooted
+    + PC1 Upload spiffs file and PC2 upload bin file (same time) => Result: OK - PC1 uploads the right file (OTA finished), PC2 shows error 0x13 - Upload ongoing
++ Web server to display results and configuration
+  v uploadFiles
+    * check if there is space enough to write the file (firmware.bin or systemfile.bin)
+    * Protected by User/Password
+  v robust webServer.on("/maintenance_update_file"...) to admit only parameters (p->name)
+    * select_file
+    * file-upload
+    * check that the firmware.bin & filesytem.bin size don't exceed the OTA/SPIFFS partitions
+    * Check if the selected file type (firmware or file system) matches the selected file
+    * Abort uploading/receiving file chunks from server side (webServer.cpp)
+  v abort/cancel if file to upload has extension other than .bin 
+  v Upload the file to Flash or SPIFFS according to the Form Selection
+  v Config part protected by user & password
 + Firmware upgrade OTA
   - Tests WebServer re-init
   v Battery powered -> boot -> Check whether Web Server inits or not => OK
@@ -40,6 +85,7 @@ Done
   v USB powered -> display off -> display on -> Check whether Web Server inits or not => OK
   v USB powered -> Wifi ON -> WiFi OFF -> WIFI ON -> Check whether Web Server inits or not => OK
 + Bug fixing
+  - Wrong "Uptime since" value in web form and config menu
   - Boot with Battery -> Go to sleep -> Plug USB -> Timer Wakeup and WebServer doesn't re-init
 + Added SPIFFSErrors variable for Error statistics. It is sent to Cloud and shown in web page as well.
   - Power checks done every VOLTAGE_CHECK_PERIOD seconds while the display is ON, even
@@ -118,7 +164,7 @@ Done
   + TZ values based on Cities: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
   + Example for Madrid Time Zone:
     setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1); tzset();
-    getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");
+    getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");
 + Deep Sleep mode implementation if BAT powered (v0.9.0) 
 + Show real time sample in Info menus (bat vol, ntp, wifi, url) (v0.8.1)
 + Review scale of battery icons (i.e. 97% => shows 75% icon)

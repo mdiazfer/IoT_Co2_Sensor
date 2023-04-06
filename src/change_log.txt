@@ -8,12 +8,24 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
-- 0.9.D 17/Mar/2023   - Added Firmware upgrade OTA
+- 0.9.D 06/Apr/2023   - Added Switch off Display option in Web page
+                      - Added Firmware/System File upgrade OTA
+                        + Protection against more than one browser uploading the file (binary or filesystem)
+                        + Abort uploading/receiving file chunks from server side (webServer.cpp) if errors
+                        + Check if the selected file type (firmware or file system) matches the uploaded file
+                        + Avoid writting files greater than the available APP non-running and SPIFFS partitions in FLASH
+                          + Robust maintenance.html to not admit file sizes greater than the available APP non-running and SPIFFS partitions
+                          + Robust webServer.cpp to return if the total received bytes exceeds the available APP non-running and SPIFFS partitions
+                        + Added password protection for Firmware upgrade, Reboot and Factory Reset
+                        + Added detection of Firmware/System File upgrade based on Web Form to properly update
+                        + Only .bin file is allowed to upload
+                        + robust webServer.on("/maintenance_update_file"...) to admit only right parameters (p->name)
                       - Added SPIFFSErrors variable for Error statistics. It is sent to Cloud and shown in web page as well.
                       - Power checks done every VOLTAGE_CHECK_PERIOD seconds while the display is ON, even
                         if Battery is the power source. This makes the power detection faster and it avoids
                         going to sleep when USB is unplugged and plugged back again 6 sec. later.
                       - Bug fixing 
+                        + Wrong "Uptime since" value in web form and config menu
                         + Boot with Battery -> Go to sleep -> Plug USB -> Timer Wakeup and WebServer doesn't re-init
                         + No (battery) icon was updated when Co2 measurement screen is selected
                         + Battery power and configuring Display Mode from the web, don't go to sleep
@@ -104,7 +116,7 @@ Version Date          Change
                         + TZ values based on Cities: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
                         + Example for Madrid Time Zone:
                           setenv("TZ","CET-1CEST,M3.5.0,M10.5.0/3",1); tzset();
-                          getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo, "%d/%m/%Y - %H:%M:%S");
+                          getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");
 - 0.8.1 28/Dec/2022   - Review scale of battery icons (i.e. 97% => shows 75% icon)
 - 0.8.0 26/Dec/2022   - Fine tunning actions and periods to reduce energy consumption
                         + Increase WiFi Scanning period and avoid scann if Display is OFF
