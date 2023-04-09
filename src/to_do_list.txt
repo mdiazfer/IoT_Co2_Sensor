@@ -1,11 +1,12 @@
 To do list
 -----------
-- Web server to display results and configuration
-  + fix web pages layout for smartphone 
+- Web Server
+  + Change admin 
+- Implement MQTT
+- BLE sutff
+  + Get info about bluetooth to update icons
 - Troubleshoot
   + WiFi connection failures (????)
-- BLE sutff
-- Get info about bluetooth to update icons
 - Icon for the bootup screen
 - Candidate features
   + REST API to get results
@@ -18,6 +19,10 @@ To do list
 
 Done
 -------
+- Added Measurements page to the web server - based on Server Side Events 
+- Bug fix
+  + HTML pages allignement
+  + fix web pages layout for smartphone
 - Added Switch off Display option in Web page
 - Tests on OTA
   + Upload bin file from PC1 browser => Result: OK

@@ -147,7 +147,7 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
   //If USB is unplugged, timeUSBPower is set to zero
 
   
-  Serial.println("    [updateBatteryVoltageAndStatus] - Enter in updateBatteryVoltageAndStatus()");
+  if (debugModeOn) Serial.println("    [updateBatteryVoltageAndStatus] - Enter in updateBatteryVoltageAndStatus()");
   //Power state check
   digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
   batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
@@ -155,12 +155,12 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
 
   /*--><--*///batADCVolt=1900;
 
-  Serial.println("    [updateBatteryVoltageAndStatus] - batADCVolt="+String(batADCVolt));
+  if (debugModeOn) Serial.println("    [updateBatteryVoltageAndStatus] - batADCVolt="+String(batADCVolt));
 
   if (batADCVolt >= VOLTAGE_TH_STATE) {
     //USB is plugged. Assume battery is always plugged and charged after FULL_CHARGE_TIME milliseconds
 
-    Serial.println("    [updateBatteryVoltageAndStatus] - powerState="+String(powerState));
+    if (debugModeOn) Serial.println("    [updateBatteryVoltageAndStatus] - powerState="+String(powerState));
     
     if (onlyBattery==powerState) { //Change BAT -> USB power
       powerState=chargingUSB;
@@ -174,7 +174,7 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
       autoBackLightOff=false; //update autoBackLightOff if USB power
       forceDisplayRefresh=true; //force Icon update (if display is ON)
 
-      Serial.println("    [updateBatteryVoltageAndStatus] - wakeup_reason="+String(wakeup_reason));
+      if (debugModeOn) Serial.println("    [updateBatteryVoltageAndStatus] - wakeup_reason="+String(wakeup_reason));
 
       //If TFT is off, switch it on and and display samples
       if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) {
@@ -201,7 +201,7 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
         CloudClockCurrentStatus=CloudClockOffStatus; //To update icons as WiFi is disconnect
         CloudSyncCurrentStatus=CloudSyncOffStatus; //To update icons as WiFi is disconnect
 
-        Serial.println("    [updateBatteryVoltageAndStatus] - forceWifiReconnect=true, forceWebServerInit=true, etc.");
+        if (debugModeOn) Serial.println("    [updateBatteryVoltageAndStatus] - forceWifiReconnect=true, forceWebServerInit=true, etc.");
       }
     }
     else { //USB power. Let's decide if chargingUSB or noChargingUSB based on USB power time

@@ -14,13 +14,13 @@ String IpAddress2String(const IPAddress& ipAddress)
     String(ipAddress[3])  ; 
 }
 
-uint8_t sendHttpRequest(boolean logsOn, IPAddress server, uint16_t port, String httpRequest) {
+uint8_t sendHttpRequest(boolean debugModeOn, IPAddress server, uint16_t port, String httpRequest) {
   //Sending httpRequest
-  //boolean logsOn=false;
+  //boolean debugModeOn=false;
 
-  if (logsOn) {Serial.print("\n[sendHttpRequest] - Trying connection to ");Serial.print(IpAddress2String(server));Serial.print(" to send httpRequest: '");Serial.print(httpRequest);Serial.println("'");}
+  if (debugModeOn) {Serial.print("\n[sendHttpRequest] - Trying connection to ");Serial.print(IpAddress2String(server));Serial.print(" to send httpRequest: '");Serial.print(httpRequest);Serial.println("'");}
   if (client.connect(server, 80)) {
-    if (logsOn) {Serial.println("[sendHttpRequest] - connected");}
+    if (debugModeOn) {Serial.println("[sendHttpRequest] - connected");}
     // Send a HTTP request:
     client.println(httpRequest);
     client.print("Host: "); client.println(IpAddress2String(server));
@@ -31,7 +31,7 @@ uint8_t sendHttpRequest(boolean logsOn, IPAddress server, uint16_t port, String 
   }
   else {
     errorsSampleUpts++;  //Something went wrong. Update error counter for stats
-    if (logsOn) {Serial.println("[sendHttpRequest] - Not connected, errorsSampleUpts="+String(errorsSampleUpts));}
+    if (debugModeOn) {Serial.println("[sendHttpRequest] - Not connected, errorsSampleUpts="+String(errorsSampleUpts));}
   }
   
   // if there are incoming bytes available
@@ -43,31 +43,31 @@ uint8_t sendHttpRequest(boolean logsOn, IPAddress server, uint16_t port, String 
     if (nowMilliseconds>=lastMilliseconds+HTTP_ANSWER_TIMEOUT) {
       //Too long with no server answer. Something was wrong. Changing icon
       CloudSyncCurrentStatus=CloudSyncOffStatus;
-      if (logsOn) {Serial.println("NO Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
+      if (debugModeOn) {Serial.println("NO Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
       break;
     }
   }; //wait till there is server answer
 
   if (CloudSyncCurrentStatus==CloudSyncOnStatus) {
-    if (logsOn) {Serial.println("Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
+    if (debugModeOn) {Serial.println("Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
     while (client.available()) {
       char c = client.read();
-      if (logsOn) {Serial.write(c);}
+      if (debugModeOn) {Serial.write(c);}
     }
-    if (logsOn) {Serial.println("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
+    if (debugModeOn) {Serial.println("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
   }
   else errorsSampleUpts++;  //Something went wrong. Update error counter for stats
 
   // if the server's disconnected, stop the client:
   if (!client.connected()) {
-    if (logsOn) {Serial.println("[sendHttpRequest] - Disconnecting from server. Bye!");}
+    if (debugModeOn) {Serial.println("[sendHttpRequest] - Disconnecting from server. Bye!");}
     client.stop();
   }
   
   return 0;
 }
 
-uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_setup, IPAddress server, 
+uint32_t sendAsyncHttpRequest(boolean debugModeOn, boolean fromSetup, uint32_t error_setup, IPAddress server, 
                              uint16_t port, String httpRequest, uint64_t* whileLoopTimeLeft) {
   //Sending Async httpRequest
   // Parameters:
@@ -88,9 +88,7 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
   // *whileLoopTimeLeft is a global variable. It is modified in here. The calling function
   //   just sends it to this function.
   
-  logsOn=true;
-  
-  if (logsOn) {
+  if (debugModeOn) {
     Serial.print("\n"+String(loopStartTime+millis())+" [sendAsyncHttpRequest] - Trying connection to ");Serial.print(IpAddress2String(server));Serial.print(" to send httpRequest: '");Serial.print(httpRequest);Serial.println("'");
     Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest] - forceWEBCheck="+String(forceWEBCheck)+", forceWEBTestCheck="+String(forceWEBTestCheck)+", webResuming="+String(webResuming));
   }
@@ -99,7 +97,7 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
   if (whileLoopTimeLeft==nullptr) {
     errorsSampleUpts++; //Something went wrong. Update error counter for stats
     webServerError1++;
-    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError1="+String(webServerError1)+" - Returning with ERROR_CLOUD_SERVER");}
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest]  - webServerError1="+String(webServerError1)+" - Returning with ERROR_CLOUD_SERVER");}
     return(ERROR_CLOUD_SERVER);
   }
   
@@ -108,7 +106,7 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
 
   if (!webResuming) { //To avoid repeating sending the same http request if resuming after ABORT or BREAK
     if (client.connect(server, 80)) {
-      if (logsOn) {Serial.println(String(loopStartTime+millis())+"[sendAsyncHttpRequest] - connected");}
+      if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest] - connected");}
       // Send a HTTP request:
       client.println(httpRequest);
       client.print("Host: "); client.println(IpAddress2String(server));
@@ -123,8 +121,8 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
       if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=HTTP_ANSWER_TIMEOUT;  //To avoid resuming connection the next loop interacion       
       forceWEBCheck=false;
       webResuming=false;
-      if (logsOn) {Serial.println("[sendAsyncHttpRequest] - Not connected, errorsSampleUpts="+String(errorsSampleUpts));}
-      if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError2="+String(webServerError2)+" - Returning with ERROR_CLOUD_SERVER");}
+      if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest] - Not connected, errorsSampleUpts="+String(errorsSampleUpts));}
+      if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest]  - webServerError2="+String(webServerError2)+" - Returning with ERROR_CLOUD_SERVER");}
       return(ERROR_CLOUD_SERVER); //not WEB server connection
     }
   }
@@ -132,7 +130,7 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
   uint64_t whileStartTime=loopStartTime+millis(),auxTime=whileStartTime;
   if (*whileLoopTimeLeft>=HTTP_ANSWER_TIMEOUT) *whileLoopTimeLeft=HTTP_ANSWER_TIMEOUT;
 
-  if (debugModeOn) {Serial.println("    - whileStartTime="+String(whileStartTime)+", *whileLoopTimeLeft="+String(*whileLoopTimeLeft)+", waiting for HTTP client.available()");}
+  if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest]    - whileStartTime="+String(whileStartTime)+", *whileLoopTimeLeft="+String(*whileLoopTimeLeft)+", waiting for HTTP client.available()");}
   while ( !client.available() && *whileLoopTimeLeft<=HTTP_ANSWER_TIMEOUT) {
     *whileLoopTimeLeft=*whileLoopTimeLeft-(loopStartTime+millis()-auxTime);
     auxTime=loopStartTime+millis();
@@ -145,7 +143,7 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
         case 2:
         case 3:
           //Button1 or Button2 pressed or released. WEB Connection process aborted if not Sync is completed
-          if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - checkButtonsActions() returns 1, 2 or 3 - Returning with ERROR_ABORT_WEB_SETUP");}
+          if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest]  - checkButtonsActions() returns 1, 2 or 3 - Returning with ERROR_ABORT_WEB_SETUP");}
           if (!client.available()) { //Actions required as the process is aborted
             forceWEBCheck=true; //Let's grant WEB check again in the next loop interaction
             webResuming=true;
@@ -177,23 +175,23 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
 
   if (*whileLoopTimeLeft>HTTP_ANSWER_TIMEOUT) { //Case if while() loop timeout.
     //Too long with no server answer. Something was wrong. Changing icon
-    if ((logsOn && fromSetup) || debugModeOn) {
-      Serial.println(String(loopStartTime+millis())+" NO Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+    if ((debugModeOn && fromSetup) || debugModeOn) {
+      Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest] NO Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
     }
   }
   else { 
     //End of while() due to successful WEB sync
     // (Button Pressed or Display Refresh force the function to return from the while() loop, 
     //  so this point is not reached in those cases)
-    if ((logsOn && fromSetup) || debugModeOn) {
-      Serial.println(String(loopStartTime+millis())+" Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
+    if ((debugModeOn && fromSetup) || debugModeOn) {
+      Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest] Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
     }
     while (client.available()) {//Should be very fast.
       char c = client.read();
-      if (logsOn) {Serial.write(c);}
+      if (debugModeOn) {Serial.write(c);}
     }
     CloudSyncCurrentStatus=CloudSyncOnStatus;
-    if (logsOn) {Serial.println("\n"+String(loopStartTime+millis())+"++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
+    if (debugModeOn) {Serial.println("\n"+String(loopStartTime+millis())+" [sendAsyncHttpRequest]++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
   }
 
   //This point is reached if either the while() loop timed out or successful WEB sync
@@ -202,7 +200,7 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
   
   // if the server's disconnected, stop the client:
   if (!client.connected()) {
-    if (logsOn) {Serial.println(String(loopStartTime+millis())+"[sendAsyncHttpRequest] - Disconnecting from server. Bye!");}
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest] - Disconnecting from server. Bye!");}
     client.stop();
   }
   
@@ -213,14 +211,14 @@ uint32_t sendAsyncHttpRequest(boolean logsOn, boolean fromSetup, uint32_t error_
     if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=HTTP_ANSWER_TIMEOUT;  //To avoid resuming connection the next loop interacion       
     forceWEBCheck=false;
     webResuming=false;
-    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - webServerError3="+String(webServerError3)+" - Returning with ERROR_CLOUD_SERVER");}
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest]  - webServerError3="+String(webServerError3)+" - Returning with ERROR_CLOUD_SERVER");}
     return(ERROR_CLOUD_SERVER); //not WEB server connection
   }
   else {
     //Case for successfull WEB connection
     if (debugModeOn) {
-        Serial.println("    - CloudSyncCurrentStatus="+String(CloudSyncCurrentStatus)+", errorsSampleUpts="+String(errorsSampleUpts));
-        Serial.println(String(loopStartTime+millis())+"  - [sendAsyncHttpRequest] - Exit - Time:");
+        Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest]    - CloudSyncCurrentStatus="+String(CloudSyncCurrentStatus)+", errorsSampleUpts="+String(errorsSampleUpts));
+        Serial.print(String(loopStartTime+millis())+" [sendAsyncHttpRequest] - Exit - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");
     }
 
     if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=HTTP_ANSWER_TIMEOUT;  //To avoid resuming connection the next loop interacion       

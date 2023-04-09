@@ -8,6 +8,13 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 1.0.0 09/Apr/2023   - Bug fix
+                        + fix web pages layout for smartphone
+- 0.9.E 08/Apr/2023   - Print code clean-up and replacing logsOn by debugModeOn in all the files
+                      - Added Measurements page to the web server - based on Server Side Events 
+                      - Bug fix
+                        + HTML pages allignement
+                        + fix web pages layout for smartphone
 - 0.9.D 06/Apr/2023   - Added Switch off Display option in Web page
                       - Added Firmware/System File upgrade OTA
                         + Protection against more than one browser uploading the file (binary or filesystem)

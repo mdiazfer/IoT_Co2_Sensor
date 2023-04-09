@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "0.9.D"
+#define VERSION "1.0.0"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -262,6 +262,7 @@
 #define WEBSERVER_CSSNAVBAR_PAGE "/tswnavbar.css"
 #define WEBSERVER_LOGO_ICON "/The_IoT_Factory.png"
 #define WEBSERVER_INDEX_PAGE "/index.html"
+#define WEBSERVER_INFO_PAGE "/info.html"
 #define WEBSERVER_BASICCONFIG_PAGE "/basic.html"
 #define WEBSERVER_CLOUDCONFIG_PAGE "/cloud.html"
 #define WEBSERVER_BLUETOOTHCONFIG_PAGE "/bluetooth.html"
@@ -275,6 +276,10 @@
 #define WEBSERVER_FILE_EXTENSION ".bin"
 #define WEBSERVER_DEFAULTCONF_PAGE "/maintenance_default_values"
 #define WEBSERVER_DEVICERESET_PAGE "/maintenance_device_reset"
+#define WEBSERVER_SAMPLES_EVENT "/sampleEvents"
+#define WEBSERVER_SAMPLES_PAGE "/samples"
+#define WEBSERVER_GAUGESCRIPT_PAGE "/gauge.min.js"
+#define WEBSERVER_RESULTSCRIPT_PAGE "/result_script.js"
 #define COOKIE_SIZE 54 //32 Chars + null
 
 
@@ -345,11 +350,9 @@
 //SPIFFS stuff
 #define SPIFFS_CFG_LOG_BLOCK_SZ  4096 //Bytes - Size of Logical SPIFFS Blocks
 #define SPIFFS_CFG_LOG_PAGE_SZ  256 //Bytes - Size of Logical SPIFFS Pages
-#define SPIFFS_MAGIC_ADDR SPIFFS_CFG_LOG_PAGE_SZ-4 //Bytes - Address for the magic number to confir it's SPIFFS partition
+#define SPIFFS_MAGIC_ADDR SPIFFS_CFG_LOG_PAGE_SZ-4 //Bytes - Address for the magic number to confirm it's SPIFFS partition
 
 #ifdef _DECLAREGLOBALPARAMETERS_
-  bool logsOn = true;         //Whether enable or not logs on the seriaml line [TRUE | FALSE]
-
   #ifndef _WIFINETWORKINFO_
     typedef struct {
       uint8_t networkItem;

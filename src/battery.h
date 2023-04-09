@@ -72,7 +72,7 @@ There are 4 different Saving Energy modes:
 
 extern adc_atten_t attenuationDb;
 extern esp_adc_cal_characteristics_t adc1_chars;
-extern bool logsOn;
+extern bool debugModeOn;
 extern TFT_eSPI tft;
 extern RTC_DATA_ATTR float_t batADCVolt,lastBatCharge,batCharge;
 extern RTC_DATA_ATTR enum powerModes powerState;

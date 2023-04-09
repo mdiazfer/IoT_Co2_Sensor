@@ -29,6 +29,7 @@
 #include <AsyncTCP.h>
 #include <SPIFFS.h>
 #include "webServer.h"
+#include <Arduino_JSON.h>
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -39,10 +40,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   907 B
+// RTC memory variables:                   1011 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     3967 B
-// RTC memory left:     8000 B - 3967 B = 4033 B 
+// RTC memorty TOTAL:                     4071 B
+// RTC memory left:     8000 B - 3967 B = 3929 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -126,6 +127,7 @@ RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServe
 RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON; //1*1=1B
 RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus=BLEOffStatus; //1*4=4B
 RTC_DATA_ATTR AsyncWebServer webServer(WEBSERVER_PORT); //1*84=84B
+RTC_DATA_ATTR AsyncEventSource webEvents(WEBSERVER_SAMPLES_EVENT); //1*104=104B
 RTC_DATA_ATTR uint32_t error_setup=NO_ERROR; //1*4=4B
 
 //Global variable definitions stored in regular RAM. 520 KB Max
@@ -175,6 +177,7 @@ String fileUpdateName;
 struct tm nowTimeInfo; //36 B
 char activeCookie[COOKIE_SIZE];
 char currentSetCookie[COOKIE_SIZE];
+JSONVar samples;
 
 
 //Code
@@ -619,28 +622,28 @@ void firstSetup() {
   currentState=bootupScreen;lastState=currentState;
   displayMode=bootup;lastDisplayMode=bootup;
 
-  if (logsOn) {Serial.print("\n[SETUP] - Doing regular CO2 bootup v");Serial.print(VERSION);Serial.println(" ..........");Serial.println("[setup] - Serial: OK");}
+  if (debugModeOn) {Serial.print("\n[SETUP] - Doing regular CO2 bootup v");Serial.print(VERSION);Serial.println(" ..........");Serial.println("[setup] - Serial: OK");}
 
   //Date initialization to 1-Jan-2022 00:00:00
   // Necessary to avoid to get frozen when getLocalTime() is called if NTP is not synced.
   // https://stackoverflow.com/questions/72940013/why-getlocaltime-implementation-needs-delay
   ESP32Time timeTest(0);
   timeTest.setTime(0,0,0,1,1,2022);  // 1st Jan 2022 00:00:00
-  if (logsOn) {Serial.println("[setup] - Initial date set to 1st Jan 2022 00:00:00. Will be updated after NTP sync");}
+  if (debugModeOn) {Serial.println("[setup] - Initial date set to 1st Jan 2022 00:00:00. Will be updated after NTP sync");}
   getLocalTime(&startTimeInfo); //Getting initial local time. Will be overwritten if NTP sync suceeds
   error_setup=NO_ERROR;
 
   //-->>Buttons init
-  if (logsOn) Serial.print("[setup] - Buttons: ");
+  if (debugModeOn) Serial.print("[setup] - Buttons: ");
   button1.begin();
   button2.begin();
   if ((error_setup & ERROR_BUTTONS_SETUP)==0) { 
-    if (logsOn) Serial.println("OK");
+    if (debugModeOn) Serial.println("OK");
   } else {
-    if (logsOn) {Serial.println("KO"); Serial.println("Can't continue. STOP");}
+    if (debugModeOn) {Serial.println("KO"); Serial.println("Can't continue. STOP");}
   }
 
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //Display init
   pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
@@ -654,7 +657,7 @@ void firstSetup() {
   rd = tft.readPixel(30,30);
   if (rd!=wr) {
     error_setup=ERROR_DISPLAY_SETUP;
-    if (logsOn) {
+    if (debugModeOn) {
       Serial.println("[setup] - Display: KO");
       Serial.println("          Pixel value wrote = ");Serial.println(wr,HEX);
       Serial.println("          Pixel value read  = ");Serial.println(rd,HEX);
@@ -664,13 +667,13 @@ void firstSetup() {
     return; //Can't continue
   }
   else {
-    if (logsOn) Serial.println("[setup] - Display: OK");
+    if (debugModeOn) Serial.println("[setup] - Display: OK");
     tft.fillScreen(TFT_BLACK);
   }
 
   //Start AP Mode to configure WiFi SSIDs
   if (startAPMode) {
-    if (logsOn) Serial.println(" [setup] - No WiFi configuration. Asking the user what to do.");
+    if (debugModeOn) Serial.println(" [setup] - No WiFi configuration. Asking the user what to do.");
     currentState=bootAPScreen;lastState=bootupScreen;
     displayMode=bootAP;lastDisplayMode=bootup;
     
@@ -678,16 +681,16 @@ void firstSetup() {
     if(runAPMode()) {
       //AP Mode is running
       if (SPIFFS.begin(true)) {
-        if (logsOn) Serial.println(" [setup] - SPIFFS.begin=OK, SPIFFSErrors="+String(SPIFFSErrors));
+        if (debugModeOn) Serial.println(" [setup] - SPIFFS.begin=OK, SPIFFSErrors="+String(SPIFFSErrors));
 
         fileSystemSize = SPIFFS.totalBytes();
         fileSystemUsed = SPIFFS.usedBytes();
       }
       else {
         SPIFFSErrors++;
-        if (logsOn) Serial.println(" [setup] - SPIFFS.begin=KO, SPIFFSErrors="+String(SPIFFSErrors));
+        if (debugModeOn) Serial.println(" [setup] - SPIFFS.begin=KO, SPIFFSErrors="+String(SPIFFSErrors));
       }
-      if (logsOn) Serial.println(" [setup] - initAPWebServer="+String(initAPWebServer()));
+      if (debugModeOn) Serial.println(" [setup] - initAPWebServer="+String(initAPWebServer()));
     
       //Infinitive loop as ESP web server is running.
       //The ESP will be restarted by the user when config is finished
@@ -703,7 +706,7 @@ void firstSetup() {
     wifiEnabled=false; //No WiFi as there is no SSID configured
     currentState=bootupScreen;lastState=currentState;
     displayMode=bootup;lastDisplayMode=bootup;
-    if (logsOn) Serial.println(" [setup] - No AP Mode. WiFi disabled. Continue setup ");
+    if (debugModeOn) Serial.println(" [setup] - No AP Mode. WiFi disabled. Continue setup ");
   }
 
   // Create a sprite for text and initialize sprite parameters
@@ -732,10 +735,10 @@ void firstSetup() {
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_WHITE,TFT_BLACK);stext1.print("CO2 bootup v");stext1.print(VERSION);stext1.println(" ..........");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Display: [");stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //Some Temp & Hum sensor checks and init
-  if (logsOn) Serial.print("[setup] - Sensor Temp/HUM: ");
+  if (debugModeOn) Serial.print("[setup] - Sensor Temp/HUM: ");
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Tp/Hu:  [");
   pinMode(SI7021_SDA,INPUT_PULLUP); pinMode(SI7021_SCL,INPUT_PULLUP);
   tempHumSensor.begin(SI7021_SDA,SI7021_SCL);
@@ -746,7 +749,7 @@ void firstSetup() {
   if (!tempHumSensor.isConnected() || 0==tempHumSensorType.compareTo("UNKNOW"))
     error_setup|=ERROR_SENSOR_TEMP_HUM_SETUP;
   if ((error_setup & ERROR_SENSOR_TEMP_HUM_SETUP)==0) { 
-    if (logsOn) {
+    if (debugModeOn) {
       Serial.println("OK");
       Serial.print("  Tp/Hm Sensor type: "); Serial.println(tempHumSensorType); 
       //Serial.print("  Tp/Hm Sen. version: "); Serial.println(tempHumSensor.getFirmwareVersion());
@@ -758,7 +761,7 @@ void firstSetup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Sensor: ");stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.println(tempHumSensorType);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
   else {
-    if (logsOn) {
+    if (debugModeOn) {
       Serial.println("KO");
       Serial.print("  Tp/Hm Sensor type: "); Serial.print(tempHumSensorType);Serial.println(" - Shouldn't be UNKNOWN");
       Serial.print("  Tp/Hm Sen. status: "); Serial.println(statSns,HEX);
@@ -772,10 +775,10 @@ void firstSetup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  Tp/Hm Sen. resolu.: ");stext1.print(tempHumSensor.getResolution());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //Sensor CO2 init
-  if (logsOn) Serial.print("[setup] - Sensor: ");
+  if (debugModeOn) Serial.print("[setup] - Sensor: ");
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Sens.:  [");
   co2SensorSerialPort.begin(9600);      // (Uno example) device to MH-Z19 serial start   
   co2Sensor.begin(co2SensorSerialPort); // *Serial(Stream) refence must be passed to library begin(). 
@@ -788,7 +791,7 @@ void firstSetup() {
       0==co2SensorType.compareTo("UNKNOW"))
     error_setup|=ERROR_SENSOR_CO2_SETUP;
   if ((error_setup & ERROR_SENSOR_CO2_SETUP)==0) { 
-    if (logsOn) {
+    if (debugModeOn) {
       Serial.println("OK");
       Serial.print("  CO2 Sensor type: "); Serial.println(co2SensorType); 
       Serial.print("  CO2 Sensor version: "); Serial.println(co2SensorVersion);
@@ -801,7 +804,7 @@ void firstSetup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  CO2 Sensor Accuracy: ");stext1.print(co2Sensor.getAccuracy(false));if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  CO2 Sensor Range: ");stext1.print(co2Sensor.getRange());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   } else {
-    if (logsOn) {
+    if (debugModeOn) {
       Serial.println("KO");
       Serial.print("  CO2 Sensor type: "); Serial.print(co2SensorType);Serial.println(" - Shouldn't be UNKNOWN");
       Serial.print("  CO2 Sensor version: "); Serial.println(co2SensorVersion);
@@ -815,7 +818,7 @@ void firstSetup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  CO2 Sensor Range: ");if  (CO2_SENSOR_CO2_RANGE!=co2Sensor.getRange()) stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print(co2Sensor.getRange());if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //Initiating buffers to draw the Co2/Temp/Hum graphs
   for (int i=0; i<(int)(3600/SAMPLE_T_LAST_HOUR); i++)  {lastHourCo2Samples[i]=0;lastHourTempSamples[i]=0;lastHourHumSamples[i]=0;}
@@ -828,7 +831,7 @@ void firstSetup() {
 
   //User credentials definition already done in initVariables()
   
-  if (logsOn) Serial.print("[setup] - WiFi: ");
+  if (debugModeOn) Serial.print("[setup] - WiFi: ");
   //Clean-up dots displayed after trying to get connected
   stext1.setCursor(cuX,cuY);
   for (int counter2=0; counter2<MAX_CONNECTION_ATTEMPTS*(wifiCred.activeIndex+1); counter2++) stext1.print(" ");
@@ -839,7 +842,7 @@ void firstSetup() {
 
     //print Logs
     if ((error_setup & ERROR_WIFI_SETUP)==0 ) { 
-      if (logsOn) Serial.println("OK");
+      if (debugModeOn) Serial.println("OK");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print(" [");
       stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("OK");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");//if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
@@ -857,7 +860,7 @@ void firstSetup() {
       else if (wifiNet.RSSI>=WIFI_025_RSSI) wifiCurrentStatus=wifi25Status;
       else if (wifiNet.RSSI<WIFI_000_RSSI) wifiCurrentStatus=wifi0Status;
     } else {
-      if (logsOn) Serial.println("KO");
+      if (debugModeOn) Serial.println("KO");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print(" [");
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("KO");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");
@@ -866,14 +869,14 @@ void firstSetup() {
     }
   }
   else {//If WiFi is not enabled, then inform
-    if (logsOn) Serial.println("N/E");
+    if (debugModeOn) Serial.println("N/E");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print(" [");
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("N/E");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");//if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     wifiCurrentStatus=wifiOffStatus;
   }
 
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //WEB SERVER
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - WEB SERVER: [");
@@ -884,22 +887,22 @@ void firstSetup() {
     
     //print Logs
     if ((error_setup & ERROR_WEB_SERVER)==0 ) { 
-      if (logsOn) Serial.println("[setup] - WEB SERVER: OK");
+      if (debugModeOn) Serial.println("[setup] - WEB SERVER: OK");
       stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     } else {
-      if (logsOn) {Serial.println("[setup] - WEB SERVER: KO");}
+      if (debugModeOn) {Serial.println("[setup] - WEB SERVER: KO");}
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     }
   }
   else {//If either WiFi or webServer is not enabled, then inform
-    if (logsOn) Serial.println("[setup] - WEB SERVER: N/E");
+    if (debugModeOn) Serial.println("[setup] - WEB SERVER: N/E");
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("N/E");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
   
   //SPIFFS
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - SPIFFS: [");
@@ -907,12 +910,12 @@ void firstSetup() {
   if(!SPIFFS.begin(true)){
     error_setup|=ERROR_SPIFFS_SETUP;
     SPIFFSErrors++;
-    if (logsOn) Serial.println("[setup] - SPIFFS.begin=KO, SPIFFSErrors="+String(SPIFFSErrors));
+    if (debugModeOn) Serial.println("[setup] - SPIFFS.begin=KO, SPIFFSErrors="+String(SPIFFSErrors));
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
   else {
-    if (logsOn) Serial.println("[setup] - SPIFFS.begin=OK, SPIFFSErrors="+String(SPIFFSErrors));
+    if (debugModeOn) Serial.println("[setup] - SPIFFS.begin=OK, SPIFFSErrors="+String(SPIFFSErrors));
     stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
 
@@ -920,7 +923,7 @@ void firstSetup() {
     fileSystemUsed = SPIFFS.usedBytes();
   }
 
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
   
   //Pre-setting up URL things to upload samples to an external server
   //Converting SERVER_UPLOAD_SAMPLES into IPAddress variable
@@ -932,17 +935,17 @@ void firstSetup() {
     String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
     String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
   
-  if (logsOn) {Serial.print("[setup] - URL: ");}
+  if (debugModeOn) {Serial.print("[setup] - URL: ");}
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - URL: ");
 
   CloudSyncCurrentStatus=CloudSyncOffStatus;
   if ((error_setup & ERROR_WIFI_SETUP)==0 && wifiEnabled && uploadSamplesEnabled) { 
     //Send HttpRequest to check the server status
     // The request updates CloudSyncCurrentStatus
-    error_setup|=sendAsyncHttpRequest(false,true,error_setup,serverToUploadSamplesIPAddress,SERVER_UPLOAD_PORT,String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1",&whileWebLoopTimeLeft);
+    error_setup|=sendAsyncHttpRequest(true,true,error_setup,serverToUploadSamplesIPAddress,SERVER_UPLOAD_PORT,String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1",&whileWebLoopTimeLeft);
 
     if (CloudSyncCurrentStatus==CloudSyncOnStatus) {
-      if (logsOn) {Serial.println("[OK]");}
+      if (debugModeOn) {Serial.println("[OK]");}
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[");
       stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
@@ -950,7 +953,7 @@ void firstSetup() {
       stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);
     }
     else {
-      if (logsOn) {Serial.println("[KO]");}
+      if (debugModeOn) {Serial.println("[KO]");}
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[");
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
@@ -958,7 +961,7 @@ void firstSetup() {
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);
     }
 
-    if (logsOn) {Serial.print("  - URL: ");Serial.println("http://"+serverToUploadSamplesIPAddress.toString()+
+    if (debugModeOn) {Serial.print("  - URL: ");Serial.println("http://"+serverToUploadSamplesIPAddress.toString()+
         String(GET_REQUEST_TO_UPLOAD_SAMPLES).substring(4,String(GET_REQUEST_TO_UPLOAD_SAMPLES).length()-1));
         Serial.print("  - Device name=");Serial.println(device);
     }
@@ -970,20 +973,20 @@ void firstSetup() {
   }
   else {
     if ((error_setup & ERROR_WIFI_SETUP)!=0 || !wifiEnabled) {
-      if (logsOn) {Serial.println("No WiFi");}
+      if (debugModeOn) {Serial.println("No WiFi");}
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[");
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("No WiFi");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     }
     else { 
-      if (logsOn) {Serial.println("N/E");}
+      if (debugModeOn) {Serial.println("N/E");}
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[");
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("N/E");
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     }
   }
 
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //NTP Server
   CloudClockCurrentStatus=CloudClockOffStatus;
@@ -1012,33 +1015,33 @@ void firstSetup() {
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //-->>BLE init
   
-  if (logsOn) Serial.print("[setup] - BLE: ");
+  if (debugModeOn) Serial.print("[setup] - BLE: ");
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - BLE:     [");
   BLEClurrentStatus=BLEOffStatus;
   if (bluetoothEnabled) {  
     if ((error_setup & ERROR_BLE_SETUP)==0 ) { 
-      if (logsOn) Serial.println("OK");
+      if (debugModeOn) Serial.println("OK");
       stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
       BLEClurrentStatus=BLEOnStatus;
     } else {
-      if (logsOn) Serial.println("KO");
+      if (debugModeOn) Serial.println("KO");
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
     }
   }
   else {
-    if (logsOn) Serial.println("N/E");
+    if (debugModeOn) Serial.println("N/E");
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("N/E");
   }
   stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //-->>Battery and ADC init
-  if (logsOn) Serial.print("[setup] - Bat. ADC: ");
+  if (debugModeOn) Serial.print("[setup] - Bat. ADC: ");
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Bat. ADC [");
   pinMode(POWER_ENABLE_PIN, OUTPUT);
   digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE);
@@ -1048,7 +1051,7 @@ void firstSetup() {
   esp_adc_cal_characterize(ADC_UNIT_1, attenuationDb, (adc_bits_width_t) ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
   if (0!=adc1_config_channel_atten(ADC1_CHANNEL_6, attenuationDb)) error_setup|=ERROR_BAT_ADC;
   if ((error_setup & ERROR_BAT_ADC)==0 ) { 
-    if (logsOn) {
+    if (debugModeOn) {
       Serial.println("OK");
       Serial.print(" - adc_num=");Serial.println(adc1_chars.adc_num);
       Serial.print(" - atten=");Serial.println(adc1_chars.atten);
@@ -1092,7 +1095,7 @@ void firstSetup() {
       else energyCurrentMode=lowestEnergy; 
       autoBackLightOff=true; //update autoBackLightOff if BAT power
     }
-    if (logsOn) {
+    if (debugModeOn) {
       Serial.println(" - voltage="+String(batADCVolt)+", charge="+String(batCharge)+"%");
       Serial.println(" - powerState="+String(powerState)+", energyCurrentMode="+String(energyCurrentMode));
     }
@@ -1101,12 +1104,12 @@ void firstSetup() {
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK); stext1.print(" V="+String((int)batADCVolt)+"mv, "+String(batCharge)+"%, pwState="+String(powerState));if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);    
   } else {
-    if (logsOn) Serial.println("KO");
+    if (debugModeOn) Serial.println("KO");
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
 
-  if (logsOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   #if BUILD_ENV_NAME==BUILD_TYPE_DEVELOPMENT
     //Clean up ERROR_SENSOR_CO2_SETUP for development as there's no CO2 sensor
@@ -1125,13 +1128,13 @@ void firstSetup() {
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine); //Add one more line
   }
   else if ((error_setup | NO_ERROR)!=0) {
-    if (logsOn) Serial.println("Ready to start but with limitations, error_setup="+String(error_setup));
+    if (debugModeOn) Serial.println("Ready to start but with limitations, error_setup="+String(error_setup));
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("Buttons to scroll UP/DOWN");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_ORANGE_4_BITS_PALETTE,TFT_BLACK);stext1.print("Ready in ");cuX=stext1.getCursorX();cuY=stext1.getCursorY();
     stext1.print(BOOTUP_TIMEOUT);stext1.print(" sec. but with limitations");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   } else {
-    if (logsOn) Serial.println("Ready to start");
+    if (debugModeOn) Serial.println("Ready to start");
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("Buttons to scroll UP/DOWN");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK);stext1.print("Ready to start in ");cuX=stext1.getCursorX();cuY=stext1.getCursorY();
@@ -1252,7 +1255,7 @@ boolean warmingUp() {
   while (nowTimeGlobal<co2PreheatingTime) {
     auxCounter++;
     //Waiting for the sensor to warmup before displaying value
-    if (waitingMessage) {if (logsOn) Serial.println("Waiting for the warmup to finish");circularGauge.drawGauge2(0);waitingMessage=false;}
+    if (waitingMessage) {if (debugModeOn) Serial.println("Waiting for the warmup to finish");circularGauge.drawGauge2(0);waitingMessage=false;}
     circularGauge.cleanValueTextGauge();
     circularGauge.cleanUnitsTextGauge();
     circularGauge.setValue((int)(co2PreheatingTime-millis())/1000);
@@ -1284,7 +1287,7 @@ boolean warmingUp() {
     nowTimeGlobal=loopStartTime+millis();
   }
   lastTimeTurnOffBacklightCheck=nowTimeGlobal;
-  if (runningMessage) {if (logsOn) Serial.println("Running.... :-)");runningMessage=false;}
+  if (runningMessage) {getLocalTime(&nowTimeInfo);Serial.print("Time: ");Serial.print(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println(".  Running.... :-)");runningMessage=false;}
   
   button1.released(); //Avoids passing the button status to the loop()
   button2.released(); //Avoids passing the button status to the loop()
@@ -1387,7 +1390,7 @@ void setup() {
     break;
   }
   
-  //This piece os code is run after wakeup from Deep Sleep (neither HW reset nor Hibernate)
+  //This piece of code is run after wakeup from Deep Sleep (neither HW reset nor Hibernate)
   //Run global setup after wakeup
   nowTimeGlobal=loopStartTime+millis();
 
@@ -1584,6 +1587,18 @@ void loop() {
       lastDayTempSamples[(int)(24*3600/SAMPLE_T_LAST_DAY)-1]=valueT;
       lastDayHumSamples[(int)(24*3600/SAMPLE_T_LAST_DAY)-1]=valueHum;
       updateDaySample=false;
+    }
+
+    //Updating JSON object with samples - Used in web webEvents
+    samples["CO2"] = String(valueCO2);
+    samples["temperature"] = String(valueT);
+    samples["humidity"] =  String(valueHum);
+
+    // Send Events to the web client with the new samples
+    if (wifiEnabled && webServerEnabled && WiFi.status()==WL_CONNECTED) {
+      webEvents.send("ping",NULL,nowTimeGlobal);
+      webEvents.send(JSON.stringify(samples).c_str(),"new_samples",nowTimeGlobal);
+      if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new SSE sample sent: "+JSON.stringify(samples));
     }
 
     if (forceGetSample) forceGetSample=false;

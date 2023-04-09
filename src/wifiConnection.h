@@ -6,7 +6,7 @@
   #include "ButtonChecks.h"
   #include "misc.h"
 
-  extern bool logsOn;
+  extern bool debugModeOn;
   #ifndef _WIFINETWORKINFO_
     typedef struct {
       uint8_t networkItem;
@@ -52,8 +52,8 @@ extern RTC_DATA_ATTR uint64_t lastTimeNTPCheck;
 extern struct tm nowTimeInfo;
 
 void printNetData();
-wifiNetworkInfo * printCurrentWiFi(boolean logsOn, int16_t *numberWiFiNetworks);
-uint32_t wifiConnect(boolean logsOn,boolean msgTFT,boolean checkButtons,uint8_t* auxLoopCounter,uint8_t* auxCounter);
+wifiNetworkInfo * printCurrentWiFi(boolean debugModeOn, int16_t *numberWiFiNetworks);
+uint32_t wifiConnect(boolean debugModeOn,boolean msgTFT,boolean checkButtons,uint8_t* auxLoopCounter,uint8_t* auxCounter);
 uint32_t setupNTPConfig(boolean fromSetup,uint8_t* auxLoopCounter,uint64_t* whileLoopTimeLeft);
 bool runAPMode();
 

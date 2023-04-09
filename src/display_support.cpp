@@ -522,7 +522,7 @@ void printGralInfo() {
   struct tm timeinfo;
   boolean ntpServerAvailable=true;
   if(!getLocalTime(&timeinfo)){
-    if (logsOn) Serial.println("Failed to obtain time");
+    if (debugModeOn) Serial.println("Failed to obtain time");
     ntpServerAvailable=false;
   }
   
@@ -568,7 +568,7 @@ void printGralInfo() {
   while (!exitWhile) {
     //Loop to update the date/hour every second
     if(!getLocalTime(&timeinfo)){
-      if (logsOn) Serial.println("Failed to obtain time");
+      if (debugModeOn) Serial.println("Failed to obtain time");
       ntpServerAvailable=false;
     }
     else ntpServerAvailable=true;

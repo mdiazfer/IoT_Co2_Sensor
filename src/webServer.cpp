@@ -280,7 +280,7 @@ String processor(const String& var){
       else return String("Rebooting the device....<p></p><div id=\"timer\"></div><script type=\"text/javascript\">var maxTime=80;var timer = maxTime;var auxTimeout=false;var interval = setInterval(function() {if (timer > 0) document.getElementById(\"timer\").innerHTML='Checking if the device is ready....<br><br>Wait '+timer+' seconds';if (timer === maxTime) {var request = new XMLHttpRequest();request.open('GET', 'http://"+WiFi.localIP().toString()+"', true);request.ontimeout = function(){auxTimeout=true;};request.onloadend = function(){if (auxTimeout === true) document.getElementById(\"timer\").innerHTML='Something went wrong. The device is not ready.<br><br>Check if either it is not connected to WiFi of the device IP address is not longer "+WiFi.localIP().toString()+" after rebooting';else {document.getElementById(\"timer\").innerHTML='The device is back and ready. Wait a bit more to connect it....';setTimeout(function() {location.replace('http://"+WiFi.localIP().toString()+"');},1500)};timer=0;};request.onloadstart = function(){document.getElementById(\"timer\").innerHTML='Checking if the device is ready....<br><br>Wait '+timer+' seconds';};request.send();};if (timer === 0) clearInterval(interval);else timer--;},1000);</script>");
     }
     else if (deviceReset && (updateCommand==U_FLASH || updateCommand==U_SPIFFS)) {
-      String auxString=(updateCommand==U_FLASH) ? String("Binary file has been written in FLASH. Size="):String("System file has been written in SPIFFS. Size=");
+      String auxString=(updateCommand==U_FLASH) ? String("Binary file has been successfully written in FLASH. Size="):String("System file has been successfully written in SPIFFS. Size=");
       return String(auxString+fileUpdateSize+" B.<p></p>Rebooting the device....<p></p><div id=\"timer\"></div><script type=\"text/javascript\">var maxTime=80;var timer = maxTime;var auxTimeout=false;var interval = setInterval(function() {if (timer > 0) document.getElementById(\"timer\").innerHTML='Checking if the device is ready....<br><br>Wait '+timer+' seconds';if (timer === maxTime) {var request = new XMLHttpRequest();request.open('GET', 'http://"+WiFi.localIP().toString()+"', true);request.ontimeout = function(){auxTimeout=true;};request.onloadend = function(){if (auxTimeout === true) document.getElementById(\"timer\").innerHTML='Something went wrong. The device is not ready.<br><br>Check if either it is not connected to WiFi of the device IP address is not longer "+WiFi.localIP().toString()+" after rebooting';else {document.getElementById(\"timer\").innerHTML='The device is back and ready. Wait a bit more to connect it....';setTimeout(function() {location.replace('http://"+WiFi.localIP().toString()+"');},1500)};timer=0;};request.onloadstart = function(){document.getElementById(\"timer\").innerHTML='Checking if the device is ready....<br><br>Wait '+timer+' seconds';};request.send();};if (timer === 0) clearInterval(interval);else timer--;},1000);</script>");
     }
     else if (factoryReset) {
@@ -288,7 +288,7 @@ String processor(const String& var){
         factoryReset=false;
         return String("Authentication is required to factory reset the device (0x")+String(fileUpdateError,HEX)+String(").<p></p>Try again: <a href=\"http://"+WiFi.localIP().toString()+"/maintenance.html\" title=\"Maintenance & Troubleshooting\"\" target=\"_self\">http://"+WiFi.localIP().toString()+"/maintenance.html</a>");
       }
-      else return String("The configuration of the device has been reset to factory values.<p></p>The WiFi SSIDs need to be setup again as the "+WiFi.SSID()+" SSID has been deleted.<br><br>Web access to the device is not available till the WiFi is setup again.");
+      else return String("The configuration of the device has been successfully reset to factory values.<p></p>The WiFi SSIDs need to be setup again as the "+WiFi.SSID()+" SSID has been deleted.<br><br>Web access to the device is not available till the WiFi is setup again.");
     }
     else if (fileUpdateError==ERROR_UPLOAD_FILE_NOAUTH) return (String("Authentication is required to upload the file (0x")+String(fileUpdateError,HEX)+String(").<p></p>Try again: <a href=\"http://"+WiFi.localIP().toString()+"/maintenance.html\" title=\"Maintenance & Troubleshooting\" target=\"_self\">http://"+WiFi.localIP().toString()+"/maintenance.html</a>"));
     else if (fileUpdateError==ERROR_UPLOAD_FILE_NOBIN_FILE) return (String("File is not a valid Binary file (0x")+String(fileUpdateError,HEX)+String(").<p></p>Try again: <a href=\"http://"+WiFi.localIP().toString()+"/maintenance.html\" title=\"Maintenance & Troubleshooting\" target=\"_self\">http://"+WiFi.localIP().toString()+"/maintenance.html</a>"));
@@ -386,6 +386,10 @@ uint32_t initWebServer() {
   });
   //webServer.serveStatic(WEBSERVER_LOGO_ICON,SPIFFS,WEBSERVER_LOGO_ICON);
 
+  webServer.on(WEBSERVER_INFO_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, WEBSERVER_INFO_PAGE, String(), false, processor);
+  });
+  
   // Route for  basic.html web page
   webServer.on(WEBSERVER_BASICCONFIG_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(SPIFFS, WEBSERVER_BASICCONFIG_PAGE, String(), false, processor);
@@ -417,7 +421,7 @@ uint32_t initWebServer() {
         memcmp(device.c_str(),request->getHeader("Cookie")->value().c_str()+3,device.length())==0 ) {
 
           memcpy(currentSetCookie,request->getHeader("Cookie")->value().c_str(),request->getHeader("Cookie")->value().length()); //End null not included
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance GET] - Valid cookie deteced="+String(currentSetCookie)+" kept");
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance GET] - Valid cookie deteced="+String(currentSetCookie)+" kept");
           auxResp->addHeader("Set-Cookie", String(currentSetCookie));
     } 
     else {
@@ -425,7 +429,7 @@ uint32_t initWebServer() {
       long auxRandom1=random(0,2147483647);long auxRandom2=random(0,2147483647);long auxRandom3=random(0,2147483647);long auxRandom4=random(0,2147483647);
       String setCookie=String("id-"+device+"="+String(auxRandom1,HEX)+String(auxRandom2,HEX)+String(auxRandom3,HEX)+String(auxRandom4,HEX));      
       memcpy(currentSetCookie,setCookie.c_str(),setCookie.length()); //End null not included
-      if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance GET] - New cookie="+String(currentSetCookie)+" created");
+      if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance GET] - New cookie="+String(currentSetCookie)+" created");
       auxResp->addHeader("Set-Cookie", setCookie);
     }
     request->send(auxResp);
@@ -461,9 +465,24 @@ uint32_t initWebServer() {
     request->send(SPIFFS, WEBSERVER_FAVICON_ICON, "image/x-icon");
   });
   
-  // Route to load jquery.min.js file
+  // Route to jquery.min.js file
   webServer.on(WEBSERVER_JQUERY_JS, HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(SPIFFS, WEBSERVER_JQUERY_JS, "text/javascript");
+  });
+
+  // Route to WEBSERVER_SAMPLES_PAGE file
+  webServer.on(WEBSERVER_SAMPLES_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(200, "application/json", JSON.stringify(samples));
+  });
+
+  // Route to gauge.min.js file
+  webServer.on(WEBSERVER_GAUGESCRIPT_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, WEBSERVER_GAUGESCRIPT_PAGE, "text/javascript");
+  });
+  
+  // Route to resutl_script.js file
+  webServer.on(WEBSERVER_RESULTSCRIPT_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, WEBSERVER_RESULTSCRIPT_PAGE, "text/javascript");
   });
 
   webServer.on("/basic1", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -973,10 +992,10 @@ uint32_t initWebServer() {
         //It's supposed that errorOnWrongCookie was updated propery during the upload handler
         deviceReset=false; //This flags prevents from serving wrong content in container.html when there's a valid ongoing upload in pararell
         fileUpdateError=errorOnWrongCookie;
-        if (errorOnWrongCookie==ERROR_UPLOAD_FILE_NOERROR) if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - Coming from Wrong cookie upload but there is no ERROR. It's strange (meditation required). Serving container.html.");
+        if (errorOnWrongCookie==ERROR_UPLOAD_FILE_NOERROR) if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - Coming from Wrong cookie upload but there is no ERROR. It's strange (meditation required). Serving container.html.");
 
         if (fileUpdateError==ERROR_UPLOAD_FILE_NOAUTH) { 
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - ERROR - Still no active cookie: Authentication required but not detected.");
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - ERROR - Still no active cookie: Authentication required but not detected.");
           //Setup a new response to send AuthenticationRequest headers in the container.html answer
           AsyncWebServerResponse * auxResp=new AsyncFileResponse(SPIFFS, WEBSERVER_CONTAINER_PAGE, String(), false, processor);
           auxResp->setCode(401);
@@ -985,7 +1004,7 @@ uint32_t initWebServer() {
           //fileUpdateError=ERROR_UPLOAD_FILE_NOERROR;
         }
         else {
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - Coming from Wrong cookie upload with ERROR code 0x"+String(fileUpdateError,HEX)+". Serving container.html.");
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - Coming from Wrong cookie upload with ERROR code 0x"+String(fileUpdateError,HEX)+". Serving container.html.");
           request->send(SPIFFS, WEBSERVER_CONTAINER_PAGE, String(), false, processor);
         }
 
@@ -995,7 +1014,7 @@ uint32_t initWebServer() {
         //Active cookie
         //Let's check the errors and then send the response
         fileUpdateError=errorOnActiveCookie;
-        if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - Coming from Active cookie upload with ERROR code 0x"+String(fileUpdateError,HEX)+". Serving container.html.");
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - Coming from Active cookie upload with ERROR code 0x"+String(fileUpdateError,HEX)+". Serving container.html.");
 
         if (fileUpdateError==ERROR_UPLOAD_FILE_NOERROR) //Check Form parameters only if no errors while uploading the file 
         { 
@@ -1012,7 +1031,7 @@ uint32_t initWebServer() {
               else if (p->name().compareTo("select_file")==0) {          
                 //Everything OK  
                 String fileName=p->value();
-                if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - fileName="+fileName);
+                if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - fileName="+fileName);
               }
             }
           }
@@ -1022,12 +1041,12 @@ uint32_t initWebServer() {
 
         if (fileUpdateError==ERROR_UPLOAD_FILE_NOERROR) {
           //No error. Let's restart the device
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - Upload finished and Post treated with no errors. Should reboot after the file is uploaded if no additional errros.");
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - Upload finished and Post treated with no errors. Should reboot after the file is uploaded if no additional errros.");
           deviceReset=true;
           request->send(SPIFFS, WEBSERVER_CONTAINER_PAGE, String(), false, processor);
         }
         else if (fileUpdateError==ERROR_UPLOAD_FILE_NOAUTH) { 
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - ERROR: Authentication required but not detected.");
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST] - ERROR: Authentication required but not detected.");
           //Setup a new response to send AuthenticationRequest headers in the container.html answer
           AsyncWebServerResponse * auxResp=new AsyncFileResponse(SPIFFS, WEBSERVER_CONTAINER_PAGE, String(), false, processor);
           auxResp->setCode(401);
@@ -1037,7 +1056,7 @@ uint32_t initWebServer() {
         }
         else {
           //Something was wrong with the file update process. Inform about it.
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST - 0] - ERROR with File update. Serving container.html.");
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware POST - 0] - ERROR with File update. Serving container.html.");
           request->send(SPIFFS, WEBSERVER_CONTAINER_PAGE, String(), false, processor);
         }
 
@@ -1059,7 +1078,7 @@ uint32_t initWebServer() {
     //Cookie is needed to allow to upload the file
     if (!request->hasHeader("Cookie")) {
       errorOnWrongCookie=ERROR_UPLOAD_FILE_NOCOOKIE;
-      if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - No Cookie detected. Close socket and Return.");  
+      if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - No Cookie detected. Close socket and Return.");  
       return;
     }
 
@@ -1068,7 +1087,7 @@ uint32_t initWebServer() {
         0!=String("id-"+device).compareTo(request->getHeader("Cookie")->value().substring(0,request->getHeader("Cookie")->value().indexOf('='))) )
     {
       errorOnWrongCookie=ERROR_UPLOAD_FILE_BADCOOKIE_FORMAT;
-      if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Bad cookie format: "+request->getHeader("Cookie")->value()+", size "+String(request->getHeader("Cookie")->value().length())+" greater than "+String(COOKIE_SIZE-1)+" or wrong name. Close socket and return. Comparing "+String("id-"+device)+" with "+request->getHeader("Cookie")->value().substring(0,request->getHeader("Cookie")->value().indexOf('=')));
+      if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Bad cookie format: "+request->getHeader("Cookie")->value()+", size "+String(request->getHeader("Cookie")->value().length())+" greater than "+String(COOKIE_SIZE-1)+" or wrong name. Close socket and return. Comparing "+String("id-"+device)+" with "+request->getHeader("Cookie")->value().substring(0,request->getHeader("Cookie")->value().indexOf('=')));
       return;
     }
 
@@ -1077,7 +1096,7 @@ uint32_t initWebServer() {
       if (memcmp(activeCookie,request->getHeader("Cookie")->value().c_str(),request->getHeader("Cookie")->value().length())!=0) {
         //No right cookie. Bye
         errorOnWrongCookie=ERROR_UPLOAD_FILE_UPLOAD_ONGOING;
-        if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - There is an ongoing file upload. Return.");
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - There is an ongoing file upload. Return.");
         return;
       }
     }
@@ -1085,7 +1104,7 @@ uint32_t initWebServer() {
     //Authentication is needed
     if(!request->authenticate(username.c_str(), password.c_str())){
       errorOnWrongCookie=ERROR_UPLOAD_FILE_NOAUTH;
-      if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Authentication required, index="+String(index)+"\n   - Faulty cookie="+request->getHeader("Cookie")->value());
+      if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Authentication required, index="+String(index)+"\n   - Faulty cookie="+request->getHeader("Cookie")->value());
       return;
     }
 
@@ -1107,13 +1126,13 @@ uint32_t initWebServer() {
           //Saving current cookie
           fileUpdateSize=0;
           memcpy(activeCookie,request->getHeader("Cookie")->value().c_str(),request->getHeader("Cookie")->value().length()); //End null not included
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Cookie="+String(activeCookie));
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Cookie="+String(activeCookie));
         }
         else {
           //Not the same cookie than the one created when serving the maintenance.html page
           //Probably the POST comes from a wrong request. Bye
           errorOnWrongCookie=ERROR_UPLOAD_FILE_BADCOOKIE;
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Bad Cookie received="+request->getHeader("Cookie")->value()+" instead of "+String(currentSetCookie));
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Bad Cookie received="+request->getHeader("Cookie")->value()+" instead of "+String(currentSetCookie));
           return;
         }
       }
@@ -1121,7 +1140,7 @@ uint32_t initWebServer() {
         //Checking if it is the current cookie
         if (memcmp(activeCookie,request->getHeader("Cookie")->value().c_str(),request->getHeader("Cookie")->value().length())==0) {
           //Coming from abort action from the same broswer. Abort previous upload and start again
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Detected upload abortion from the same broswer. Reset and starting again");
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Detected upload abortion from the same broswer. Reset and starting again");
           Update.abort(); 
           fileUpdateSize=0;
         }
@@ -1129,7 +1148,7 @@ uint32_t initWebServer() {
           //Coming from different browser. But there is an ongoing upload. Error. Bye
           //It's supposed that this point is never reached
           errorOnWrongCookie=ERROR_UPLOAD_FILE_UPLOAD_ONGOING;
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - There is an ongoing file upload. Return.");
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - There is an ongoing file upload. Return.");
           return;
         }
       }
@@ -1141,14 +1160,14 @@ uint32_t initWebServer() {
       else {
         errorOnActiveCookie=ERROR_UPLOAD_FILE_WRONG_FILE_NAME;
         updateCommand=-1;
-        if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Wrong file name, filename="+filename+", index="+String(index)+", len="+String(len)+", loaded bytes(fileUpdateSize)="+String(fileUpdateSize+len));
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Wrong file name, filename="+filename+", index="+String(index)+", len="+String(len)+", loaded bytes(fileUpdateSize)="+String(fileUpdateSize+len));
         return;
       }
 
       if (!Update.begin(UPDATE_SIZE_UNKNOWN, updateCommand)) { // Start with max available size
         Update.printError(Serial);
         errorOnActiveCookie=ERROR_UPLOAD_FILE_UPDATE_BEGIN;
-        if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Update.begin()"+String(Serial)+", errorOnActiveCookie="+String(errorOnActiveCookie)+", index="+String(index)+", len="+String(len)+", loaded bytes(fileUpdateSize)="+String(fileUpdateSize+len));
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Update.begin()"+String(Serial)+", errorOnActiveCookie="+String(errorOnActiveCookie)+", index="+String(index)+", len="+String(len)+", loaded bytes(fileUpdateSize)="+String(fileUpdateSize+len));
         return;
       }
     }
@@ -1159,7 +1178,7 @@ uint32_t initWebServer() {
         //No same cookie than the one used for starting the file upload
         //It's supposed that this point is never reached
         errorOnWrongCookie=ERROR_UPLOAD_FILE_UPLOAD_ONGOING;
-        if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Bad cookie detected as there is an ongoing file upload. Cookie detected: "+request->getHeader("Cookie")->value()+" rather than "+String(activeCookie)+" in index="+String(index)+" len="+String(len));
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Bad cookie detected as there is an ongoing file upload. Cookie detected: "+request->getHeader("Cookie")->value()+" rather than "+String(activeCookie)+" in index="+String(index)+" len="+String(len));
         return;
       }
       
@@ -1170,7 +1189,7 @@ uint32_t initWebServer() {
         //OTA partition for firmware.bin
         if ((int)(OTAAvailableSize-fileUpdateSize)<0) {
           errorOnActiveCookie=ERROR_UPLOAD_FILE_NOFLASHSPACE_LEFT;
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error No OTA space left in FLASH memory. OTAAvailableSize ("+String(OTAAvailableSize)+") - fileUpdateSize ("+String(fileUpdateSize)+") = "+String((int)(OTAAvailableSize-fileUpdateSize))+" B"+", index="+String(index)+", len="+String(len));
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error No OTA space left in FLASH memory. OTAAvailableSize ("+String(OTAAvailableSize)+") - fileUpdateSize ("+String(fileUpdateSize)+") = "+String((int)(OTAAvailableSize-fileUpdateSize))+" B"+", index="+String(index)+", len="+String(len));
           Update.abort();
           return;
         }
@@ -1181,7 +1200,7 @@ uint32_t initWebServer() {
           uint8_t *dataPtr=data;
           if (*dataPtr != BINARY_HD_MAGIC_NUMBER || len<(BINARY_HD_MAGIC_WORD_ADDR+3)) {
             errorOnActiveCookie=ERROR_UPLOAD_FILE_NOBIN_FILE;
-            if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Binary file. Magic Number=0x"+String(*dataPtr,HEX)+" rather than 0x"+String(BINARY_HD_MAGIC_NUMBER,HEX)+" or len("+String(len)+") < BINARY_HD_MAGIC_WORD_ADDR+3("+String(BINARY_HD_MAGIC_WORD_ADDR+3)+")");
+            if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Binary file. Magic Number=0x"+String(*dataPtr,HEX)+" rather than 0x"+String(BINARY_HD_MAGIC_NUMBER,HEX)+" or len("+String(len)+") < BINARY_HD_MAGIC_WORD_ADDR+3("+String(BINARY_HD_MAGIC_WORD_ADDR+3)+")");
             Update.abort();
             return;
           }
@@ -1194,7 +1213,7 @@ uint32_t initWebServer() {
           dataPtr++;auxByte1=*dataPtr;receivedMagic|=(auxByte1<<24);
           if (receivedMagic != ((uint32_t) BINARY_HD_MAGIC_WORD)) {
             errorOnActiveCookie=ERROR_UPLOAD_FILE_NOBIN_FILE;
-            if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Binary file. Magic Word=0x"+String((uint32_t) receivedMagic,HEX)+" rather than 0x"+String(BINARY_HD_MAGIC_WORD,HEX));
+            if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Binary file. Magic Word=0x"+String((uint32_t) receivedMagic,HEX)+" rather than 0x"+String(BINARY_HD_MAGIC_WORD,HEX));
             Update.abort();
             return;
           }
@@ -1204,7 +1223,7 @@ uint32_t initWebServer() {
         //SPIFFS partition for spiffs.bin
         if ((int)(SPIFFSAvailableSize-fileUpdateSize)<0) {
           errorOnActiveCookie=ERROR_UPLOAD_FILE_NOSPIFFSPACE_LEFT;
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error No SPIFFS space left in FLASH memory. SPIFFSAvailableSize ("+String(SPIFFSAvailableSize)+") - fileUpdateSize ("+String(fileUpdateSize)+") = "+String((int)(SPIFFSAvailableSize-fileUpdateSize))+" B"+", index="+String(index)+", len="+String(len));
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error No SPIFFS space left in FLASH memory. SPIFFSAvailableSize ("+String(SPIFFSAvailableSize)+") - fileUpdateSize ("+String(fileUpdateSize)+") = "+String((int)(SPIFFSAvailableSize-fileUpdateSize))+" B"+", index="+String(index)+", len="+String(len));
           Update.abort();
           return;
         }
@@ -1224,7 +1243,7 @@ uint32_t initWebServer() {
           if (receivedMagic!=calculatedMagic) {
             //No SPIFFS partition
             errorOnActiveCookie=bix==0?ERROR_UPLOAD_FILE_NOSPIFFS_FILE:ERROR_UPLOAD_FILE_NOSPIFFS_FILE_NOSAFE;
-            if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error No SPIFFS file. Index="+String(index)+", block="+String(bix)+", magic addr=0x"+String(magicAddr,HEX)+", calculatedMagic=0x"+String(calculatedMagic,HEX)+", receivedMagic=0x"+String(receivedMagic,HEX));
+            if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error No SPIFFS file. Index="+String(index)+", block="+String(bix)+", magic addr=0x"+String(magicAddr,HEX)+", calculatedMagic=0x"+String(calculatedMagic,HEX)+", receivedMagic=0x"+String(receivedMagic,HEX));
             Update.abort();
             return;
           }
@@ -1233,7 +1252,7 @@ uint32_t initWebServer() {
         if(!index && len<magicAddr) {
           //File size lower than SPIFFS header, so No SPIFFS partition
           errorOnActiveCookie=bix==0?ERROR_UPLOAD_FILE_NOSPIFFS_FILE:ERROR_UPLOAD_FILE_NOSPIFFS_FILE_NOSAFE;
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error No SPIFFS file.");
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error No SPIFFS file.");
           Update.abort();
           return;
         }
@@ -1243,7 +1262,7 @@ uint32_t initWebServer() {
       //This code should be used if files are uploaded to SPIFFS (no filesystem.bin)
       /*if ((int)(fileSystemSize-fileSystemUsed-fileUpdateSize)<=0) {
         fileUpdateError=ERROR_UPLOAD_FILE_NOSPIFFSPACE_LEFT;
-        if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error No SPIFFS memory left. fileSystemSize ("+String(fileSystemSize)+") - fileSystemUsed ("+String(fileSystemUsed)+") - fileUpdateSize ("+String(fileUpdateSize)+") = "+String((int)(fileSystemSize-fileSystemUsed-fileUpdateSize))+" B");
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error No SPIFFS memory left. fileSystemSize ("+String(fileSystemSize)+") - fileSystemUsed ("+String(fileSystemUsed)+") - fileUpdateSize ("+String(fileUpdateSize)+") = "+String((int)(fileSystemSize-fileSystemUsed-fileUpdateSize))+" B");
         Update.abort();
         return;
       }*/
@@ -1251,7 +1270,7 @@ uint32_t initWebServer() {
       if (Update.write(data, len) != len) {
           Update.printError(Serial);
           errorOnActiveCookie=ERROR_UPLOAD_FILE_UPDATE_WRITE;
-          if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Update.write(), Serial="+String(Serial)+", errorOnActiveCookie="+String(errorOnActiveCookie)+", index="+String(index)+", len="+String(len)+", loaded bytes(fileUpdateSize)="+String(fileUpdateSize));
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Update.write(), Serial="+String(Serial)+", errorOnActiveCookie="+String(errorOnActiveCookie)+", index="+String(index)+", len="+String(len)+", loaded bytes(fileUpdateSize)="+String(fileUpdateSize));
           Update.abort();
           return;
       }
@@ -1262,7 +1281,7 @@ uint32_t initWebServer() {
         //No same cookie than the one used for starting the file upload. Send error message
         //It's supposed that this point is never reached
         errorOnWrongCookie=ERROR_UPLOAD_FILE_UPLOAD_ONGOING;
-        if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - In final block, bad cookie detected as there is an ongoing file upload. Cookie detected: "+request->getHeader("Cookie")->value()+" rather than "+String(activeCookie)+" in index="+String(index)+" len="+String(len));
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - In final block, bad cookie detected as there is an ongoing file upload. Cookie detected: "+request->getHeader("Cookie")->value()+" rather than "+String(activeCookie)+" in index="+String(index)+" len="+String(len));
         return;
       }
 
@@ -1271,19 +1290,34 @@ uint32_t initWebServer() {
       if (Update.end(true)) { //true to set the size to the current progress
         //Inform Reset will be done and then reset the device
         errorOnActiveCookie=ERROR_UPLOAD_FILE_NOERROR;
-        if (logsOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Update Success - Should reboot now"+", errorOnActiveCookie="+String(errorOnActiveCookie)+", index="+String(index)+", len="+String(len)+", loaded bytes(fileUpdateSize)="+String(fileUpdateSize));
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Update Success - Should reboot now"+", errorOnActiveCookie="+String(errorOnActiveCookie)+", index="+String(index)+", len="+String(len)+", loaded bytes(fileUpdateSize)="+String(fileUpdateSize));
         return;
       } 
       else {
         Update.printError(Serial);
         errorOnActiveCookie=ERROR_UPLOAD_FILE_UPDATE_END;
-        if (logsOn) {Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Update.end()"+String(Serial)+", errorOnActiveCookie="+String(errorOnActiveCookie)+", index="+String(index)+", len="+String(len)+", loaded bytes(fileUpdateSize)="+String(fileUpdateSize));}
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Error Update.end()"+String(Serial)+", errorOnActiveCookie="+String(errorOnActiveCookie)+", index="+String(index)+", len="+String(len)+", loaded bytes(fileUpdateSize)="+String(fileUpdateSize));}
         Update.abort();
         return;
       }
     }
   });
 
+  // Handle Web Server Events
+  webEvents.onConnect([](AsyncEventSourceClient *client){
+    if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [webEvents.onConnect] - Client reconnected! Last message ID that it got is: "+String(client->lastId()));
+    if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [webEvents.onConnect] - Client reconnected! client->client()->remoteIP()="+client->client()->remoteIP().toString());
+    if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [webEvents.onConnect] - Client reconnected! client->client()->remotePort()="+String(client->client()->remotePort()));
+
+    if(client->lastId()){
+      if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [webEvents.onConnect] - Client reconnected! Last message ID that it got is:"+String(client->lastId()));
+    }
+    // send event with message "hello!", id current millis
+    // and set reconnect delay to 1 second
+    client->send("hello!", NULL, millis(), 10000);
+  });
+  webServer.addHandler(&webEvents);
+  
   // Start web server
   webServer.begin();
 
@@ -1554,13 +1588,8 @@ uint32_t initAPWebServer() {
     if (updateEEPROM) EEPROM.commit();
     deviceReset=true;
     request->send(SPIFFS, WEBSERVER_APCONTAINER_PAGE, String(), false, processorAP);
-    //ESP.restart();
   });
 
-  // Start server OTA
-  //AsyncElegantOTA.begin(&webServer);
-  //AsyncElegantOTA.begin(&webServer,MQTT_USER_CREDENTIAL,MQTT_PW_CREDENTIAL);
-  
   // Start server
   webServer.begin();
 

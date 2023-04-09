@@ -40,7 +40,7 @@ void printNetData() {
  Function printCurrentWiFi
  Target: prints WiFi parameters on Serial and returs variable with Wifi parameters
  *****************************************************/
-wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetworks=nullptr) {
+wifiNetworkInfo * printCurrentWiFi(boolean debugModeOn=true, int16_t *numberWiFiNetworks=nullptr) {
   // print current network parameters
   WiFiScanClass wifiScan = WiFiScanClass();
   int16_t countWiFiNetworks=wifiScan.scanNetworks();
@@ -49,7 +49,7 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
     scanReturn=wifiScan.scanComplete();
     switch (scanReturn) {
       case WIFI_SCAN_FAILED:
-        if (logsOn) Serial.println("  [error] - Failed to scan WiFi networks");
+        if (debugModeOn) Serial.println("  [error] - Failed to scan WiFi networks");
         return nullptr;
       break;
       case WIFI_SCAN_RUNNING:
@@ -70,26 +70,26 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
     String mySSID=wifiCred.wifiSSIDs[wifiCred.activeIndex];
     wifiScan.getNetworkInfo(i, wifiNet.ssid, wifiNet.encryptionType, wifiNet.RSSI, wifiNet.BSSID, wifiNet.channel);
     if (mySSID.compareTo(wifiNet.ssid) == 0) {
-      //if (logsOn) {Serial.print(mySSID);Serial.print(" is equal than "); Serial.println(wifiNet.ssid);
+      //if (debugModeOn) {Serial.print(mySSID);Serial.print(" is equal than "); Serial.println(wifiNet.ssid);
       //             Serial.print("networkItem=");Serial.println(i);}
       wifiNetworkNode=i;
       break;
     }
     else {
-      //if (logsOn) {Serial.print(mySSID);Serial.print(" is not equal than "); Serial.println(wifiNet.ssid);}
+      //if (debugModeOn) {Serial.print(mySSID);Serial.print(" is not equal than "); Serial.println(wifiNet.ssid);}
     }
   }
 
   if (-1==wifiNetworkNode) {
     //WiFi SSID was lost
-    if (logsOn) {
+    if (debugModeOn) {
       Serial.print("  SSID: ");Serial.print(wifiCred.wifiSSIDs[wifiCred.activeIndex]);Serial.println(" lost");
     }
     return nullptr;
   }
 
   // print current network parameters
-  if (logsOn) {
+  if (debugModeOn) {
     Serial.print("  Wifi Network Node: ");Serial.print(wifiNetworkNode);
     Serial.print(" and "); Serial.print(scanReturn); Serial.println(" detected");
     //Serial.print("SSID: ");Serial.println(WiFi.SSID());
@@ -125,9 +125,9 @@ wifiNetworkInfo * printCurrentWiFi(boolean logsOn=true, int16_t *numberWiFiNetwo
  Function wifiConnect
  Target: to get connected to the WiFi
  *****************************************************/
-uint32_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, boolean checkButtons=false, uint8_t* auxLoopCounter=nullptr, uint8_t* auxCounter=nullptr) {
+uint32_t wifiConnect(boolean debugModeOn=true, boolean msgTFT=true, boolean checkButtons=false, uint8_t* auxLoopCounter=nullptr, uint8_t* auxCounter=nullptr) {
   // Parameters:
-  // - logsOn: Print or not log messages in Serial line. Diferent prints out are done base on its value
+  // - debugModeOn: Print or not log messages in Serial line. Diferent prints out are done base on its value
   //      Value false: no log messages are printed out
   //      Value true:  log messages are printed out
   // - msgTFT: Print or not log messages in the Display during the boot time. Diferent prints out are done base on its value
@@ -170,7 +170,7 @@ uint32_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, boolean checkButt
         counter++;
         *auxCounter=counter;
         auxWhile=millis();
-        if (logsOn) {Serial.print("[setup - wifi] Attempting to connect to WPA SSID: ");Serial.println(wifiCred.wifiSSIDs[loopCounter].c_str());}
+        if (debugModeOn) {Serial.print("[setup - wifi] Attempting to connect to WPA SSID: ");Serial.println(wifiCred.wifiSSIDs[loopCounter].c_str());}
         if (msgTFT) {
           #ifdef __TFT_DISPLAY_PRESENT__
             stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print(".");
@@ -213,7 +213,7 @@ uint32_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, boolean checkButt
     } //End of while() loop
 
     if (counter>=MAX_CONNECTION_ATTEMPTS) { //Case if while() loop timeout.
-      if (logsOn) {
+      if (debugModeOn) {
         Serial.print("[setup - wifi] WiFi network ERROR: ");
         Serial.print("No connection to SSID ");Serial.println(wifiCred.wifiSSIDs[loopCounter].c_str());
         Serial.print("[setup - wifi] Number of connection attempts ");
@@ -244,7 +244,7 @@ uint32_t wifiConnect(boolean logsOn=true, boolean msgTFT=true, boolean checkButt
   }
 
   //Case for successfull SSID connection
-  if (logsOn) {
+  if (debugModeOn) {
     int16_t numberWiFiNetworks;
     Serial.println("[setup - wifi] Connected to the network. Waiting for getting WiFi info: "); printCurrentWiFi(true,&numberWiFiNetworks);
     Serial.print("[setup - wifi] Net info: \n");printNetData();
@@ -306,7 +306,7 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
     for (uint8_t loopCounter=*auxLoopCounter; loopCounter<(uint8_t)sizeof(ntpServers)/sizeof(String); loopCounter++) {
       if (ntpServers[loopCounter].charAt(0)=='\0') loopCounter++;
       else {
-        if ((logsOn && fromSetup) || debugModeOn) {Serial.println("[setup - NTP] Connecting to NTP Server: "+ntpServers[loopCounter]);}
+        if ((debugModeOn && fromSetup) || debugModeOn) {Serial.println("[setup - NTP] Connecting to NTP Server: "+ntpServers[loopCounter]);}
         if (!NTPResuming) { //Only calling configXTime() for new checks
           configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
         }
@@ -362,7 +362,7 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
         if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - End of wait - Elapsed Time: "+String(auxTime-whileStartTime));}
         
         if (*whileLoopTimeLeft>NTP_CHECK_TIMEOUT) { //Case if while() loop timeout.
-          if ((logsOn && fromSetup) || debugModeOn) {
+          if ((debugModeOn && fromSetup) || debugModeOn) {
             Serial.println("  Time: Failed to get time");
             Serial.print("[setup] - NTP: ");Serial.println("KO");
           }
@@ -371,7 +371,7 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
           //End of while() due to successful NTP sync
           // (Button Pressed or Display Refresh force the function to return from the while() loop, 
           //  so this point is not reached in those cases)
-          if ((logsOn && fromSetup) || debugModeOn) {
+          if ((debugModeOn && fromSetup) || debugModeOn) {
             Serial.print("  Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo,"%d/%m/%Y - %H:%M:%S");
             Serial.print("[setup] - NTP: ");Serial.println("OK");
           }
@@ -413,7 +413,7 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
 
 bool runAPMode() {
   bool activeOK=true,auxWileLoop=true;
-  if (logsOn) Serial.println("  [runAPMode] - WiFi Enabled but no WiFi SSID is setup. Asking if run AP.");
+  if (debugModeOn) Serial.println("  [runAPMode] - WiFi Enabled but no WiFi SSID is setup. Asking if run AP.");
   tft.setTextColor(TFT_YELLOW,TFT_BLACK);
   tft.drawString("WIFI enabled but no SSID is setup",5,4,TEXT_FONT_BOOT_SCREEN);
   tft.drawString("To setup device WiFi, connect to:",5,28,TEXT_FONT_BOOT_SCREEN);
@@ -452,7 +452,7 @@ bool runAPMode() {
     WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(APLocalIP, APLocalGW, APLocalSubnetMask);
     WiFi.softAP(APMODE_SSID, APMODE_PSSW);
-    if (logsOn) Serial.println("  [runAPMode] - AP IP address: ="+WiFi.softAPIP().toString());
+    if (debugModeOn) Serial.println("  [runAPMode] - AP IP address: ="+WiFi.softAPIP().toString());
 
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_YELLOW,TFT_BLACK);

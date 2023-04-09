@@ -30,35 +30,45 @@ meter, progress, output {
 }
 
 div#tswsidecol {
-  float: right;
+  float: left;
   width: 27%;
   color: white;
   background-color: #34383b;
 }
 
 div#tswsidecolindex {
-  float: right;
+  /*float: right;*/
+  float: left;
+  width: 27%;
+  color: white;
+  background-color: #34383b;
+}
+
+div#tswsidecolinfo {
+  float: left;
+  width: 27%;
+  color: white;
+  background-color: #34383b;
+  padding-top: 1%;
+  padding-bottom: 1%;
+}
+
+div#tswsidecolbasic {
+  float: left;
   width: 27%;
   color: white;
   background-color: #34383b;
 }
 
 div#tswsidecolapindex {
-  float: right;
-  width: 27%;
-  color: white;
-  background-color: #34383b;
-}
-
-div#tswsidecolbasic {
-  float: right;
+  float: left;
   width: 27%;
   color: white;
   background-color: #34383b;
 }
 
 div#tswsidecolmaint {
-  float: right;
+  float: left;
   width: 27%;
   color: white;
   background-color: #34383b;
@@ -71,30 +81,78 @@ div#tswcontent {
   background-color: #34383b;
 }
 
+div#tswcontentinfo {
+  float: right;
+  width: 70%;
+  color: white;
+  background-color: #34383b;
+}
+
 @media only screen and ( max-width : 629px ) {
+  div#tswcontainer {
+    float: none;
+    width: 370px;
+  }
+  div#tswcontainerindex {
+    float: none;
+    width: 529px;
+  }
+  div#tswcontainerinfo {
+    float: none;
+    width: 629px;
+  }
+  div#tswheader {
+    float: none;
+    width: 100%;
+  }
+  div#tswfooter {
+    float: none;
+    width: 100%;
+  }
   div#tswsidecol {
     float: none;
     width: 100%;
+    height: 100%;
   }
   div#tswsidecolindex {
     float: none;
     width: 100%;
+    height: 100%;
   }
-  div#tswsidecolapindex {
+  div#tswsidecolinfo {
     float: none;
+    clear: both;
     width: 100%;
+    height: 100%;
+    padding-top: 1%;
+    padding-bottom: 1%;
   }
   div#tswsidecolbasic {
     float: none;
     width: 100%;
+    height: 100%;
   }
   div#tswsidecolmaint {
     float: none;
     width: 100%;
+    height: 100%;
+  }div#tswsidecolapindex {
+    float: none;
+    width: 100%;
+    height: 100%;
   }
   div#tswcontent {
     float: none;
     width: 100%;
+    /*max-width : 529px*/
+    height: 100%;
+  }
+  div#tswcontentinfo {
+    float: none;
+    width: 100%;
+    color: white;
+    background-color: #34383b;
+    height: 1080px;
   }
 }
 
@@ -104,6 +162,14 @@ div#tswcontproper {
 }
 
 div#tswcontainer {
+  background-color: #1d2324;
+}
+
+div#tswcontainerindex {
+  background-color: #1d2324;
+}
+
+div#tswcontainerinfo {
   background-color: #1d2324;
 }
 
@@ -133,7 +199,21 @@ div#tswfooter {
   margin: auto;
 }
 
+#tswcontainerindex {
+  width: 800px;
+  margin: auto;
+}
+
+#tswcontainerinfo {
+  width: 800px;
+  margin: auto;
+}
+
 #tswcontent {
+  margin: auto auto auto 0%;
+}
+
+#tswcontentinfo {
   margin: auto auto auto 0%;
 }
 
@@ -143,9 +223,23 @@ div#tswfooter {
 }
 
 #tswsidecolindex {
+  margin: auto auto auto 0%;
+  /*margin-left: 0%;
+  margin-right: 3%;*/
+  height: 604px;
+}
+
+#tswsidecolinfo {
+  margin: auto auto auto 0%;
+  height: 872px;
+  padding-top: 1%;
+  padding-bottom: 1%;
+}
+
+#tswsidecolbasic {
   margin-left: 0%;
   margin-right: 3%;
-  height: 1027px;
+  height: 694px;
 }
 
 #tswsidecolapindex {
@@ -154,16 +248,10 @@ div#tswfooter {
   height: 388px;
 }
 
-#tswsidecolbasic {
-  margin-left: 0%;
-  margin-right: 3%;
-  height: 658px;
-}
-
 #tswsidecolmaint {
   margin-left: 0%;
   margin-right: 3%;
-  height: 431px;
+  height: 513px;
 }
 
 #tswcontproper {
@@ -180,18 +268,24 @@ div#tswfooter {
   display: block;
 }
 
-#tswdevice {
-  float: left;
-  width: 50%;
-  padding-right: 5%;
-  clear: left;
-}
-
 #tswsamples {
   width: 50%;
   float: left;
   padding-right: 5%;
   padding-bottom: 5%;
+}
+
+#tswwifiinfo {
+  width: 45%;
+  float: right;
+  padding-bottom: 5%;
+}
+
+#tswdevice {
+  float: left;
+  width: 50%;
+  padding-right: 5%;
+  clear: left;
 }
 
 #tswnetinfo {
@@ -200,6 +294,13 @@ div#tswfooter {
   padding-top: 5%;
   padding-bottom: 5%;
   width: 45%;
+}
+
+#tswmiscinfo {
+  float: left;
+  clear: both;
+  width: 100%;
+  padding-top: 5%;
 }
 
 #tswmiscinfoleft {
@@ -213,9 +314,34 @@ div#tswfooter {
   float: left;
 }
 
-#tswmiscinfo {
-  float: left;
-  width: 100%;
-  padding-top: 5%;
+.card-content {
+  padding: 5%;
 }
 
+.card-grid {
+  max-width: 1200px;
+  margin: 0px auto;
+  display: grid;
+  -webkit-grid-gap: 2rem;
+  grid-gap: 2rem;
+  -webkit-grid-template-columns: 1fr 100px 100px;
+  grid-template-columns: 1fr 100px 100px;
+}
+
+.card {
+  max-width: 240px;
+  background-color: #34383b;
+  box-shadow: 2px 2px 12px 1px rgba(140, 140, 140, 0.5);
+}
+
+.card-title {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #89bfff;
+}
+
+#id-card-CO2 {
+  min-width: 220px;
+  margin-top: 40%;
+  height: 300px;
+}

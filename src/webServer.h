@@ -13,6 +13,7 @@
 #include "MHZ19.h"
 #include <WiFi.h>
 #include <EEPROM.h>
+#include <Arduino_JSON.h>
 
 #ifndef _DISPLAYSUPPORTINFO_
   //enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
@@ -43,6 +44,7 @@
 #endif
 
 extern RTC_DATA_ATTR AsyncWebServer webServer;
+extern RTC_DATA_ATTR AsyncEventSource webEvents;
 extern RTC_DATA_ATTR float_t valueCO2,valueT,valueHum;
 extern String device;
 extern RTC_DATA_ATTR enum powerModes powerState;
@@ -84,6 +86,7 @@ extern uint32_t fileSystemSize;
 extern uint32_t fileSystemUsed;
 extern String fileUpdateName;
 extern char activeCookie[],currentSetCookie[];
+extern JSONVar samples;
 
 
 String processor(const String& var);
