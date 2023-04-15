@@ -40,9 +40,9 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   1011 B
+// RTC memory variables:                   1013 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     4071 B
+// RTC memorty TOTAL:                     4073 B
 // RTC memory left:     8000 B - 3967 B = 3929 B 
 //
 //EEPROM MAP
@@ -71,7 +71,9 @@
 //Address 211-250: NTP4 char []* (63 B+null=64 B)
 //Address 251-289: TZEnvVar char []* (56 B+null=57 B)
 //Address 28A-2A7: TZName char []* (29 B+null=30 B)
-//Address 2A8: Stores Misc Variable Values (1 B)
+//Address 2A8-2B2: User name char []* (10 B+null=11 B)
+//Address 2B3-2BD: User passw char []* (10 B+null=11 B)
+//Address 2BE: Stores Misc Variable Values (1 B)
 //  - Bit 0: siteAllowToUploadSamples - 1=true, 0=false
 //  - Bit 1: siteBk1AllowToUploadSamples - 1=true, 0=false
 //  - Bit 2: siteBk2AllowToUploadSamples - 1=true, 0=false
@@ -178,6 +180,8 @@ struct tm nowTimeInfo; //36 B
 char activeCookie[COOKIE_SIZE];
 char currentSetCookie[COOKIE_SIZE];
 JSONVar samples;
+String userName;
+String userPssw;
 
 
 //Code
@@ -264,7 +268,9 @@ void initVariable() {
   //Address 211-250: NTP4 char []* (63 B+null=64 B)
   //Address 251-289: TZEnvVar char []* (56 B+null=57 B)
   //Address 28A-2A7: TZName char []* (29 B+null=30 B)
-  //Address 2A8: Stores Misc Variable Values (1 B)
+  //Address 2A8-2B2: User name char []* (10 B+null=11 B)
+  //Address 2B3-2BD: User passw char []* (10 B+null=11 B)
+  //Address 2BE: Stores Misc Variable Values (1 B)
   //  - Bit 0: siteAllowToUploadSamples - 1=true, 0=false
   //  - Bit 1: siteBk1AllowToUploadSamples - 1=true, 0=false
   //  - Bit 2: siteBk2AllowToUploadSamples - 1=true, 0=false
@@ -593,8 +599,30 @@ void initVariable() {
     //Update volatile TZEnvVariable & TZName. Same function is called after waking up from sleep if pushed button1
     updateEEPROM|=initTZVariables();
 
+    //Get the User Credential-related variables from EEPROM or global_setup.h
+    //If variables exist in global_setup.h and doesn't exist in EEPPROM, then update EEPROM 
+    char auxUserName[MQTT_USER_CREDENTIAL_LENGTH],auxUserPssw[MQTT_PW_CREDENTIAL_LENGTH];
+    memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);EEPROM.get(0x2A8,auxUserName);
+    if (String(auxUserName).compareTo("")==0) {
+      userName=MQTT_USER_CREDENTIAL;  
+      EEPROM.put(0x2A8,auxUserName);
+      updateEEPROM|=true;
+    }
+    else {
+      userName=String(auxUserName);
+    }
+    memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);EEPROM.get(0x2B3,auxUserPssw);
+    if (String(auxUserPssw).compareTo("")==0) {
+      userPssw=MQTT_PW_CREDENTIAL;  
+      EEPROM.put(0x2B3,auxUserPssw);
+      updateEEPROM|=true;
+    }
+    else {
+      userPssw=String(auxUserPssw);
+    }
+    
     //Get the rest of wifiCred.SiteAllow variables from EEPROM
-    configVariables=EEPROM.read(0x2A8);
+    configVariables=EEPROM.read(0x2BE);
     wifiCred.SiteAllow[0]=configVariables & 0x01;
     wifiCred.SiteAllow[1]=configVariables & 0x02;
     wifiCred.SiteAllow[2]=configVariables & 0x04;
@@ -610,6 +638,7 @@ void initVariable() {
   if (debugModeOn) {Serial.println(" [initVariable] - wifiCred.wifiSSIDs[2]='"+wifiCred.wifiSSIDs[2]+"', wifiCred.wifiPSSWs[2]='"+wifiCred.wifiPSSWs[2]+"', wifiCred.wifiSITEs[2]='"+wifiCred.wifiSITEs[2]+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - ntpServers[0]='"+ntpServers[0]+"', ntpServers[1]='"+ntpServers[1]+"', ntpServers[2]='"+ntpServers[2]+"', ntpServers[3]='"+ntpServers[3]+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - TZEnvVariable='"+TZEnvVariable+"', TZName='"+TZName+"'");}
+  if (debugModeOn) {Serial.println(" [initVariable] - userName='"+userName+"', userPssw='"+userPssw+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - wifiCred.SiteAllow[0]='"+String(wifiCred.SiteAllow[0])+"'"+", wifiCred.SiteAllow[1]='"+String(wifiCred.SiteAllow[1])+"'"+", wifiCred.SiteAllow[2]='"+String(wifiCred.SiteAllow[2])+"'");}
 
   //If no SSID is setup, display message to warn and run AP mode
@@ -1435,7 +1464,7 @@ void setup() {
   memset(auxTZEnvVar,'\0',TZ_ENV_VARIABLE_MAX_LENGTH);EEPROM.get(0x251,auxTZEnvVar);TZEnvVariable=String(auxTZEnvVar);
   
   //wifiCred.SiteAllow definition  - Not run if waking up from either button or timer
-  configVariables=EEPROM.read(0x2A8);
+  configVariables=EEPROM.read(0x2BE);
   wifiCred.SiteAllow[0]=configVariables & 0x01;
   wifiCred.SiteAllow[1]=configVariables & 0x02;
   wifiCred.SiteAllow[2]=configVariables & 0x04;
@@ -1590,10 +1619,12 @@ void loop() {
     }
 
     //Updating JSON object with samples - Used in web webEvents
+    char s[100];getLocalTime(&nowTimeInfo);strftime(s,sizeof(s),"%d/%m/%Y - %H:%M:%S",&nowTimeInfo);
     samples["CO2"] = String(valueCO2);
     samples["temperature"] = String(valueT);
     samples["humidity"] =  String(valueHum);
-
+    samples["dateUpdate"] =  String(s);
+    
     // Send Events to the web client with the new samples
     if (wifiEnabled && webServerEnabled && WiFi.status()==WL_CONNECTED) {
       webEvents.send("ping",NULL,nowTimeGlobal);

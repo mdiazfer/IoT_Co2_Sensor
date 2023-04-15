@@ -8,7 +8,7 @@
     <link rel="stylesheet" type="text/css" media="all" href="styles.css">
     <link type="text/css" rel="stylesheet" href="tswnavbar.css" title="Side Menu CSS">
   </head>
-  <body style="background-color: #1d2324; color: white;">
+  <body onload="getTime()" style="background-color: #1d2324; color: white;">
     <div id="tswcontainer">
       <div id="tswheader">
         <!-- start of header section: insert your logo, etc, here -->
@@ -19,7 +19,17 @@
           </a>
         </p>
         <p>&nbsp;</p>
-        <p style="text-align: center; font-size: smaller;">Sensor CO2 by The IoT Factory (C). </p>
+        <p style="text-align: right; font-size: smaller;">
+          <font>Sensor CO2 by The IoT Factory (C).</font>
+          <font style="color:#3f9bd5;""><label id='currentDate'"></label></font>
+        </p>
+        <script>
+          function getTime() {
+            var now=new Date();
+            document.getElementById("currentDate").innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"+now.toLocaleDateString()+" - "+now.toLocaleTimeString()+"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+            setTimeout(getTime,1000);
+          }
+        </script>
         <p style="text-align: center; font-size: smaller;"><br></p>
       </div>
       <div id="tswsidecolmaint">

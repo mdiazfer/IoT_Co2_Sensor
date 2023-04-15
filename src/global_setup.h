@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "1.0.0"
+#define VERSION "1.0.1"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -31,7 +31,9 @@
 #define I2C_SCL 22 //I2C - SCL pin in the ESP board (SCL pin in the sensor)
 #define DEVICE_NAME_PREFIX "co2-sensor"
 #define PIN_TFT_BACKLIGHT 4
-#define DEBUG_MODE_ON true
+#ifndef DEBUG_MODE_ON
+  #define DEBUG_MODE_ON true
+#endif
 #define EEPROM_SIZE 0x300
 
 //Co2 Sensor stuff
@@ -351,6 +353,16 @@
 #define SPIFFS_CFG_LOG_BLOCK_SZ  4096 //Bytes - Size of Logical SPIFFS Blocks
 #define SPIFFS_CFG_LOG_PAGE_SZ  256 //Bytes - Size of Logical SPIFFS Pages
 #define SPIFFS_MAGIC_ADDR SPIFFS_CFG_LOG_PAGE_SZ-4 //Bytes - Address for the magic number to confirm it's SPIFFS partition
+
+//MQTT stuff
+#ifndef MQTT_USER_CREDENTIAL
+  #define MQTT_USER_CREDENTIAL "admin"
+#endif
+#ifndef MQTT_PW_CREDENTIAL
+  #define MQTT_PW_CREDENTIAL "adminCO2"
+#endif
+#define MQTT_USER_CREDENTIAL_LENGTH 11 //10+null=11B
+#define MQTT_PW_CREDENTIAL_LENGTH 11 //10+null=11B
 
 #ifdef _DECLAREGLOBALPARAMETERS_
   #ifndef _WIFINETWORKINFO_

@@ -8,7 +8,7 @@
     <link type="text/css" rel="stylesheet" href="tswnavbar.css" title="Side Menu CSS">
     <script src="gauge.min.js"></script>
   </head>
-  <body style="           background-color: #1d2324; color: white;">
+  <body onload="getTime()" style="background-color: #1d2324; color: white;">
     <div id="tswcontainerindex">
       <div id="tswheader">
         <!-- start of header section: insert your logo, etc, here -->
@@ -19,7 +19,17 @@
           </a>
         </p>
         <p>&nbsp;</p>
-        <p style="text-align: center; font-size: smaller;">Sensor CO2 by The IoT Factory (C). </p>
+        <p style="text-align: right; font-size: smaller;">
+          <font>Sensor CO2 by The IoT Factory (C).</font>
+          <font style="color:#3f9bd5;""><label id='currentDate'"></label></font>
+        </p>
+        <script>
+          function getTime() {
+            var now=new Date();
+            document.getElementById("currentDate").innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"+now.toLocaleDateString()+" - "+now.toLocaleTimeString()+"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+            setTimeout(getTime,1000);
+          }
+        </script>
         <p style="text-align: center; font-size: smaller;"><br></p>
       </div> <!--tswheader-->
       <div id="tswsidecolindex"> <!--*-->
@@ -52,7 +62,16 @@
       <div id="tswcontent">
         <div id="tswcontproper">
           <!-- start of content column: insert your content here -->
-          <h1>Measurements</h1>
+          <div id="tswmeasurementstitle">
+            <font size="6">Measurements</font>
+          </div>
+          <div id="tswupdateheader">
+            <font size="2"; style="font-family:verdana; color:#b69249;"><label>Latest update:</label></font>
+          </div>
+          <div id="tswupdate">
+            <font size="2"; style="font-family:verdana; color:#FFAB00;"><label id='latestUpdate'></label></font>
+          </div>
+          <p>&nbsp;</p>
           <div id="tswmeasurements">
             <div class="card-content">
               <div class="card-grid" id="id-card-grid">

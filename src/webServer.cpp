@@ -138,6 +138,14 @@ String processor(const String& var){
   } else if (var == "WIFICHECKED_OFF") {
     if (!wifiEnabled) return String ("checked");
     else return String();
+  } else if (var == "UserName") {
+    return userName;
+  } else if (var == "UserPssw_VALUE") {
+    return userName;  
+  } else if (var == "UserPssw") {
+    return "User password";
+  } else if (var == "UserPssw_VALUE") {
+    return "**********";  
   } else if (var == "SSID") {
     if (wifiCred.wifiSSIDs[0].compareTo(String(""))==0) {if (wifiEnabled) return "Mandatory if WiFi enabled"; else return String();}
     else return wifiCred.wifiSSIDs[0];
@@ -342,16 +350,9 @@ uint32_t initWebServer() {
 
   // Route to load maintenance_upload_firmware/identity file
   webServer.on("/maintenance_upload_firmware/identity", HTTP_GET, [](AsyncWebServerRequest *request) {
-    //From AsyncElegantOTA
-    String username=String(MQTT_USER_CREDENTIAL);
-    String password=String(MQTT_PW_CREDENTIAL);
     String id = String((uint32_t)ESP.getEfuseMac(), HEX);
     id.toUpperCase();
     
-    /*if(!request->authenticate(username.c_str(), password.c_str())){
-      return request->requestAuthentication();
-    }*/
-
     request->send(200, "application/json", "{\"id\": \""+id+"\", \"hardware\": \"ESP32\"}");
   });
   
@@ -523,6 +524,50 @@ uint32_t initWebServer() {
       }
     }
     request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
+  });
+
+  webServer.on("/basic4", HTTP_POST, [](AsyncWebServerRequest *request) {
+    int params = request->params();
+    bool updateEEPROM=false;
+    char auxUserName[MQTT_USER_CREDENTIAL_LENGTH],auxUserPssw[MQTT_PW_CREDENTIAL_LENGTH];
+    AsyncWebServerResponse * auxResp=new AsyncFileResponse(SPIFFS, WEBSERVER_BASICCONFIG_PAGE, String(), false, processor);
+
+    //Authentication is required
+    if(!request->authenticate(userName.c_str(), userPssw.c_str())) {
+      //Setup a new response to send AuthenticationRequest headers in the container.html answer
+      auxResp->setCode(401);
+      auxResp->addHeader("WWW-Authenticate", "Basic realm=\"Login Required\"");
+      request->send(auxResp);
+    }
+    else
+    {
+      for(int i=0;i<params;i++) {
+      AsyncWebParameter* p = request->getParam(i);
+        if(p->isPost()){
+          // HTTP POST AdminUser_Form value
+          if (String(p->name()).compareTo("UserName")==0) {
+            memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);
+            memcpy(auxUserName,p->value().c_str(),p->value().length()); //End null not included
+            if (userName.compareTo(auxUserName)!=0) {
+              userName=p->value();
+              EEPROM.put(0x2A8,auxUserName);
+              updateEEPROM=true;
+            }
+          }
+          if (String(p->name()).compareTo("UserPssw")==0) {
+            memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);
+            memcpy(auxUserPssw,p->value().c_str(),p->value().length()); //End null not included
+            if (userPssw.compareTo(auxUserPssw)!=0) {
+              userPssw=p->value();
+              EEPROM.put(0x2B3,auxUserPssw);
+              updateEEPROM=true;
+            }
+          }
+        }
+      }
+      if (updateEEPROM) EEPROM.commit();
+      request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
+    }
   });
 
   webServer.on("/basic2", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -804,7 +849,7 @@ uint32_t initWebServer() {
     uint8_t currentConfigVariables,configVariables=0;
     bool updateEEPROM=false;
 
-    currentConfigVariables=EEPROM.read(0x2A8);
+    currentConfigVariables=EEPROM.read(0x2BE);
     wifiCred.SiteAllow[0]=false;wifiCred.SiteAllow[1]=false;wifiCred.SiteAllow[2]=false;
     
     //Checking checkbox. Name is sent only if checked. 
@@ -831,7 +876,7 @@ uint32_t initWebServer() {
     }
 
     if (currentConfigVariables != configVariables) {
-      EEPROM.write(0x2A8,configVariables);
+      EEPROM.write(0x2BE,configVariables);
       updateEEPROM=true;
       if (uploadSamplesEnabled) lastTimeUploadSampleCheck=nowTimeGlobal-uploadSamplesPeriod; //Force to update status of the cloud server (CloudSyncCurrentStatus) in the next loop round
     }
@@ -896,8 +941,6 @@ uint32_t initWebServer() {
   });
 
   webServer.on(WEBSERVER_DEFAULTCONF_PAGE, HTTP_POST, [](AsyncWebServerRequest *request) {
-    String username=String(MQTT_USER_CREDENTIAL);
-    String password=String(MQTT_PW_CREDENTIAL);
     reconnectWifiAndRestartWebServer=false;
     resyncNTPServer=false;
     factoryReset=false;
@@ -915,7 +958,7 @@ uint32_t initWebServer() {
           factoryReset=true;
 
           //Authentication is required
-          if(!request->authenticate(username.c_str(), password.c_str())) {
+          if(!request->authenticate(userName.c_str(), userPssw.c_str())) {
             fileUpdateError=ERROR_UPLOAD_FILE_NOAUTH;
             //Setup a new response to send AuthenticationRequest headers in the container.html answer
             auxResp->setCode(401);
@@ -949,8 +992,6 @@ uint32_t initWebServer() {
 
   webServer.on(WEBSERVER_DEVICERESET_PAGE, HTTP_POST, [](AsyncWebServerRequest *request) {
     //This code is run after uploading the file
-    String username=String(MQTT_USER_CREDENTIAL);
-    String password=String(MQTT_PW_CREDENTIAL);
     deviceReset=false;
     fileUpdateError=ERROR_UPLOAD_FILE_NOERROR;
     updateCommand=-1;
@@ -966,7 +1007,7 @@ uint32_t initWebServer() {
           deviceReset=true;
           
           //Authentication is required
-          if(!request->authenticate(username.c_str(), password.c_str())) {
+          if(!request->authenticate(userName.c_str(), userPssw.c_str())) {
             fileUpdateError=ERROR_UPLOAD_FILE_NOAUTH;
             //Setup a new response to send AuthenticationRequest headers in the container.html answer
             auxResp->setCode(401);
@@ -981,9 +1022,6 @@ uint32_t initWebServer() {
   
   webServer.on(WEBSERVER_UPLOADFILE_PAGE, HTTP_POST, [](AsyncWebServerRequest *request) {
       //This code is run after uploading the file
-      String username=String(MQTT_USER_CREDENTIAL);
-      String password=String(MQTT_PW_CREDENTIAL);
-      
       int params = request->params();
 
       //Checking if the POST comes from the browser with the active cookie
@@ -1069,8 +1107,6 @@ uint32_t initWebServer() {
       fileUpdateError=ERROR_UPLOAD_FILE_NOERROR;
     }, [&](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
     //This code is run first
-    String username=String(MQTT_USER_CREDENTIAL);
-    String password=String(MQTT_PW_CREDENTIAL);
     fileUpdateName=filename;
 
     //Doing some checks first before allowing the file upload
@@ -1102,7 +1138,7 @@ uint32_t initWebServer() {
     }
 
     //Authentication is needed
-    if(!request->authenticate(username.c_str(), password.c_str())){
+    if(!request->authenticate(userName.c_str(), userPssw.c_str())){
       errorOnWrongCookie=ERROR_UPLOAD_FILE_NOAUTH;
       if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance_upload_firmware upload] - Authentication required, index="+String(index)+"\n   - Faulty cookie="+request->getHeader("Cookie")->value());
       return;

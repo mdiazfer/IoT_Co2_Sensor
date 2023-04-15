@@ -271,9 +271,26 @@ void factoryConfReset() {
 
   if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxTZEnvVar='"+String(auxTZEnvVar)+"', auxTZName='"+String(auxTZName)+"'");}
 
+  //Write User Credential-related variables
+  char auxUserName[MQTT_USER_CREDENTIAL_LENGTH],auxUserPssw[MQTT_PW_CREDENTIAL_LENGTH];
+  //Set variables for SSID or null if no config in global_setup.h file
+  memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);
+  memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);
+  #ifdef MQTT_USER_CREDENTIAL
+    String(MQTT_USER_CREDENTIAL).toCharArray(auxUserName,String(MQTT_USER_CREDENTIAL).length()+1);
+  #endif
+  #ifdef MQTT_PW_CREDENTIAL
+    String(MQTT_PW_CREDENTIAL).toCharArray(auxUserPssw,String(MQTT_PW_CREDENTIAL).length()+1);
+  #endif
+  //Write varialbes in EEPROM to be available the next boots up
+  EEPROM.put(0x2A8,auxUserName);userName=auxUserName;
+  EEPROM.put(0x2B3,auxUserPssw);userPssw=auxUserPssw;
+  
+  if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxUserName='"+String(auxUserName)+"', auxUserPssw='"+String(auxUserPssw)+"'");}
+  
   //Now initialize wifiCred.SiteAllow variables
   configVariables=0x0; //Bit 0, notFirstRun=true
-  EEPROM.write(0x2A8,configVariables); //All unset the first time EEPROM is written
+  EEPROM.write(0x2BE,configVariables); //All unset the first time EEPROM is written
   wifiCred.SiteAllow[0]=0;wifiCred.SiteAllow[1]=0;wifiCred.SiteAllow[2]=0;
 }
 

@@ -8,6 +8,9 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 1.0.1 09/Apr/2023   - Web Server
+                        + Change admin password                        
+                        + Added current time and latest update time (SSE)
 - 1.0.0 09/Apr/2023   - Bug fix
                         + fix web pages layout for smartphone
 - 0.9.E 08/Apr/2023   - Print code clean-up and replacing logsOn by debugModeOn in all the files

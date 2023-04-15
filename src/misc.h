@@ -42,6 +42,7 @@ extern wifiCredentials wifiCred;
 extern String TZEnvVariable,TZName;
 extern String ntpServers[4];
 extern struct tm nowTimeInfo;
+extern String userName,userPssw;
 
 void go_to_hibernate();
 void go_to_sleep();

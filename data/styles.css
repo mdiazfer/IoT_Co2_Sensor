@@ -81,6 +81,30 @@ div#tswcontent {
   background-color: #34383b;
 }
 
+div#tswmeasurementstitle {
+  float: left;
+  width: 40%;
+  color: white;
+  background-color: #34383b;
+  padding-left: 1%;
+}
+
+div#tswupdateheader {
+  float: right;
+  width: 25%;
+  color: #b69249;
+  background-color: #34383b;
+  padding-right: 1%;
+}
+
+div#tswupdate {
+  float: right;
+  width: 36%;
+  color: #b69249;
+  background-color: #34383b;
+  padding-right: 1%;
+}
+
 div#tswcontentinfo {
   float: right;
   width: 70%;
@@ -146,6 +170,21 @@ div#tswcontentinfo {
     width: 100%;
     /*max-width : 529px*/
     height: 100%;
+  }
+  div#tswmeasurementstitle {
+    float: left;
+    width: 40%;
+    padding-left: 1%;
+  }
+  div#tswupdateheader {
+    float: right;
+    width: 25%;
+    padding-left: 1%;
+  }
+  div#tswupdate {
+    float: right;
+    width: 36%;
+    padding-left: 1%;
   }
   div#tswcontentinfo {
     float: none;
@@ -226,7 +265,7 @@ div#tswfooter {
   margin: auto auto auto 0%;
   /*margin-left: 0%;
   margin-right: 3%;*/
-  height: 604px;
+  height: 577px;
 }
 
 #tswsidecolinfo {
@@ -239,7 +278,7 @@ div#tswfooter {
 #tswsidecolbasic {
   margin-left: 0%;
   margin-right: 3%;
-  height: 694px;
+  height: 815px;
 }
 
 #tswsidecolapindex {
@@ -266,6 +305,17 @@ div#tswfooter {
 
 #tswntpservers {
   display: block;
+}
+
+#tswadminusername {
+  display: block;
+  float: left;
+  width: 50%;
+}
+
+#tswadminuserpssw {
+  display: block;
+  
 }
 
 #tswsamples {

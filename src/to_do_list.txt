@@ -1,10 +1,9 @@
 To do list
 -----------
-- Web Server
-  + Change admin 
 - Implement MQTT
 - BLE sutff
   + Get info about bluetooth to update icons
+  + Add Asset Tracking frames
 - Troubleshoot
   + WiFi connection failures (????)
 - Icon for the bootup screen
@@ -15,10 +14,15 @@ To do list
   + Adding Bootup info Option to the Display Info Menu
   + Check MD5/version to allow upload file (????)
   + Show graphs in webpage
+  + Use Wifi.onEvent() to detect WiFi disconnection rather than monitoring periodically
+    (https://randomnerdtutorials.com/esp32-useful-wi-fi-functions-arduino/)
 
 
 Done
 -------
+- Web Server
+  + Change admin password
+  + Added current time and latest update time (SSE)
 - Added Measurements page to the web server - based on Server Side Events 
 - Bug fix
   + HTML pages allignement

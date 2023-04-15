@@ -179,6 +179,8 @@ var gaugeCO2 = new RadialGauge({
   animationRule: "linear"
 }).draw();
 
+var dateUpdate;
+
 // Function to get current readings on the webpage when it loads for the first time
 function getReadings(){
   var xhr = new XMLHttpRequest();
@@ -189,9 +191,12 @@ function getReadings(){
       var temp = myObj.temperature;
       var hum = myObj.humidity;
       var CO2 = myObj.CO2;
+      var date_Update=myObj.dateUpdate;
       gaugeTemp.value = temp;
       gaugeHum.value = hum;
       gaugeCO2.value = CO2;
+      dateUpdate=date_Update;
+      document.getElementById("latestUpdate").innerHTML = dateUpdate;
     }
   }; 
   xhr.open("GET", "/samples", true);
@@ -225,5 +230,7 @@ if (!!window.EventSource) {
     gaugeTemp.value = myObj.temperature;
     gaugeHum.value = myObj.humidity;
     gaugeCO2.value = myObj.CO2;
+    dateUpdate=myObj.dateUpdate;
+    document.getElementById("latestUpdate").innerHTML = dateUpdate;
   }, false);
 }

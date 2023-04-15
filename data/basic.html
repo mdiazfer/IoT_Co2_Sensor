@@ -7,20 +7,28 @@
     <link rel="stylesheet" type="text/css" media="all" href="styles.css">
     <link type="text/css" rel="stylesheet" href="tswnavbar.css" title="Side Menu CSS">
   </head>
-  <body style="background-color: #1d2324; color: white;">
+  <body onload="getTime()" style="background-color: #1d2324; color: white;">
     <div id="tswcontainer">
       <div id="tswheader">
         <!-- start of header section: insert your logo, etc, here -->
-        <p style="text-align: center; font-size: 1%; vertical-align: 210px;"> <a
-
-            href="http://the-iotfactory.com" title="The IoT Factory" target="_blank"><img
-
-              src="The_IoT_Factory.png" alt="The IoT Factory Logo" title="Logo"
-
-              id="logo" style="width: 215px; height: 45.3204px;"></a></p>
+        <p style="text-align: center; font-size: 1%; vertical-align: 210px;">
+          <a href="http://the-iotfactory.com" title="The IoT Factory" target="_blank">
+            <img src="The_IoT_Factory.png" alt="The IoT Factory Logo" title="Logo"
+              id="logo" style="width: 215px; height: 45.3204px;">
+          </a>
+        </p>
         <p>&nbsp;</p>
-        <p style="text-align: center; font-size: smaller;">Sensor CO2 by The IoT
-          Factory (C). </p>
+        <p style="text-align: right; font-size: smaller;">
+          <font>Sensor CO2 by The IoT Factory (C).</font>
+          <font style="color:#3f9bd5;""><label id='currentDate'"></label></font>
+        </p>
+        <script>
+          function getTime() {
+            var now=new Date();
+            document.getElementById("currentDate").innerHTML = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"+now.toLocaleDateString()+" - "+now.toLocaleTimeString()+"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+            setTimeout(getTime,1000);
+          }
+        </script>
         <p style="text-align: center; font-size: smaller;"><br>
         </p>
       </div>
@@ -76,6 +84,31 @@
             </fieldset>
           </form>
           <p></p>
+          <p></p>
+          <form action="basic4" method="post">
+            <fieldset name="AdminUser" form="AdminUser_Form">
+              <legend> Administrator User</legend>
+              <p></p>
+              <div id="tswadminusername">
+                <label for="UserName">User Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                <input id="UserName_id" name="UserName" size="11" placeholder="~UserName~" value="~UserName_VALUE~" disabled maxlength="10" type="text"><br>
+              </div>
+              <div id="tswadminuserpssw">
+                <label for="UserPssw">User Password&nbsp;</label>
+                <input id="UserPssw_id" name="UserPssw" size="11" placeholder="~UserPssw~" value="~UserPssw_VALUE~" maxlength="10" type="password"><br>
+                <br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <button type="reset" name="Button_Reset" id="Button_Reset_id">Reset</button>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <button type="submit" name="Button_Send" id="Button_Send_id"><strong>Submit</strong></button>
+              </div>
+            </fieldset>
+          </form>
           <p></p>
           <form action="basic2" method="post">
             <fieldset name="WiFiSet" form="WiFi_Form">
