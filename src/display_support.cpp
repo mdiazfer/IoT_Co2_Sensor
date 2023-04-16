@@ -807,13 +807,23 @@ void showIcons() {
     break;
   }
   
-  //-->>Get Cloud status
+    //-->>Get MQTT status
+  switch (MqttSyncCurrentStatus) {
+    case (MqttSyncOnStatus):
+      tft.pushImage(125,0,24,24,mqttSyncOn);
+    break;
+    case (MqttSyncOffStatus):
+      tft.pushImage(125,0,24,24,mqttSyncOff);
+    break;
+   }
+   
+   //-->>Get Cloud status
   switch (CloudSyncCurrentStatus) {
     case (CloudSyncOnStatus):
-      tft.pushImage(125,0,24,24,cloudSyncOn);
+      tft.pushImage(155,0,24,24,cloudSyncOn);
     break;
     case (CloudSyncOffStatus):
-      tft.pushImage(125,0,24,24,cloudSyncOff);
+      tft.pushImage(155,0,24,24,cloudSyncOff);
     break;
    }
   

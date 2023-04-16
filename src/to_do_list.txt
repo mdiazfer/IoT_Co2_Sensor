@@ -20,6 +20,15 @@ To do list
 
 Done
 -------
+- Tests on MQTT
+  + Publish and Subscribe (no authentication) => Result: OK - Messages are published and received successfully
+  + Wake up after Hibernation => Result: OK - mqttClient is initiated and messages are published
+  + Wake up after Sleep (press button) => Result: OK - mqttClient is initiated and messages are published
+  + Re-Connection after WiFi is reconnected => Result: OK - mqttClient is initiated and messages are published
+  + Re-Connection after MQTT broker is lost => Result: OK - mqttClient is initiated and messages are published
+- MQTT Support
+  + added MQTT-related variables
+  + added MQTT support in html pages (show and config)
 - Web Server
   + Change admin password
   + Added current time and latest update time (SSE)

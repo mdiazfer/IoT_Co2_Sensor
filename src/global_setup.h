@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "1.0.1"
+#define VERSION "1.1.0"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -34,7 +34,7 @@
 #ifndef DEBUG_MODE_ON
   #define DEBUG_MODE_ON true
 #endif
-#define EEPROM_SIZE 0x300
+#define EEPROM_SIZE 0x400
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
@@ -104,6 +104,7 @@
 #define ERROR_BREAK_WEB_SETUP         0x00008000
 #define ERROR_SPIFFS_SETUP            0x00010000
 #define ERROR_WEB_SERVER              0x00020000
+#define ERROR_MQTT_SERVER             0x00040000
 #define DEAD_ERRORS                   0x0001000F //ERROR_DISPLAY_SETUP OR ERROR_SENSOR_CO2_SETUP OR ERROR_SENSOR_TEMP_HUM_SETUP OR ERROR_BUTTONS_SETUP OR ERROR_SPIFFS_SETUP
 #define ERROR_UPLOAD_FILE_NOERROR           0x00
 #define ERROR_UPLOAD_FILE_EXTENSION         0x01
@@ -354,7 +355,15 @@
 #define SPIFFS_CFG_LOG_PAGE_SZ  256 //Bytes - Size of Logical SPIFFS Pages
 #define SPIFFS_MAGIC_ADDR SPIFFS_CFG_LOG_PAGE_SZ-4 //Bytes - Address for the magic number to confirm it's SPIFFS partition
 
-//MQTT stuff
+//WEB and MQTT credentials
+#ifndef WEB_USER_CREDENTIAL
+  #define WEB_USER_CREDENTIAL "admin"
+#endif
+#ifndef WEB_PW_CREDENTIAL
+  #define WEB_PW_CREDENTIAL "adminCO2"
+#endif
+#define WEB_USER_CREDENTIAL_LENGTH 11 //10+null=11B
+#define WEB_PW_CREDENTIAL_LENGTH 11 //10+null=11B
 #ifndef MQTT_USER_CREDENTIAL
   #define MQTT_USER_CREDENTIAL "admin"
 #endif
@@ -363,6 +372,17 @@
 #endif
 #define MQTT_USER_CREDENTIAL_LENGTH 11 //10+null=11B
 #define MQTT_PW_CREDENTIAL_LENGTH 11 //10+null=11B
+
+//MQTT stuff
+#define MQTTSERVER_ENABLED true
+#define SECURE_MQTT_ENABLED true
+#define MQTTSERVER_PORT 1883
+#define MQTT_SERVER_NAME_MAX_LENGTH NTP_SERVER_NAME_MAX_LENGTH
+#define MQTT_TOPIC_NAME_MAX_LENGTH 201 //200+null=201 B
+#ifndef MQTT_TOPIC_PREFIX
+  #define MQTT_TOPIC_PREFIX "the-iot-factory/"
+#endif
+#define MQTT_TOPIC_SUBSCRIPTION "the-iot-factory/info"
 
 #ifdef _DECLAREGLOBALPARAMETERS_
   #ifndef _WIFINETWORKINFO_
@@ -390,6 +410,7 @@
   wifiCredentials wifiCred;
   String ntpServers[4];
   uint8_t ntpServerIndex;
+  String mqttServer;
   
   #ifndef _DISPLAYSUPPORTINFO_
     enum displayModes {bootup,bootAP,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
@@ -399,6 +420,7 @@
     enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
+    enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncOffStatus};
     #define _DISPLAYSUPPORTINFO_
   #endif
 

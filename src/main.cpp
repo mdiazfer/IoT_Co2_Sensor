@@ -9,27 +9,29 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <WiFi.h>
-#include "global_setup.h"
-#include "wifiConnection.h"
-#include "display_support.h"
-#include "MHZ19.h"
 #include <SoftwareSerial.h>
-#include "Button.h"
-#include "SHT2x.h"
-#include "ButtonChecks.h"
 #include "time.h"
-#include "httpClient.h"
-#include "icons.h"
-#include "battery.h"
 #include "esp_sntp.h"
-#include "misc.h"
 #include <ESP32Time.h>
 #include <EEPROM.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncTCP.h>
 #include <SPIFFS.h>
-#include "webServer.h"
 #include <Arduino_JSON.h>
+#include <AsyncMqttClient.h>
+#include "global_setup.h"
+#include "wifiConnection.h"
+#include "display_support.h"
+#include "MHZ19.h"
+#include "Button.h"
+#include "SHT2x.h"
+#include "ButtonChecks.h"
+#include "httpClient.h"
+#include "icons.h"
+#include "battery.h"
+#include "misc.h"
+#include "webServer.h"
+#include "mqttClient.h"
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -40,10 +42,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   1013 B
+// RTC memory variables:                   1434 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     4073 B
-// RTC memory left:     8000 B - 3967 B = 3929 B 
+// RTC memorty TOTAL:                     4514 B
+// RTC memory left:     8000 B - 4514 B = 3486 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -55,6 +57,8 @@
 //  - Bit 3: bluetoothEnabled - 1=true, 0=false
 //  - Bit 4: wifiEnabled - 1=true, 0=false
 //  - Bit 5: webServerEnable - 1=true, 0=false
+//  - Bit 6: mqttServerEnable - 1=true, 0=false
+//  - Bit 7: secureMmqttEnable - 1=true, 0=false
 //Address 09-0C: Stores float_t batCharge (4 B)
 //Address 0D-2D:   SSID1 char []* (32 B+null=33 B)
 //Address 2E-6D:   PSSW1 char []* (63 B+null=64 B)
@@ -71,12 +75,17 @@
 //Address 211-250: NTP4 char []* (63 B+null=64 B)
 //Address 251-289: TZEnvVar char []* (56 B+null=57 B)
 //Address 28A-2A7: TZName char []* (29 B+null=30 B)
-//Address 2A8-2B2: User name char []* (10 B+null=11 B)
-//Address 2B3-2BD: User passw char []* (10 B+null=11 B)
+//Address 2A8-2B2: Web User name char []* (10 B+null=11 B)
+//Address 2B3-2BD: Web User passw char []* (10 B+null=11 B)
 //Address 2BE: Stores Misc Variable Values (1 B)
 //  - Bit 0: siteAllowToUploadSamples - 1=true, 0=false
 //  - Bit 1: siteBk1AllowToUploadSamples - 1=true, 0=false
 //  - Bit 2: siteBk2AllowToUploadSamples - 1=true, 0=false
+//  - Bit 2: siteBk2AllowToUploadSamples - 1=true, 0=false
+//Address 2BF-2FE: MQTT char []* (63 B+null=64 B)
+//Address 2FF-309: MQTT User name char []* (10 B+null=11 B)
+//Address 30A-314: MQTT User passw char []* (10 B+null=11 B)
+//Address 315-3DD: MQTT Topic name char []* (200 B+null=201 B)
 
 
 RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour C02 values
@@ -96,6 +105,7 @@ RTC_DATA_ATTR enum displayModes displayMode=bootup,lastDisplayMode=bootup; //2*4
 RTC_DATA_ATTR enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState; //3*4=12 B
 RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus; //4 B
 RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus; // 4B
+RTC_DATA_ATTR enum MqttSyncStatus MqttSyncCurrentStatus; // 4B
 RTC_DATA_ATTR boolean updateHourSample=true,updateDaySample=true,updateHourGraph=true,updateDayGraph=true,
               autoBackLightOff=true,button1Pressed=false,button2Pressed=false,reconnectWifiAndRestartWebServer=false,
               resyncNTPServer=false,deviceReset=false,factoryReset=false; //12*1=12 B 
@@ -125,12 +135,13 @@ RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
 RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0,webServerError1=0,
                   webServerError2=0,webServerError3=0,SPIFFSErrors=0; //7*4=28B - Error stats
-RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled;//4*1=4B
+RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled,mqttServerEnabled,secureMqttEnabled;//5*1=5B
 RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON; //1*1=1B
 RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus=BLEOffStatus; //1*4=4B
 RTC_DATA_ATTR AsyncWebServer webServer(WEBSERVER_PORT); //1*84=84B
 RTC_DATA_ATTR AsyncEventSource webEvents(WEBSERVER_SAMPLES_EVENT); //1*104=104B
 RTC_DATA_ATTR uint32_t error_setup=NO_ERROR; //1*4=4B
+RTC_DATA_ATTR AsyncMqttClient mqttClient;
 
 //Global variable definitions stored in regular RAM. 520 KB Max
 TFT_eSPI tft = TFT_eSPI();  // 292 B - Invoke library to manage the display
@@ -180,8 +191,7 @@ struct tm nowTimeInfo; //36 B
 char activeCookie[COOKIE_SIZE];
 char currentSetCookie[COOKIE_SIZE];
 JSONVar samples;
-String userName;
-String userPssw;
+String userName,userPssw,mqttUserName,mqttUserPssw,mqttTopicPrefix,mqttTopicName;
 
 
 //Code
@@ -252,6 +262,8 @@ void initVariable() {
   //  - Bit 3: bluetoothEnabled - 1=true, 0=false
   //  - Bit 4: wifiEnabled - 1=true, 0=false
   //  - Bit 5: webServerEnable - 1=true, 0=false
+  //  - Bit 6: mqttServerEnable - 1=true, 0=false
+  //  - Bit 7: secureMmqttEnable - 1=true, 0=false
   //Address 09-0C: Stores float_t batCharge (4 B)
   //Address 0D-2D:   SSID1 char []* (32 B+null=33 B)
   //Address 2E-6D:   PSSW1 char []* (63 B+null=64 B)
@@ -274,7 +286,17 @@ void initVariable() {
   //  - Bit 0: siteAllowToUploadSamples - 1=true, 0=false
   //  - Bit 1: siteBk1AllowToUploadSamples - 1=true, 0=false
   //  - Bit 2: siteBk2AllowToUploadSamples - 1=true, 0=false
+  //Address 2BF-2FE: MQTT char []* (63 B+null=64 B)
+  //Address 2FF-309: MQTT User name char []* (10 B+null=11 B)
+  //Address 30A-314: MQTT User passw char []* (10 B+null=11 B)
+  //Address 315-3DD: MQTT Topic name char []* (200 B+null=201 B)
 
+  //Adding the 3 latest mac bytes to the device name (in Hex format)
+  WiFi.macAddress(mac);
+  device=device+"-"+String((char)hex_digits[mac[3]>>4])+String((char)hex_digits[mac[3]&15])+
+    String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
+    String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
+  
   //Check if it is the first run after the very first firmware upload
   for (int i=0; i<VERSION_CHAR_LENGTH; i++) firmwareVersion[i]=EEPROM.read(i);firmwareVersion[VERSION_CHAR_LENGTH]='\0';
   uint16_t readChecksum,computedChecksum;
@@ -323,6 +345,8 @@ void initVariable() {
     bluetoothEnabled=configVariables & 0x08;
     wifiEnabled=configVariables & 0x10;
     webServerEnabled=configVariables & 0x20;
+    mqttServerEnabled=configVariables & 0x40;
+    secureMqttEnabled=configVariables & 0x80;
 
     //Get the WiFi Credential-related variables from EEPROM or global_setup.h
     //If varialbes exist in global_setup.h and doesn't exit in EEPPROM, then update EEPROM 
@@ -599,33 +623,113 @@ void initVariable() {
     //Update volatile TZEnvVariable & TZName. Same function is called after waking up from sleep if pushed button1
     updateEEPROM|=initTZVariables();
 
-    //Get the User Credential-related variables from EEPROM or global_setup.h
+    //Get the WEB User Credential-related variables from EEPROM or global_setup.h
     //If variables exist in global_setup.h and doesn't exist in EEPPROM, then update EEPROM 
-    char auxUserName[MQTT_USER_CREDENTIAL_LENGTH],auxUserPssw[MQTT_PW_CREDENTIAL_LENGTH];
-    memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);EEPROM.get(0x2A8,auxUserName);
+    char auxUserName[WEB_USER_CREDENTIAL_LENGTH],auxUserPssw[WEB_PW_CREDENTIAL_LENGTH];
+    memset(auxUserName,'\0',WEB_USER_CREDENTIAL_LENGTH);EEPROM.get(0x2A8,auxUserName);
     if (String(auxUserName).compareTo("")==0) {
-      userName=MQTT_USER_CREDENTIAL;  
+      userName=WEB_USER_CREDENTIAL;  
       EEPROM.put(0x2A8,auxUserName);
       updateEEPROM|=true;
     }
     else {
       userName=String(auxUserName);
     }
-    memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);EEPROM.get(0x2B3,auxUserPssw);
+    memset(auxUserPssw,'\0',WEB_PW_CREDENTIAL_LENGTH);EEPROM.get(0x2B3,auxUserPssw);
     if (String(auxUserPssw).compareTo("")==0) {
-      userPssw=MQTT_PW_CREDENTIAL;  
+      userPssw=WEB_PW_CREDENTIAL;  
       EEPROM.put(0x2B3,auxUserPssw);
       updateEEPROM|=true;
     }
     else {
       userPssw=String(auxUserPssw);
     }
-    
+
     //Get the rest of wifiCred.SiteAllow variables from EEPROM
     configVariables=EEPROM.read(0x2BE);
     wifiCred.SiteAllow[0]=configVariables & 0x01;
     wifiCred.SiteAllow[1]=configVariables & 0x02;
     wifiCred.SiteAllow[2]=configVariables & 0x04;
+
+    //Get the MQTT Server variables from EEPROM or global_setup.h
+    //If variables exist in global_setup.h and doesn't exist in EEPPROM, then update EEPROM 
+    char auxMQTT[MQTT_SERVER_NAME_MAX_LENGTH];
+  
+    memset(auxMQTT,'\0',MQTT_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x2BF,auxMQTT);
+    if (String(auxMQTT).compareTo("")==0) {
+      #ifdef MQTT_SERVER
+        mqttServer=MQTT_SERVER;  
+        //Check if MQTT server must be updated in EEPROM
+        if (mqttServer.compareTo(String(auxMQTT))!=0) {
+          uint8_t auxLength=mqttServer.length()+1;
+          if (auxLength>MQTT_SERVER_NAME_MAX_LENGTH-1) { //Substring if greater that max length
+            auxLength=MQTT_SERVER_NAME_MAX_LENGTH-1;
+            mqttServer=mqttServer.substring(0,auxLength);
+          }
+          memset(auxMQTT,'\0',MQTT_SERVER_NAME_MAX_LENGTH);
+          memcpy(auxMQTT,mqttServer.c_str(),auxLength);
+          EEPROM.put(0x2BF,auxMQTT);
+          updateEEPROM=true;
+        }
+      #else
+        mqttServer=auxMQTT;
+      #endif
+    } else mqttServer=auxMQTT;
+
+    //Get the MQTT User Credential-related variables from EEPROM or global_setup.h
+    //If variables exist in global_setup.h and doesn't exist in EEPPROM, then update EEPROM 
+    memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);EEPROM.get(0x2FF,auxUserName);
+    if (String(auxUserName).compareTo("")==0) {
+      mqttUserName=MQTT_USER_CREDENTIAL;  
+      EEPROM.put(0x2FF,auxUserName);
+      updateEEPROM|=true;
+    }
+    else {
+      mqttUserName=String(auxUserName);
+    }
+    memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);EEPROM.get(0x30A,auxUserPssw);
+    if (String(auxUserPssw).compareTo("")==0) {
+      mqttUserPssw=MQTT_PW_CREDENTIAL;  
+      EEPROM.put(0x30A,auxUserPssw);
+      updateEEPROM|=true;
+    }
+    else {
+      mqttUserPssw=String(auxUserPssw);
+    }
+
+    //Get the MQTT Topic Name variables from EEPROM or global_setup.h
+    //If variables exist in global_setup.h and doesn't exist in EEPPROM, then update EEPROM
+    char auxMqttTopicPrefix[MQTT_TOPIC_NAME_MAX_LENGTH];
+    memset(auxMqttTopicPrefix,'\0',MQTT_TOPIC_NAME_MAX_LENGTH);EEPROM.get(0x315,auxMqttTopicPrefix);
+    if (String(auxMqttTopicPrefix).compareTo("")==0) {
+      #ifdef MQTT_TOPIC_PREFIX
+        mqttTopicPrefix=MQTT_SERVER;
+        if (mqttTopicPrefix.charAt(mqttTopicPrefix.length()-1)!='/') mqttTopicPrefix+="/"; //Adding slash at the end if needed
+        //Check if MQTT topic name must be updated in EEPROM
+        if (mqttTopicPrefix.compareTo(String(auxMqttTopicPrefix))!=0) {
+          uint8_t auxLength=mqttTopicPrefix.length()+1;
+          if (auxLength>MQTT_TOPIC_NAME_MAX_LENGTH-1) { //Substring if greater that max length
+            auxLength=MQTT_TOPIC_NAME_MAX_LENGTH-1;
+            mqttTopicPrefix=mqttTopicPrefix.substring(0,auxLength);
+          }
+          memset(auxMqttTopicPrefix,'\0',MQTT_TOPIC_NAME_MAX_LENGTH);
+          memcpy(auxMqttTopicPrefix,mqttTopicPrefix.c_str(),auxLength);
+          EEPROM.put(0x315,auxMqttTopicPrefix);
+          updateEEPROM=true;
+        }
+      #else
+        mqttTopicPrefix=auxMqttTopicPrefix;
+      #endif
+    } else mqttTopicPrefix=auxMqttTopicPrefix;
+    mqttTopicName=mqttTopicPrefix+device; //Adding the device name to the MQTT Topic name
+
+    //Set MQTT variables and functions first
+    mqttClient.onConnect(onMqttConnect);
+    mqttClient.onDisconnect(onMqttDisconnect);
+    mqttClient.onSubscribe(onMqttSubscribe);
+    mqttClient.onMessage(onMqttMessage);
+    mqttClient.onUnsubscribe(onMqttUnsubscribe);
+    mqttClient.onPublish(onMqttPublish);
     
     if (updateEEPROM) {
       if (debugModeOn) {Serial.println(" [initVariable] - Update EEPROM variables with values taken from global_setup.h");}
@@ -639,6 +743,7 @@ void initVariable() {
   if (debugModeOn) {Serial.println(" [initVariable] - ntpServers[0]='"+ntpServers[0]+"', ntpServers[1]='"+ntpServers[1]+"', ntpServers[2]='"+ntpServers[2]+"', ntpServers[3]='"+ntpServers[3]+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - TZEnvVariable='"+TZEnvVariable+"', TZName='"+TZName+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - userName='"+userName+"', userPssw='"+userPssw+"'");}
+  if (debugModeOn) {Serial.println(" [initVariable] - mqttServer='"+mqttServer+"', mqttTopicPrefix='"+mqttTopicPrefix+"', mqttTopicName='"+mqttTopicName+"', mqttUserName='"+mqttUserName+"', mqttUserPssw='"+mqttUserPssw+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - wifiCred.SiteAllow[0]='"+String(wifiCred.SiteAllow[0])+"'"+", wifiCred.SiteAllow[1]='"+String(wifiCred.SiteAllow[1])+"'"+", wifiCred.SiteAllow[2]='"+String(wifiCred.SiteAllow[2])+"'");}
 
   //If no SSID is setup, display message to warn and run AP mode
@@ -957,12 +1062,6 @@ void firstSetup() {
   //Pre-setting up URL things to upload samples to an external server
   //Converting SERVER_UPLOAD_SAMPLES into IPAddress variable
   serverToUploadSamplesIPAddress=stringToIPAddress(serverToUploadSamplesString);
-
-  //Adding the 3 latest mac bytes to the device name (in Hex format)
-  WiFi.macAddress(mac);
-  device=device+"-"+String((char)hex_digits[mac[3]>>4])+String((char)hex_digits[mac[3]&15])+
-    String((char)hex_digits[mac[4]>>4])+String((char)hex_digits[mac[4]&15])+
-    String((char)hex_digits[mac[5]>>4])+String((char)hex_digits[mac[5]&15]);
   
   if (debugModeOn) {Serial.print("[setup] - URL: ");}
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - URL: ");
@@ -1043,6 +1142,12 @@ void firstSetup() {
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("No WiFi");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
+
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+
+  //Setting up MQTT server
+  MqttSyncCurrentStatus=MqttSyncOffStatus;
+  error_setup|=mqttClientInit(true,true,true);
 
   if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
@@ -1397,6 +1502,7 @@ void setup() {
       lastTimeTurnOffBacklightCheck=nowTimeGlobal; //To avoid TIME_TURN_OFF_BACKLIGHT 
       displayMode=sampleValue;  //To force refresh TFT with the sample value Screen
       lastDisplayMode=bootup;   //To force rendering the value graph
+      forceWifiReconnect=true; //Force WiFi reconnection in the next loop - v1.1.0
       if (debugModeOn) {Serial.println("    - end");}
     break;
     case ESP_SLEEP_WAKEUP_TIMER : 
@@ -1481,6 +1587,13 @@ void setup() {
 
   if (debugModeOn) {Serial.println("      - Restoring TZEnvVar="+String(TZEnvVar));}
   setenv("TZ",TZEnvVar,1); tzset(); //Restore TZ enviroment variable to show the right time
+
+  //Init MQTT String stuff
+  char auxMQTT[MQTT_SERVER_NAME_MAX_LENGTH],auxMqttTopicPrefix[MQTT_TOPIC_NAME_MAX_LENGTH],auxUserName[WEB_USER_CREDENTIAL_LENGTH],auxUserPssw[WEB_PW_CREDENTIAL_LENGTH];
+  memset(auxMQTT,'\0',MQTT_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x2BF,auxMQTT);mqttServer=auxMQTT;
+  memset(auxMqttTopicPrefix,'\0',MQTT_TOPIC_NAME_MAX_LENGTH);EEPROM.get(0x315,auxMqttTopicPrefix);mqttTopicPrefix=auxMqttTopicPrefix;mqttTopicName=mqttTopicPrefix+device;
+  memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);EEPROM.get(0x2FF,auxUserName);mqttUserName=auxUserName;
+  memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);EEPROM.get(0x30A,auxUserPssw);mqttUserPssw=auxUserPssw;
 
   nowTimeGlobal=loopStartTime+millis();
   if (debugModeOn) {Serial.print(String(nowTimeGlobal)+" [SETUP] - Exit - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
@@ -1630,6 +1743,24 @@ void loop() {
       webEvents.send("ping",NULL,nowTimeGlobal);
       webEvents.send(JSON.stringify(samples).c_str(),"new_samples",nowTimeGlobal);
       if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new SSE sample sent: "+JSON.stringify(samples));
+    }
+
+    // Publish MQTT message with the new samples
+    if (wifiEnabled && mqttServerEnabled && WiFi.status()==WL_CONNECTED) {
+      if (mqttClient.connected()) {
+        //MQTT Client connected
+        if (MqttSyncCurrentStatus!=MqttSyncOnStatus) MqttSyncCurrentStatus=MqttSyncOnStatus;
+        if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new MQTT messages published:\n    "+mqttTopicName+"/temperature "+String(valueT)+", packetId="+String(mqttClient.publish(String(mqttTopicName+"/temperature").c_str(), 0, true, String(valueT).c_str()))+
+                      "\n    "+mqttTopicName+"/humidity "+String(valueHum)+", packetID="+String(mqttClient.publish(String(mqttTopicName+"/humidity").c_str(), 0, true, String(valueHum).c_str()))+
+                      "\n    "+mqttTopicName+"/co2 "+String(valueCO2)+", packetId="+String(mqttClient.publish(String(mqttTopicName+"/co2").c_str(), 0, true, String(valueCO2).c_str())));
+      }
+      else {
+        //MQTT Client disconnected
+        if (MqttSyncCurrentStatus!=MqttSyncOffStatus) MqttSyncCurrentStatus=MqttSyncOffStatus;
+        //Connect to MQTT broker
+        if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new MQTT messages can't be published as MQTT broker is disconnected. Trying to get connected again...");
+        mqttClientInit(true,true,false);
+      }
     }
 
     if (forceGetSample) forceGetSample=false;
@@ -1864,6 +1995,11 @@ void loop() {
         if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with NO_ERROR. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWEBTestCheck="+String(forceWEBTestCheck));}
       break;
     } 
+
+    if (WiFi.status()==WL_CONNECTED && !mqttClient.connected() && mqttServerEnabled) { //Connect to MQTT broker again
+      //mqttClient.connect();
+      mqttClientInit(true,true,false);
+    }
 
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - WIFI_RECONNECT_PERIOD - exit, lastTimeWifiReconnectionCheck="+String(lastTimeWifiReconnectionCheck));}
   }

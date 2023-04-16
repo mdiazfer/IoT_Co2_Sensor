@@ -56,6 +56,7 @@ There are 4 different Saving Energy modes:
                           displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode,factResetMenu,factReset};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
+    enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncOffStatus};
     //#define _DISPLAYSUPPORTINFO_
   #endif
 

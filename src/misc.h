@@ -8,6 +8,7 @@
 #include "esp_partition.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
+#include <AsyncMqttClient.h>
 
 
 #ifndef _WIFINETWORKINFO_
@@ -36,13 +37,14 @@ extern RTC_DATA_ATTR boolean debugModeOn;
 extern RTC_DATA_ATTR uint64_t loopEndTime,loopStartTime,sleepTimer;
 extern RTC_DATA_ATTR float_t batCharge;
 extern RTC_DATA_ATTR struct tm startTimeInfo;
-extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled;
+extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled,mqttServerEnabled,secureMqttEnabled;
 extern RTC_DATA_ATTR AsyncWebServer webServer;
+extern RTC_DATA_ATTR AsyncMqttClient mqttClient;
 extern wifiCredentials wifiCred;
 extern String TZEnvVariable,TZName;
 extern String ntpServers[4];
 extern struct tm nowTimeInfo;
-extern String userName,userPssw;
+extern String userName,userPssw,mqttUserName,mqttUserPssw,mqttServer,mqttTopicPrefix,mqttTopicName,device;
 
 void go_to_hibernate();
 void go_to_sleep();

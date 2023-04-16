@@ -87,6 +87,12 @@ String processor(const String& var){
     if (bluetoothEnabled) return String("Enabled"); else return String("Disabled");
   } else if (var == "CLOUDSERVICESSTATUS") {
     if (uploadSamplesEnabled) return String("Enabled"); else return String("Disabled");
+  } else if (var == "MQTTSERVICESSTATUS") {
+    if (mqttServerEnabled) return String("Enabled"); else return String("Disabled");
+  } else if (var == "Secure_MQTTSERVICESSTATUS") {
+    if (secureMqttEnabled) return String("Enabled"); else return String("Disabled");
+  } else if (var == "MQTTTOPICNAME") {
+    return mqttTopicName;
   } else if (var == "CLOUDSERVICESURL") {
     return String("http://"+serverToUploadSamplesIPAddress.toString())+String(GET_REQUEST_TO_UPLOAD_SAMPLES).substring(4,String(GET_REQUEST_TO_UPLOAD_SAMPLES).length()-1);
   } else if (var == "CURRENTENERGYMODE") {
@@ -140,11 +146,19 @@ String processor(const String& var){
     else return String();
   } else if (var == "UserName") {
     return userName;
-  } else if (var == "UserPssw_VALUE") {
+  } else if (var == "UserName_VALUE") {
     return userName;  
   } else if (var == "UserPssw") {
     return "User password";
   } else if (var == "UserPssw_VALUE") {
+    return "**********";  
+  } else if (var == "MQTTUserName") {
+    return mqttUserName;
+  } else if (var == "MQTTUserName_VALUE") {
+    return mqttUserName;  
+  } else if (var == "MQTTUserPssw") {
+    return "User password";
+  } else if (var == "MQTTUserPssw_VALUE") {
     return "**********";  
   } else if (var == "SSID") {
     if (wifiCred.wifiSSIDs[0].compareTo(String(""))==0) {if (wifiEnabled) return "Mandatory if WiFi enabled"; else return String();}
@@ -267,6 +281,25 @@ String processor(const String& var){
   } else if (var == "SITE_BK2_ALLOW_CHECKED") {
     if (wifiCred.wifiSITEs[2].compareTo(String(""))==0) return String(" disabled ");
     else if (wifiCred.SiteAllow[2]) return String("checked");
+    else return String();
+  } else if (var == "MQTTSERVER") {
+    return mqttServer;
+  } else if (var == "MQTTTOPIC") {
+    return mqttTopicPrefix;
+  } else if (var == "MQTT_ON_CHECKED") {
+    if (mqttServerEnabled) return String("checked");
+    else return String();
+  } else if (var == "MQTT_OFF_CHECKED") {
+    if (!mqttServerEnabled) return String("checked");
+    else return String();
+  } else if (var == "MQTTREQUIRED") {
+    if (mqttServerEnabled) return String("required");
+    else return String();
+  } else if (var == "Secure_MQTT_ON_CHECKED") {
+    if (secureMqttEnabled) return String("checked");
+    else return String();
+  } else if (var == "Secure_MQTT_OFF_CHECKED") {
+    if (!secureMqttEnabled) return String("checked");
     else return String();
   } else if (var == "BLUETOOTH_ON_CHECKED") {
     if (bluetoothEnabled) return String("checked");
@@ -529,7 +562,7 @@ uint32_t initWebServer() {
   webServer.on("/basic4", HTTP_POST, [](AsyncWebServerRequest *request) {
     int params = request->params();
     bool updateEEPROM=false;
-    char auxUserName[MQTT_USER_CREDENTIAL_LENGTH],auxUserPssw[MQTT_PW_CREDENTIAL_LENGTH];
+    char auxUserName[WEB_USER_CREDENTIAL_LENGTH],auxUserPssw[WEB_PW_CREDENTIAL_LENGTH];
     AsyncWebServerResponse * auxResp=new AsyncFileResponse(SPIFFS, WEBSERVER_BASICCONFIG_PAGE, String(), false, processor);
 
     //Authentication is required
@@ -546,7 +579,7 @@ uint32_t initWebServer() {
         if(p->isPost()){
           // HTTP POST AdminUser_Form value
           if (String(p->name()).compareTo("UserName")==0) {
-            memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);
+            memset(auxUserName,'\0',WEB_USER_CREDENTIAL_LENGTH);
             memcpy(auxUserName,p->value().c_str(),p->value().length()); //End null not included
             if (userName.compareTo(auxUserName)!=0) {
               userName=p->value();
@@ -555,7 +588,7 @@ uint32_t initWebServer() {
             }
           }
           if (String(p->name()).compareTo("UserPssw")==0) {
-            memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);
+            memset(auxUserPssw,'\0',WEB_PW_CREDENTIAL_LENGTH);
             memcpy(auxUserPssw,p->value().c_str(),p->value().length()); //End null not included
             if (userPssw.compareTo(auxUserPssw)!=0) {
               userPssw=p->value();
@@ -847,65 +880,180 @@ uint32_t initWebServer() {
   webServer.on("/cloud", HTTP_POST, [](AsyncWebServerRequest *request) {
     int params = request->params();
     uint8_t currentConfigVariables,configVariables=0;
-    bool updateEEPROM=false;
+    bool updateEEPROM=false,connectMqtt=false,disconnectMqtt=false;
+    char auxUserName[MQTT_USER_CREDENTIAL_LENGTH],auxUserPssw[MQTT_PW_CREDENTIAL_LENGTH];
+    AsyncWebServerResponse * auxResp=new AsyncFileResponse(SPIFFS, WEBSERVER_CLOUDCONFIG_PAGE, String(), false, processor);
+    byte auxCounter=0;
 
     currentConfigVariables=EEPROM.read(0x2BE);
     wifiCred.SiteAllow[0]=false;wifiCred.SiteAllow[1]=false;wifiCred.SiteAllow[2]=false;
     
-    //Checking checkbox. Name is sent only if checked. 
-    for(int i=0;i<params;i++) {
-      AsyncWebParameter* p = request->getParam(i);
-
-      if(p->isPost()){
-        // HTTP POST SITE_ALLOW_NAME value
-        if (p->name().compareTo("SITE_ALLOW_NAME")==0) { //Check-box checked
-          wifiCred.SiteAllow[0]=true;
-          configVariables|= 0x01;
-        }
-        // HTTP POST SITE_BK1_ALLOW_NAME value
-        else if (p->name().compareTo("SITE_BK1_ALLOW_NAME")==0) { //Check-box checked
-          wifiCred.SiteAllow[1]=true;
-          configVariables|=0x02;
-        }
-        // HTTP POST SITE_BK2_ALLOW_NAME value
-        else if (p->name().compareTo("SITE_BK2_ALLOW_NAME")==0) { //Check-box checked
-          wifiCred.SiteAllow[2]=true;
-          configVariables|=0x04;
-        }
-      }
+    //Authentication is required
+    if(!request->authenticate(userName.c_str(), userPssw.c_str())) {
+      //Setup a new response to send AuthenticationRequest headers in the container.html answer
+      auxResp->setCode(401);
+      auxResp->addHeader("WWW-Authenticate", "Basic realm=\"Login Required\"");
+      request->send(auxResp);
     }
+    else 
+    {
+      //Checking checkbox. Name is sent only if checked. 
+      for(int i=0;i<params;i++) {
+        AsyncWebParameter* p = request->getParam(i);
 
-    if (currentConfigVariables != configVariables) {
-      EEPROM.write(0x2BE,configVariables);
-      updateEEPROM=true;
-      if (uploadSamplesEnabled) lastTimeUploadSampleCheck=nowTimeGlobal-uploadSamplesPeriod; //Force to update status of the cloud server (CloudSyncCurrentStatus) in the next loop round
-    }
-    
-    //Checking the rest of parameters different to checkbox
-    for(int i=0;i<params;i++) {
-      AsyncWebParameter* p = request->getParam(i);
-
-      if(p->isPost()){
-        // HTTP POST Cloud_enabled value
-        if (p->name().compareTo("Cloud_enabled")==0) {
-          if ((p->value().compareTo("on")==0) && !uploadSamplesEnabled) {
-            uploadSamplesEnabled=true;
-            if (uploadSamplesEnabled) lastTimeUploadSampleCheck=nowTimeGlobal-uploadSamplesPeriod; //Force to update status of the cloud server (CloudSyncCurrentStatus) in the next loop round
-            configVariables=EEPROM.read(0x08) | 0x04; //Set uploadSamplesEnabled bit to true (enabled)
-            EEPROM.write(0x08,configVariables);
-            updateEEPROM=true;
+        if(p->isPost()){
+          // HTTP POST SITE_ALLOW_NAME value
+          if (p->name().compareTo("SITE_ALLOW_NAME")==0) { //Check-box checked
+            wifiCred.SiteAllow[0]=true;
+            configVariables|= 0x01;
           }
-          if ((p->value().compareTo("off")==0) && uploadSamplesEnabled) {
-            uploadSamplesEnabled=false;
-            if (CloudSyncCurrentStatus==CloudSyncOnStatus) CloudSyncCurrentStatus=CloudSyncOffStatus;
-            configVariables=EEPROM.read(0x08) & 0xFB;
-            EEPROM.write(0x08,configVariables);
-            updateEEPROM=true;
+          // HTTP POST SITE_BK1_ALLOW_NAME value
+          else if (p->name().compareTo("SITE_BK1_ALLOW_NAME")==0) { //Check-box checked
+            wifiCred.SiteAllow[1]=true;
+            configVariables|=0x02;
+          }
+          // HTTP POST SITE_BK2_ALLOW_NAME value
+          else if (p->name().compareTo("SITE_BK2_ALLOW_NAME")==0) { //Check-box checked
+            wifiCred.SiteAllow[2]=true;
+            configVariables|=0x04;
           }
         }
       }
+
+      if (currentConfigVariables != configVariables) {
+        EEPROM.write(0x2BE,configVariables);
+        updateEEPROM=true;
+        if (uploadSamplesEnabled) lastTimeUploadSampleCheck=nowTimeGlobal-uploadSamplesPeriod; //Force to update status of the cloud server (CloudSyncCurrentStatus) in the next loop round
+      }
+      
+      //Checking the rest of parameters different to checkbox
+      for(int i=0;i<params;i++) {
+        AsyncWebParameter* p = request->getParam(i);
+
+        if(p->isPost()){
+          // HTTP POST Cloud_enabled value
+          if (p->name().compareTo("Cloud_enabled")==0) {
+            if ((p->value().compareTo("on")==0) && !uploadSamplesEnabled) {
+              uploadSamplesEnabled=true;
+              if (uploadSamplesEnabled) lastTimeUploadSampleCheck=nowTimeGlobal-uploadSamplesPeriod; //Force to update status of the cloud server (CloudSyncCurrentStatus) in the next loop round
+              configVariables=EEPROM.read(0x08) | 0x04; //Set uploadSamplesEnabled bit to true (enabled)
+              EEPROM.write(0x08,configVariables);
+              updateEEPROM=true;
+            }
+            if ((p->value().compareTo("off")==0) && uploadSamplesEnabled) {
+              uploadSamplesEnabled=false;
+              if (CloudSyncCurrentStatus==CloudSyncOnStatus) CloudSyncCurrentStatus=CloudSyncOffStatus;
+              configVariables=EEPROM.read(0x08) & 0xFB;
+              EEPROM.write(0x08,configVariables);
+              updateEEPROM=true;
+            }
+          }
+          // HTTP POST MQTT_enabled value
+          if (p->name().compareTo("MQTT_enabled")==0) {
+            if ((p->value().compareTo("on")==0) && !mqttServerEnabled) {
+              mqttServerEnabled=true;
+              connectMqtt=true;auxCounter|=0x01;
+              configVariables=EEPROM.read(0x08) | 0x40; //Set mqttServerEnabled bit to true (enabled)
+              EEPROM.write(0x08,configVariables);
+              updateEEPROM=true;
+            }
+            if ((p->value().compareTo("off")==0) && mqttServerEnabled) {
+              mqttServerEnabled=false;
+              disconnectMqtt=true;
+              configVariables=EEPROM.read(0x08) & 0xBF;
+              EEPROM.write(0x08,configVariables);
+              updateEEPROM=true;
+            }
+          }
+          // HTTP POST Secure_MQTT_enabled value
+          if (p->name().compareTo("Secure_MQTT_enabled")==0) {
+            if ((p->value().compareTo("on")==0) && !secureMqttEnabled) {
+              secureMqttEnabled=true;
+              if (mqttServerEnabled) {connectMqtt=true;auxCounter|=0x02;}  //Connect with authentication
+              configVariables=EEPROM.read(0x08) | 0x80; //Set secureMqttEnabled bit to true (enabled)
+              EEPROM.write(0x08,configVariables);
+              updateEEPROM=true;
+            }
+            if ((p->value().compareTo("off")==0) && secureMqttEnabled) {
+              secureMqttEnabled=false;
+              if (mqttServerEnabled) {connectMqtt=true;auxCounter|=0x04;} //Connect without authentication
+              configVariables=EEPROM.read(0x08) & 0x7F;
+              EEPROM.write(0x08,configVariables);
+              updateEEPROM=true;
+            }
+          }
+          // HTTP POST MQTTSERVER value
+          if (p->name().compareTo("MQTTSERVER")==0) {
+            char auxMQTT[MQTT_SERVER_NAME_MAX_LENGTH];
+            memset(auxMQTT,'\0',MQTT_SERVER_NAME_MAX_LENGTH);
+            memcpy(auxMQTT,p->value().c_str(),p->value().length()); //End null not included
+            if (mqttServer.compareTo(auxMQTT)!=0) {
+              mqttServer=p->value();
+              EEPROM.put(0x2BF,auxMQTT);
+              if (mqttServerEnabled) {connectMqtt=true;auxCounter|=0x08;}
+              updateEEPROM=true;
+            }
+          }
+          // HTTP POST MQTTTOPIC value
+          if (p->name().compareTo("MQTTTOPIC")==0) {
+            char auxMqttTopicPrefix[MQTT_TOPIC_NAME_MAX_LENGTH];
+            memset(auxMqttTopicPrefix,'\0',MQTT_TOPIC_NAME_MAX_LENGTH);
+            memcpy(auxMqttTopicPrefix,p->value().c_str(),p->value().length()); //End null not included
+            if (mqttTopicPrefix.compareTo(auxMqttTopicPrefix)!=0) {
+              mqttTopicPrefix=p->value();
+              if (mqttTopicPrefix.charAt(mqttTopicPrefix.length()-1)!='/') mqttTopicPrefix+="/"; //Adding slash at the end if needed
+              mqttTopicPrefix.toCharArray(auxMqttTopicPrefix,mqttTopicPrefix.length()+1);
+              EEPROM.put(0x315,auxMqttTopicPrefix);
+              if (mqttServerEnabled) {connectMqtt=true;auxCounter|=0x10;}
+              updateEEPROM=true;
+              mqttTopicName=mqttTopicPrefix+device; //Adding the device name to the MQTT Topic name
+            }
+          }
+          // HTTP POST MQTTUserName value
+          if (String(p->name()).compareTo("MQTTUserName")==0) {
+            memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);
+            memcpy(auxUserName,p->value().c_str(),p->value().length()); //End null not included
+            if (mqttUserName.compareTo(auxUserName)!=0) {
+              mqttUserName=p->value();
+              EEPROM.put(0x2FF,auxUserName);
+              updateEEPROM=true;
+              if (mqttServerEnabled && secureMqttEnabled) {connectMqtt=true;auxCounter|=0x20;}
+            }
+          }
+          // HTTP POST MQTTUserPssw value
+          if (String(p->name()).compareTo("MQTTUserPssw")==0) {
+            memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);
+            memcpy(auxUserPssw,p->value().c_str(),p->value().length()); //End null not included
+            if (mqttUserPssw.compareTo(auxUserPssw)!=0) {
+              mqttUserPssw=p->value();
+              EEPROM.put(0x30A,auxUserPssw);
+              updateEEPROM=true;
+              if (mqttServerEnabled && secureMqttEnabled) {connectMqtt=true;auxCounter|=0x40;}
+            }
+          }
+        }
+      }
     }
-    
+    if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  [webServer cloud] - connectMqtt="+String(connectMqtt)+", disconnectMqtt="+String(disconnectMqtt)+", auxCounter=0x"+String(auxCounter,HEX));
+    if (connectMqtt) {
+      if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  [webServer cloud] - mqttClient.connected()="+String(mqttClient.connected()));
+      //Disconnect first from the current MQTT server
+      if (mqttClient.connected()) mqttClient.disconnect(true);
+      while (mqttClient.connected()) {}; //Wait till get disconnected
+      
+      //Connect to the MQTT broker
+      if (WiFi.status()==WL_CONNECTED && !mqttClient.connected() && mqttServerEnabled) { //Connect to MQTT broker again
+        if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  [webServer cloud] - about to init Mqtt client");
+        mqttClientInit(false,true,false);
+      }
+      if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  [webServer cloud] - about to exit");
+    }
+    if (disconnectMqtt) {
+      /*Code here to unsuscribe from the MQTT broker*/
+      
+      //Disconnect to the MQTT broker
+      mqttClient.disconnect(true);
+    }
     if (updateEEPROM) EEPROM.commit();
     request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
   });

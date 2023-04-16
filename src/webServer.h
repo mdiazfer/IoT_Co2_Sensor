@@ -3,17 +3,13 @@
 #include "global_setup.h"
 #include <ESPAsyncWebServer.h>
 #include <SPIFFS.h>
-/*#ifndef AsyncElegantOTA_h
-  #include <AsyncElegantOTA.h>
-  #define AsyncElegantOTA_h
-#endif*/
 #include "Update.h"
-//#include "Hash.h"
 #include "misc.h"
 #include "MHZ19.h"
 #include <WiFi.h>
 #include <EEPROM.h>
 #include <Arduino_JSON.h>
+#include <AsyncMqttClient.h>
 
 #ifndef _DISPLAYSUPPORTINFO_
   //enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
@@ -45,6 +41,7 @@
 
 extern RTC_DATA_ATTR AsyncWebServer webServer;
 extern RTC_DATA_ATTR AsyncEventSource webEvents;
+extern RTC_DATA_ATTR AsyncMqttClient mqttClient;
 extern RTC_DATA_ATTR float_t valueCO2,valueT,valueHum;
 extern String device;
 extern RTC_DATA_ATTR enum powerModes powerState;
@@ -87,9 +84,11 @@ extern uint32_t fileSystemUsed;
 extern String fileUpdateName;
 extern char activeCookie[],currentSetCookie[];
 extern JSONVar samples;
+extern String mqttTopicName;
 
 
 String processor(const String& var);
 String processorAP(const String& var);
 uint32_t initWebServer();
 uint32_t initAPWebServer();
+extern uint32_t mqttClientInit(bool fromSetup, bool debugModeOn, bool TFTDisplayLogs);

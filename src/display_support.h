@@ -74,6 +74,7 @@ extern RTC_DATA_ATTR  enum CloudClockStatus CloudClockCurrentStatus;
 extern RTC_DATA_ATTR enum powerModes powerState;
 extern RTC_DATA_ATTR enum batteryChargingStatus batteryStatus;
 extern RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode;
+extern RTC_DATA_ATTR  enum  MqttSyncStatus MqttSyncCurrentStatus;
 extern RTC_DATA_ATTR float_t batADCVolt,lastBatCharge,batCharge;
 extern RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];
 extern RTC_DATA_ATTR float_t lastHourTempSamples[3600/SAMPLE_T_LAST_HOUR];

@@ -18,5 +18,10 @@
   #define WIFI_SITE_BK2 "pare. home"
 #endif
 
+#define WEB_USER_CREDENTIAL "admin"
+#define WEB_PW_CREDENTIAL "adminCO2"
+
 #define MQTT_USER_CREDENTIAL "admin"
 #define MQTT_PW_CREDENTIAL "adminCO2"
+#define MQTT_SERVER "10.88.50.5"
+#define MQTT_TOPIC_PREFIX "the-iot-factory/"

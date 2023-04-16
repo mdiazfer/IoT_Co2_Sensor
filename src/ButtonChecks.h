@@ -10,6 +10,7 @@
                           displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode,factResetMenu,factReset};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
+    enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncOffStatus};
     enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status};
     enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
     #define _DISPLAYSUPPORTINFO_

@@ -32,7 +32,7 @@
         <p style="text-align: center; font-size: smaller;"><br>
         </p>
       </div>
-      <div id="tswsidecol">
+      <div id="tswsidecolcloud">
         <div id="tswsideproper">
           <!-- start of side column: insert your navigation menu, etc, here -->
           <!-- start of hamburger menu button -->
@@ -64,33 +64,82 @@
           <!-- start of content column: insert your content here -->
           <h1>Cloud Configuration</h1>
             <p></p>
-            <label for="CLOUDURL">Cloud Services:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
-            <input id="CLOUDURL_id" name="CLOUDURL" size="25" placeholder="http://pandora.the-iotfactory.com"
-              readonly type="text" required>
-            <br><br>
             <form action="cloud" method="post">
-              Enable Cloud Services:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              <label for="Cloud_on_id">On</label>
-              <input name="Cloud_enabled" id="Cloud_on_id" value="on" required="required" ~CLOUD_ON_CHECKED~ type="radio">
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <label for="Cloud_off_id">Off</label>
-              <input name="Cloud_enabled" id="Cloud_off_id" value="off" required="required" ~CLOUD_OFF_CHECKED~ type="radio">
+              <fieldset name="StatsEnabledSet">
+                <legend> Stats Server Configuration</legend>
+                <p></p>
+                <label for="CLOUDURL">Stats Services:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                <input id="CLOUDURL_id" name="CLOUDURL" size="25" placeholder="http://pandora.the-iotfactory.com"
+                  readonly type="text" required>
+                <br><br>
+              
+                Enable Cloud Services:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <label for="Cloud_on_id">On</label>
+                <input name="Cloud_enabled" id="Cloud_on_id" value="on" required="required" ~CLOUD_ON_CHECKED~ type="radio">
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <label for="Cloud_off_id">Off</label>
+                <input name="Cloud_enabled" id="Cloud_off_id" value="off" required="required" ~CLOUD_OFF_CHECKED~ type="radio">
+                <br><br>
+                Sites allowed to upload measures from:&nbsp;&nbsp;<br><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <label for="SiteAllowed_id">~SITE_ALLOW_NAME~</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                <input name="SITE_ALLOW_NAME" id="SiteAllowed_id" value="site_allowed" ~SITE_ALLOW_CHECKED~ type="checkbox"><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <label for="SiteBk1Allowed_id">~SITE_BK1_ALLOW_NAME~</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                <input name="SITE_BK1_ALLOW_NAME" id="SiteBk1Allowed_id" value="site_bk1_allowed" ~SITE_BK1_ALLOW_CHECKED~ type="checkbox"><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <label for="SiteBk2Allowed_id">~SITE_BK2_ALLOW_NAME~</label>&nbsp;&nbsp;&nbsp;&nbsp;
+                <input name="SITE_BK2_ALLOW_NAME" id="SiteBk2Allowed_id" value="site_bk2_allowed" ~SITE_BK2_ALLOW_CHECKED~ type="checkbox">&nbsp;&nbsp;&nbsp;&nbsp;
+              </fieldset>
               <br><br>
-              Sites allowed to upload measures from:&nbsp;&nbsp;<br><br>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <label for="SiteAllowed_id">~SITE_ALLOW_NAME~</label>&nbsp;&nbsp;&nbsp;&nbsp;
-              <input name="SITE_ALLOW_NAME" id="SiteAllowed_id" value="site_allowed" ~SITE_ALLOW_CHECKED~ type="checkbox"><br>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <label for="SiteBk1Allowed_id">~SITE_BK1_ALLOW_NAME~</label>&nbsp;&nbsp;&nbsp;&nbsp;
-              <input name="SITE_BK1_ALLOW_NAME" id="SiteBk1Allowed_id" value="site_bk1_allowed" ~SITE_BK1_ALLOW_CHECKED~ type="checkbox"><br>
-              &nbsp;&nbsp;&nbsp;&nbsp;
-              <label for="SiteBk2Allowed_id">~SITE_BK2_ALLOW_NAME~</label>&nbsp;&nbsp;&nbsp;&nbsp;
-              <input name="SITE_BK2_ALLOW_NAME" id="SiteBk2Allowed_id" value="site_bk2_allowed" ~SITE_BK2_ALLOW_CHECKED~ type="checkbox">&nbsp;&nbsp;&nbsp;&nbsp;
+              <fieldset name="StatsEnabledSet">
+                <legend> MQTT Configuration</legend>
+                <p></p>
+                <label for="MQTTSERVER">MQTT Server:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                <input id="MQTTSERVER_id" name="MQTTSERVER" size="25" placeholder=~MQTTSERVER~ type="text" 
+                  pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)+([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])$" 
+                  ~MQTTREQUIRED~ value="~MQTTSERVER~">
+                <br>
+                <label for="MQTTTOPIC">MQTT Topic Prefix:&nbsp;</label>
+                <input id="MQTTTOPIC_id" name="MQTTTOPIC" size="25" placeholder=~MQTTTOPIC~ type="text" pattern="^[^\/].+\/*" ~MQTTREQUIRED~ value="~MQTTTOPIC~">
+                <br><br>
+                Enable MQTT Service:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <label for="MQTT_on_id">On</label>
+                <input name="MQTT_enabled" id="MQTT_on_id" value="on" required="required" ~MQTT_ON_CHECKED~ type="radio">
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <label for="MQTT_off_id">Off</label>
+                <input name="MQTT_enabled" id="MQTT_off_id" value="off" required="required" ~MQTT_OFF_CHECKED~ type="radio">
+                <br><br>
+                Secure MQTT Service:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <label for="Secure_MQTT_on_id">On</label>
+                <input name="Secure_MQTT_enabled" id="Secure_MQTT_on_id" value="on" required="required" ~Secure_MQTT_ON_CHECKED~ type="radio">
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                <label for="Secure_MQTT_off_id">Off</label>
+                <input name="Secure_MQTT_enabled" id="Secure_MQTT_off_id" value="off" required="required" ~Secure_MQTT_OFF_CHECKED~ type="radio">
+                <br>
+              </fieldset>
               <br><br>
+              <fieldset name="AdminUser" form="AdminUser_Form">
+                <legend> MQTT User for Authentication</legend>
+                <p></p>
+                <div id="tswadminusername">
+                  <label for="MQTTUserName">User Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+                  <input id="MQTTUserName_id" name="MQTTUserName" size="11" placeholder="~MQTTUserName~" value="~MQTTUserName_VALUE~" disabled maxlength="10" type="text"><br>
+                </div>
+                <div id="tswadminuserpssw">
+                  <label for="MQTTUserPssw">User Password&nbsp;</label>
+                  <input id="MQTTUserPssw_id" name="MQTTUserPssw" size="11" placeholder="~MQTTUserPssw~" value="~MQTTUserPssw_VALUE~" maxlength="10" type="password"><br>
+                </div>
+              </fieldset>
               <p></p>
+              <br>
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
               <button type="reset" name="Button_Reset" id="Button_Reset_id">Reset</button>&nbsp;&nbsp;&nbsp;&nbsp;
               <button type="submit" name="Button_Send" id="Button_Send_id"><strong>Submit</strong></button>
-          </form>
+            </form>
+            <p></p>
           <!-- end of content column: put your content above this line --> </div>
       </div>
       <div style="clear: both;"></div>

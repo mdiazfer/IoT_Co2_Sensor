@@ -60,6 +60,13 @@ div#tswsidecolbasic {
   background-color: #34383b;
 }
 
+div#tswsidecolcloud {
+  float: left;
+  width: 27%;
+  color: white;
+  background-color: #34383b;
+}
+
 div#tswsidecolapindex {
   float: left;
   width: 27%;
@@ -152,6 +159,11 @@ div#tswcontentinfo {
     padding-bottom: 1%;
   }
   div#tswsidecolbasic {
+    float: none;
+    width: 100%;
+    height: 100%;
+  }
+  div#tswsidecolcloud {
     float: none;
     width: 100%;
     height: 100%;
@@ -270,7 +282,7 @@ div#tswfooter {
 
 #tswsidecolinfo {
   margin: auto auto auto 0%;
-  height: 872px;
+  height: 1134px;
   padding-top: 1%;
   padding-bottom: 1%;
 }
@@ -279,6 +291,12 @@ div#tswfooter {
   margin-left: 0%;
   margin-right: 3%;
   height: 815px;
+}
+
+#tswsidecolcloud {
+  margin-left: 0%;
+  margin-right: 3%;
+  height: 637px;
 }
 
 #tswsidecolapindex {
@@ -358,9 +376,9 @@ div#tswfooter {
 }
 
 #tswmiscinforight {
-  clear: right;
+  /*clear: right;
   position: relative;
-  left: 5%;
+  left: 5%;*/
   float: left;
 }
 

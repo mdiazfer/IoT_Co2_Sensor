@@ -72,6 +72,7 @@ void go_to_sleep() {
   
   //Close WiFi connection and go to sleep
   webServer.end();
+  mqttClient.disconnect(true);
   WiFi.disconnect(true,false);
   esp_deep_sleep_start();
 }
@@ -148,6 +149,8 @@ void factoryConfReset() {
   uploadSamplesEnabled=UPLOAD_SAMPLES_ENABLED;
   configSavingEnergyMode=reducedEnergy; //Default value
   webServerEnabled=WEBSERVER_ENABLED;
+  mqttServerEnabled=MQTTSERVER_ENABLED;
+  secureMqttEnabled=SECURE_MQTT_ENABLED;
   
   //Now initialize configVariables
   configVariables=0x01; //Bit 0, notFirstRun=true
@@ -156,6 +159,8 @@ void factoryConfReset() {
   if (bluetoothEnabled) configVariables|=0x08; //Bit 3: bluetoothEnabled
   if (wifiEnabled) configVariables|=0x10; //Bit 4: wifiEnabled
   if (webServerEnabled) configVariables|=0x20; //Bit 5: webServerEnabled
+  if (mqttServerEnabled) configVariables|=0x40; //Bit 6: mqttServerEnabled
+  if (secureMqttEnabled) configVariables|=0x80; //Bit 7: secureMqttEnabled
 
   //Write variables in EEPROM to be available the next boots up
   EEPROM.write(0x08,configVariables);
@@ -271,16 +276,16 @@ void factoryConfReset() {
 
   if (debugModeOn) {Serial.println(" [initVariable] - Wrote auxTZEnvVar='"+String(auxTZEnvVar)+"', auxTZName='"+String(auxTZName)+"'");}
 
-  //Write User Credential-related variables
-  char auxUserName[MQTT_USER_CREDENTIAL_LENGTH],auxUserPssw[MQTT_PW_CREDENTIAL_LENGTH];
-  //Set variables for SSID or null if no config in global_setup.h file
-  memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);
-  memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);
-  #ifdef MQTT_USER_CREDENTIAL
-    String(MQTT_USER_CREDENTIAL).toCharArray(auxUserName,String(MQTT_USER_CREDENTIAL).length()+1);
+  //Write Web User Credential-related variables
+  char auxUserName[WEB_USER_CREDENTIAL_LENGTH],auxUserPssw[WEB_PW_CREDENTIAL_LENGTH];
+  //Set variables for Web User Credential or null if no config in global_setup.h file
+  memset(auxUserName,'\0',WEB_USER_CREDENTIAL_LENGTH);
+  memset(auxUserPssw,'\0',WEB_PW_CREDENTIAL_LENGTH);
+  #ifdef WEB_USER_CREDENTIAL
+    String(WEB_USER_CREDENTIAL).toCharArray(auxUserName,String(WEB_USER_CREDENTIAL).length()+1);
   #endif
-  #ifdef MQTT_PW_CREDENTIAL
-    String(MQTT_PW_CREDENTIAL).toCharArray(auxUserPssw,String(MQTT_PW_CREDENTIAL).length()+1);
+  #ifdef WEB_PW_CREDENTIAL
+    String(WEB_PW_CREDENTIAL).toCharArray(auxUserPssw,String(WEB_PW_CREDENTIAL).length()+1);
   #endif
   //Write varialbes in EEPROM to be available the next boots up
   EEPROM.put(0x2A8,auxUserName);userName=auxUserName;
@@ -292,6 +297,50 @@ void factoryConfReset() {
   configVariables=0x0; //Bit 0, notFirstRun=true
   EEPROM.write(0x2BE,configVariables); //All unset the first time EEPROM is written
   wifiCred.SiteAllow[0]=0;wifiCred.SiteAllow[1]=0;wifiCred.SiteAllow[2]=0;
+
+  //Write MQTT server variable
+  //Set variables for MQTT Server or null if no config in global_setup.h file
+  char auxMQTT[MQTT_SERVER_NAME_MAX_LENGTH];
+  memset(auxMQTT,'\0',MQTT_SERVER_NAME_MAX_LENGTH);
+  #ifdef MQTT_SERVER
+    String(MQTT_SERVER).toCharArray(auxMQTT,String(MQTT_SERVER).length()+1);
+  #endif
+  //Write varialbes in EEPROM to be available the next boots up
+  EEPROM.put(0x2BF,auxMQTT);mqttServer=auxMQTT;
+  
+  //Write MQTT User Credential-related variables
+  //Set variables for MQTT User Credentials or null if no config in global_setup.h file
+  memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);
+  memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);
+  #ifdef MQTT_USER_CREDENTIAL
+    String(MQTT_USER_CREDENTIAL).toCharArray(auxUserName,String(MQTT_USER_CREDENTIAL).length()+1);
+  #endif
+  #ifdef MQTT_PW_CREDENTIAL
+    String(MQTT_PW_CREDENTIAL).toCharArray(auxUserPssw,String(MQTT_PW_CREDENTIAL).length()+1);
+  #endif
+  //Write varialbes in EEPROM to be available the next boots up
+  EEPROM.put(0x2FF,auxUserName);mqttUserName=auxUserName;
+  EEPROM.put(0x30A,auxUserPssw);mqttUserPssw=auxUserPssw;
+
+  //Write MQTT Topic Name variable
+  //Set variables for MQTT Topic or null if no config in global_setup.h file
+  char auxMqttTopicPrefix[MQTT_TOPIC_NAME_MAX_LENGTH];
+  memset(auxMqttTopicPrefix,'\0',MQTT_TOPIC_NAME_MAX_LENGTH);
+  #ifdef MQTT_TOPIC_PREFIX
+    mqttTopicPrefix=MQTT_TOPIC_PREFIX;
+    if (mqttTopicPrefix.charAt(mqttTopicPrefix.length()-1)!='/') mqttTopicPrefix+="/"; //Adding slash at the end if needed
+    uint8_t auxLength=mqttTopicPrefix.length()+1;
+    if (auxLength>MQTT_TOPIC_NAME_MAX_LENGTH-1) { //Substring if greater that max length
+      auxLength=MQTT_TOPIC_NAME_MAX_LENGTH-1;
+      mqttTopicPrefix=mqttTopicPrefix.substring(0,auxLength);
+    }
+    mqttTopicPrefix.toCharArray(auxMqttTopicPrefix,mqttTopicPrefix.length()+1);
+  #endif
+  mqttTopicName=mqttTopicPrefix+device; //Adding the device name to the MQTT Topic name
+   //Write varialbes in EEPROM to be available the next boots up
+  EEPROM.put(0x315,auxMqttTopicPrefix);
+
+  if (debugModeOn) {Serial.println(" [initVariable] - Wrote mqttServer='"+String(auxMQTT)+"', mqttTopicPrefix='"+String(auxMqttTopicPrefix)+"', mqttUserName='"+String(auxUserName)+"', mqttUserPssw='"+String(auxUserPssw)+"'");}
 }
 
 bool initTZVariables() {
