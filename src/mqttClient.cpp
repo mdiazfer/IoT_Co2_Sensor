@@ -53,7 +53,7 @@ uint32_t mqttClientInit(bool fromSetup, bool debugModeOn, bool TFTDisplayLogs) {
     mqttClient.setServer(stringToIPAddress(mqttServer), MQTTSERVER_PORT); //init variable
   }
 
-  // If secure MQTT is enables
+  // If secure MQTT is enabled
   if (secureMqttEnabled) {
     mqttClient.setCredentials(mqttUserName.c_str(),mqttUserPssw.c_str()); //init variable
   }

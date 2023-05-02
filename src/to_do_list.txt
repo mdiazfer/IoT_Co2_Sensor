@@ -1,11 +1,18 @@
 To do list
 -----------
-- Implement MQTT
+- Check code with TFT_eSprite stext1 in files other than main.cpp. After stext1 is free up in warming() is not longer usable.
 - BLE sutff
-  + Get info about bluetooth to update icons
-  + Add Asset Tracking frames
+  + Advertise
+    * Readings: CO2, Temperature, Humidity
+  + Scanning to find TAG frames
+    * iBecons
+    * Other frames (Location Frames, etc.)
+  + Scanning to find other devices
+    * iPhone, Android, airtags, etc.
 - Troubleshoot
   + WiFi connection failures (????)
+  + Some times SPIFFS doesn't get mounted and no error detected. Find out how to check if mounted to detect error
+  + Bootup situation not detected in web page after device reset from maintenance page 
 - Icon for the bootup screen
 - Candidate features
   + REST API to get results
@@ -16,10 +23,32 @@ To do list
   + Show graphs in webpage
   + Use Wifi.onEvent() to detect WiFi disconnection rather than monitoring periodically
     (https://randomnerdtutorials.com/esp32-useful-wi-fi-functions-arduino/)
+  + Reduce size of BLE stack/code
 
 
 Done
 -------
+- Tests on BLE
+  + iBeacon send and heap checks => Result: OK
+  + iBeacon ON/OFF based on BLE ON/OFF config in web => Result: OK
+  + iBeacon restart after waking up from sleep (both buttom or timer) => Result: OK
+  + iBeacon restart after waking up from hibernate  => Result: OK
+  + iBeacon not sent if heap < BLE_MIN_HEAP_SIZE => No checked
+  + iBeacon not sent if webServer.on(*) => Result: Looks OK. Several tries browsing pages and not restart or overflow
+- Bug fixing after implementing BLE
+  + Web server didn't restart after waking up from sleep with button
+  + Slow button detection if sending iBeacon
+  + Fixed wrong Uptime in web
+- Added BLE support
+  + Sends iBeacon info
+  + Add info heap (min?) in web server
+  + Add info about restart in web server since last time
+  + Don't allow OTA binary upgrade if there is no two OTA partitions (BLE support is compiled for 1 OTA partition due to BLE stack size)
+  + Send random iBeacon even if in menu screens to avoid not sending iBeacons if in menu display for ever
+- Implement MQTT
+- Bug fixing
+  + After wake up from sleep, some variables look to be deleted:
+     * userPassword, SPIFFSAvailableSize
 - Tests on MQTT
   + Publish and Subscribe (no authentication) => Result: OK - Messages are published and received successfully
   + Wake up after Hibernation => Result: OK - mqttClient is initiated and messages are published

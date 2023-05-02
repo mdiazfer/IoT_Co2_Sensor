@@ -73,19 +73,17 @@ extern RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus;
 extern RTC_DATA_ATTR uint64_t nowTimeGlobal,lastTimeUploadSampleCheck;
 extern RTC_DATA_ATTR ulong uploadSamplesPeriod;
 extern RTC_DATA_ATTR int errorsWiFiCnt,errorsSampleUpts,errorsNTPCnt,SPIFFSErrors;
+extern RTC_DATA_ATTR boolean OTAUpgradeBinAllowed,SPIFFSUpgradeBinAllowed;
 extern wifiCredentials wifiCred;
-extern uint8_t fileUpdateError,errorOnActiveCookie,errorOnWrongCookie;
+extern uint8_t fileUpdateError,errorOnActiveCookie,errorOnWrongCookie,bootCount,resetCount;
 extern size_t fileUpdateSize,OTAAvailableSize,SPIFFSAvailableSize;
 extern int updateCommand;
-extern uint32_t flashSize;
-extern uint32_t programSize;
-extern uint32_t fileSystemSize;
-extern uint32_t fileSystemUsed;
+extern uint32_t flashSize,programSize,fileSystemSize,fileSystemUsed,minHeapSeen;
 extern String fileUpdateName;
 extern char activeCookie[],currentSetCookie[];
 extern JSONVar samples;
 extern String mqttTopicName;
-
+extern bool webServerResponding,isBeaconAdvertising;
 
 String processor(const String& var);
 String processorAP(const String& var);

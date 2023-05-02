@@ -338,6 +338,18 @@ String processor(const String& var){
     else if (fileUpdateError!=ERROR_UPLOAD_FILE_NOERROR) return (String("Something went wrong while uploading the file (0x")+String(fileUpdateError,HEX)+String(").<p></p>You may need to reboot the device before trying again: <a href=\"http://"+WiFi.localIP().toString()+"/maintenance.html\" title=\"Maintenance & Troubleshooting\"\" target=\"_self\">http://"+WiFi.localIP().toString()+"/maintenance.html</a>"));
     //else if (fileUpdateError!=0) return String("Something went wrong in the file upload process.<p></p>Try again.");
     else return String("Other");
+  } else if (var == "OTADISABLED") { //v1.2.0 - Not allow OTA upgrade if not two OTA partitions
+    if (OTAUpgradeBinAllowed) return String();
+    else return String("disabled");
+  } else if (var == "SPIFFSDISABLED") { //v1.2.0 - Not allow SPIFFS upgrade it's wrong
+    if (SPIFFSUpgradeBinAllowed) return String();
+    else return String("disabled");
+  } else if (var == "SPIFFSCHECKED") { //v1.2.0 - Not allow SPIFFS upgrade it's wrong
+    if (!SPIFFSUpgradeBinAllowed) return String();
+    else return String("checked");
+  } else if (var == "SELECTFILEBUTTONDISABLED") { //v1.2.0 - Not allow upgrade if OTA or SPIFFS are wrong
+    if (OTAUpgradeBinAllowed || SPIFFSUpgradeBinAllowed) return String();
+    else return String("disabled"); 
   } else if (var == "SETUPERRORS") {
     return String("0x")+String(error_setup,HEX);
   } else if (var == "WIFIERRORS") {
@@ -348,6 +360,14 @@ String processor(const String& var){
     return String(errorsNTPCnt);
   } else if (var == "SPIFFSERRORS") {
     return String(SPIFFSErrors);
+  } else if (var == "BOOTCOUNT") {
+    return String(bootCount);
+  } else if (var == "RESETCOUNT") {
+    return String(resetCount);
+  } else if (var == "MINHEAPSIZE") {
+    return String(minHeapSeen);
+  } else if (var == "CURRENTHEAPSIZE") {
+    return String(esp_get_free_heap_size());
   } else if (var == "MAINTENLEFTMEM") {
     return String(OTAAvailableSize)+String(",")+String(SPIFFSAvailableSize);
   } else if (var == "MAINTENLEFTBINMEM") {
@@ -363,22 +383,34 @@ uint32_t initWebServer() {
   
   // Route for root / web page
   webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route for root index.html web page
   webServer.on(WEBSERVER_INDEX_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   
   // Route to load style.css file
   webServer.on(WEBSERVER_CSSSTYLES_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_CSSSTYLES_PAGE, "text/css");
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route to load tswnavbar.css file
   webServer.on(WEBSERVER_CSSNAVBAR_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_CSSNAVBAR_PAGE, "text/css");
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route to load maintenance_upload_firmware/identity file
@@ -386,11 +418,16 @@ uint32_t initWebServer() {
     String id = String((uint32_t)ESP.getEfuseMac(), HEX);
     id.toUpperCase();
     
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(200, "application/json", "{\"id\": \""+id+"\", \"hardware\": \"ESP32\"}");
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   
   // Route to load The_IoT_Factory.png file
   webServer.on(WEBSERVER_LOGO_ICON, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_LOGO_ICON, "image/png");
 
     //Wait to disconnect the connection
@@ -417,32 +454,49 @@ uint32_t initWebServer() {
       //Device reset
       if (deviceReset) ESP.restart();
     });
+
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   //webServer.serveStatic(WEBSERVER_LOGO_ICON,SPIFFS,WEBSERVER_LOGO_ICON);
 
   webServer.on(WEBSERVER_INFO_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_INFO_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   
   // Route for  basic.html web page
   webServer.on(WEBSERVER_BASICCONFIG_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_BASICCONFIG_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route for cloud.html web page
   webServer.on(WEBSERVER_CLOUDCONFIG_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_CLOUDCONFIG_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route for bluetooth.html web page
   webServer.on(WEBSERVER_BLUETOOTHCONFIG_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_BLUETOOTHCONFIG_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route for maintenance.html web page
   webServer.on(WEBSERVER_MAINTENANCE_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
     fileUpdateError=0; //To check POST parameters & File Upload process
     //request->send(SPIFFS, WEBSERVER_MAINTENANCE_PAGE, String(), false, processor);
+
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
 
     //Setup a new response to send Set Cookie headers in the maintenance.html answer
     AsyncWebServerResponse * auxResp=new AsyncFileResponse(SPIFFS, WEBSERVER_MAINTENANCE_PAGE, String(), false, processor);
@@ -467,59 +521,95 @@ uint32_t initWebServer() {
       auxResp->addHeader("Set-Cookie", setCookie);
     }
     request->send(auxResp);
+
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route for container.html web page
   webServer.on(WEBSERVER_CONTAINER_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     updateCommand=-1;
     fileUpdateError=ERROR_UPLOAD_FILE_NOERROR;
     request->send(SPIFFS, WEBSERVER_CONTAINER_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route for /maintenance_default_values web page
   webServer.on(WEBSERVER_DEFAULTCONF_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     fileUpdateError=ERROR_UPLOAD_FILE_NOERROR; //To check POST parameters & File Upload process
     request->send(SPIFFS, WEBSERVER_MAINTENANCE_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route for /maintenance_device_reset web page
   webServer.on(WEBSERVER_DEVICERESET_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     fileUpdateError=ERROR_UPLOAD_FILE_NOERROR; //To check POST parameters & File Upload process
     request->send(SPIFFS, WEBSERVER_MAINTENANCE_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   
   // Route for updatefile.html web page
   webServer.on(WEBSERVER_UPLOADFILE_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     fileUpdateError=0; //To check POST parameters & File Upload process
     request->send(SPIFFS, WEBSERVER_MAINTENANCE_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route to load favicon.ico file
   webServer.on(WEBSERVER_FAVICON_ICON, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_FAVICON_ICON, "image/x-icon");
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   
   // Route to jquery.min.js file
   webServer.on(WEBSERVER_JQUERY_JS, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_JQUERY_JS, "text/javascript");
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route to WEBSERVER_SAMPLES_PAGE file
   webServer.on(WEBSERVER_SAMPLES_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(200, "application/json", JSON.stringify(samples));
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route to gauge.min.js file
   webServer.on(WEBSERVER_GAUGESCRIPT_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_GAUGESCRIPT_PAGE, "text/javascript");
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   
   // Route to resutl_script.js file
   webServer.on(WEBSERVER_RESULTSCRIPT_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_RESULTSCRIPT_PAGE, "text/javascript");
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   webServer.on("/basic1", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     int params = request->params();
     for(int i=0;i<params;i++) {
       AsyncWebParameter* p = request->getParam(i);
@@ -557,9 +647,13 @@ uint32_t initWebServer() {
       }
     }
     request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   webServer.on("/basic4", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     int params = request->params();
     bool updateEEPROM=false;
     char auxUserName[WEB_USER_CREDENTIAL_LENGTH],auxUserPssw[WEB_PW_CREDENTIAL_LENGTH];
@@ -601,9 +695,15 @@ uint32_t initWebServer() {
       if (updateEEPROM) EEPROM.commit();
       request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
     }
+
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   webServer.on("/basic2", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
+
     reconnectWifiAndRestartWebServer=false;
     resyncNTPServer=false;
     int params = request->params();
@@ -785,9 +885,15 @@ uint32_t initWebServer() {
     if (updateEEPROM) EEPROM.commit();
     //request->send(200,String("text/html"),String("<!DOCTYPE html><html lang=\"en\"><head><meta http-equiv=\"refresh\" content=\"0.5; URL=http://192.168.100.103\"/></head><body style=\"background-color:#34383b;\"></body></html>"));
     request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
+
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   webServer.on("/basic3", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
+    
     int params = request->params();
     for(int i=0;i<params;i++) {
       AsyncWebParameter* p = request->getParam(i);
@@ -875,9 +981,13 @@ uint32_t initWebServer() {
       }
     }
     request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   webServer.on("/cloud", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     int params = request->params();
     uint8_t currentConfigVariables,configVariables=0;
     bool updateEEPROM=false,connectMqtt=false,disconnectMqtt=false;
@@ -1056,9 +1166,14 @@ uint32_t initWebServer() {
     }
     if (updateEEPROM) EEPROM.commit();
     request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
+
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   
   webServer.on("/bluetooth", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     int params = request->params();
     for(int i=0;i<params;i++) {
       AsyncWebParameter* p = request->getParam(i);
@@ -1086,9 +1201,13 @@ uint32_t initWebServer() {
       }
     }
     request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   webServer.on(WEBSERVER_DEFAULTCONF_PAGE, HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     reconnectWifiAndRestartWebServer=false;
     resyncNTPServer=false;
     factoryReset=false;
@@ -1136,10 +1255,15 @@ uint32_t initWebServer() {
     //request->send(200,String("text/html"),String("<!DOCTYPE html><html lang=\"en\"><head><meta http-equiv=\"refresh\" content=\"0; URL=http://192.168.100.103\"/></head><body style=\"background-color:#34383b;\"></body></html>"));
     //request->send(SPIFFS, WEBSERVER_CONTAINER_PAGE, String(), false, processor);
     request->send(auxResp);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   webServer.on(WEBSERVER_DEVICERESET_PAGE, HTTP_POST, [](AsyncWebServerRequest *request) {
     //This code is run after uploading the file
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
+    
     deviceReset=false;
     fileUpdateError=ERROR_UPLOAD_FILE_NOERROR;
     updateCommand=-1;
@@ -1166,10 +1290,14 @@ uint32_t initWebServer() {
       }
     }
     request->send(auxResp);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   
   webServer.on(WEBSERVER_UPLOADFILE_PAGE, HTTP_POST, [](AsyncWebServerRequest *request) {
-      //This code is run after uploading the file
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
+    //This code is run after uploading the file
       int params = request->params();
 
       //Checking if the POST comes from the browser with the active cookie
@@ -1485,6 +1613,8 @@ uint32_t initWebServer() {
         return;
       }
     }
+
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Handle Web Server Events
@@ -1572,26 +1702,41 @@ uint32_t initAPWebServer() {
 
    // Route for root / web page
   webServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_APINDEX_PAGE, String(), false, processorAP);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route for root index.html web page
   webServer.on(WEBSERVER_INDEX_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_APINDEX_PAGE, String(), false, processorAP);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   
   // Route to load style.css file
   webServer.on(WEBSERVER_CSSSTYLES_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_CSSSTYLES_PAGE, "text/css");
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route to load tswnavbar.css file
   webServer.on(WEBSERVER_CSSNAVBAR_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_CSSNAVBAR_PAGE, "text/css");
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route to load The_IoT_Factory.png file
   webServer.on(WEBSERVER_LOGO_ICON, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     request->send(SPIFFS, WEBSERVER_LOGO_ICON, "image/png");
 
     //Wait to disconnect the connection
@@ -1599,14 +1744,21 @@ uint32_t initAPWebServer() {
       //Device reset
       if (deviceReset) ESP.restart();
     });
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Route to load favicon.ico file
   webServer.on(WEBSERVER_FAVICON_ICON, HTTP_GET, [](AsyncWebServerRequest *request){
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
     request->send(SPIFFS, WEBSERVER_FAVICON_ICON, "image/x-icon");
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   webServer.on("/wifibasic", HTTP_POST, [](AsyncWebServerRequest *request) {
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising) delay(200); //Wait to iBeacon stops to prevent heap overflow
+    
     int params = request->params();
     bool updateEEPROM=false;
     char auxSSID[WIFI_MAX_SSID_LENGTH],auxPSSW[WIFI_MAX_PSSW_LENGTH],auxSITE[WIFI_MAX_SITE_LENGTH],
@@ -1772,6 +1924,7 @@ uint32_t initAPWebServer() {
     if (updateEEPROM) EEPROM.commit();
     deviceReset=true;
     request->send(SPIFFS, WEBSERVER_APCONTAINER_PAGE, String(), false, processorAP);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
   // Start server

@@ -32,6 +32,7 @@
 #include "misc.h"
 #include "webServer.h"
 #include "mqttClient.h"
+#include "BLE_support.h"
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -42,10 +43,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   1434 B
+// RTC memory variables:                   1439 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     4514 B
-// RTC memory left:     8000 B - 4514 B = 3486 B 
+// RTC memorty TOTAL:                     4519 B
+// RTC memory left:     8000 B - 4519 B = 3481 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -86,6 +87,8 @@
 //Address 2FF-309: MQTT User name char []* (10 B+null=11 B)
 //Address 30A-314: MQTT User passw char []* (10 B+null=11 B)
 //Address 315-3DD: MQTT Topic name char []* (200 B+null=201 B)
+//Address 3DE: bootCount - Number of restarts since last upgrade
+//Address 3DF: resetCount - Number of non controlled resets since last upgrade
 
 
 RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour C02 values
@@ -96,10 +99,11 @@ RTC_DATA_ATTR float_t lastDayTempSamples[24*3600/SAMPLE_T_LAST_DAY]; //4*(24*360
 RTC_DATA_ATTR float_t lastDayHumSamples[24*3600/SAMPLE_T_LAST_DAY];  //4*(24*3600/450)=768 B - Buffer to record last-day Hum values
 RTC_DATA_ATTR boolean firstBoot=true;  //1B - First boot flag.
 RTC_DATA_ATTR uint64_t nowTimeGlobal=0,timeUSBPowerGlobal=0,loopStartTime=0,loopEndTime=0,
-                        lastTimeSampleCheck=0,previousLastTimeSampleCheck=0, lastTimeDisplayCheck=0,lastTimeDisplayModeCheck=0,lastTimeNTPCheck=0,lastTimeVOLTCheck=0,
+                        lastTimeSampleCheck=0,previousLastTimeSampleCheck=0,lastTimeiBeaconCheck=0,previousLastTimeiBeaconCheck=0,
+                        lastTimeDisplayCheck=0,lastTimeDisplayModeCheck=0,lastTimeNTPCheck=0,lastTimeVOLTCheck=0,
                         lastTimeHourSampleCheck=0,lastTimeDaySampleCheck=0,lastTimeUploadSampleCheck=0,lastTimeIconStatusRefreshCheck=0,
                         lastTimeTurnOffBacklightCheck=0,lastTimeWifiReconnectionCheck=0; //16*8=128 B
-RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod; //3*4=12B
+RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,iBeaconPeriod; //4*4=16B
 RTC_DATA_ATTR uint64_t sleepTimer=0; //8 B
 RTC_DATA_ATTR enum displayModes displayMode=bootup,lastDisplayMode=bootup; //2*4=8 B
 RTC_DATA_ATTR enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState; //3*4=12 B
@@ -112,7 +116,7 @@ RTC_DATA_ATTR boolean updateHourSample=true,updateDaySample=true,updateHourGraph
 RTC_DATA_ATTR enum powerModes powerState=off; //1*4=4 B
 RTC_DATA_ATTR enum batteryChargingStatus batteryStatus=battery000; //1*4=4 B
 RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode; //2*4=8 B
-RTC_DATA_ATTR uint8_t bootCount=0,loopCount=0; //2*1=2 B
+RTC_DATA_ATTR uint8_t bootCount,resetCount,loopCount=0; //3*1=3 B
 RTC_DATA_ATTR const String co2SensorType=String(CO2_SENSOR_TYPE); //16 B
 RTC_DATA_ATTR const String tempHumSensorType=String(TEMP_HUM_SENSOR_TYPE); //16 B
 RTC_DATA_ATTR char co2SensorVersion[5]; //5 B
@@ -136,12 +140,13 @@ RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //
 RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0,webServerError1=0,
                   webServerError2=0,webServerError3=0,SPIFFSErrors=0; //7*4=28B - Error stats
 RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled,mqttServerEnabled,secureMqttEnabled;//5*1=5B
-RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON; //1*1=1B
+RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON,startTimeConfigure=false; //2*1=1B
 RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus=BLEOffStatus; //1*4=4B
 RTC_DATA_ATTR AsyncWebServer webServer(WEBSERVER_PORT); //1*84=84B
 RTC_DATA_ATTR AsyncEventSource webEvents(WEBSERVER_SAMPLES_EVENT); //1*104=104B
-RTC_DATA_ATTR uint32_t error_setup=NO_ERROR; //1*4=4B
+RTC_DATA_ATTR uint32_t error_setup=NO_ERROR,minHeapSeen=0xFFFFFFFF; //1*4=4B
 RTC_DATA_ATTR AsyncMqttClient mqttClient;
+RTC_DATA_ATTR boolean OTAUpgradeBinAllowed=false,SPIFFSUpgradeBinAllowed=false; //2*1=2B - v1.2.0 To block SPIFFS upgrade if there is something wrong with SPIFFS partition
 
 //Global variable definitions stored in regular RAM. 520 KB Max
 TFT_eSPI tft = TFT_eSPI();  // 292 B - Invoke library to manage the display
@@ -192,7 +197,10 @@ char activeCookie[COOKIE_SIZE];
 char currentSetCookie[COOKIE_SIZE];
 JSONVar samples;
 String userName,userPssw,mqttUserName,mqttUserPssw,mqttTopicPrefix,mqttTopicName;
-
+//uint32_t heapSizeNow=0,heapSizeLast=0;
+BLEServer *pServer=nullptr;
+BLEAdvertising* pAdvertising=nullptr;
+bool webServerResponding=false,isBeaconAdvertising=false;
 
 //Code
 
@@ -200,7 +208,8 @@ void initVariable() {
   //Global variables init. Needed as they have random values after wakeup from hiberte mode
   firstBoot=true;
   nowTimeGlobal=0;timeUSBPowerGlobal=0;loopStartTime=0;loopEndTime=0;
-  lastTimeSampleCheck=0;previousLastTimeSampleCheck=0; lastTimeDisplayCheck=0;lastTimeDisplayModeCheck=0;
+  lastTimeSampleCheck=0;previousLastTimeSampleCheck=0;lastTimeDisplayCheck=0;lastTimeDisplayModeCheck=0;
+  lastTimeiBeaconCheck=0;previousLastTimeiBeaconCheck=0;
   lastTimeNTPCheck=0;lastTimeVOLTCheck=0;lastTimeHourSampleCheck=0;lastTimeDaySampleCheck=0;
   lastTimeUploadSampleCheck=0;lastTimeIconStatusRefreshCheck=0;lastTimeTurnOffBacklightCheck=0;
   lastTimeWifiReconnectionCheck=0;
@@ -211,7 +220,7 @@ void initVariable() {
   autoBackLightOff=true;button1Pressed=false;button2Pressed=false;
   powerState=off;
   batteryStatus=battery000;
-  bootCount=0;loopCount=0;
+  loopCount=0;
   circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
                             CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
                             CO2_GAUGE_TH1,TFT_YELLOW,CO2_GAUGE_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
@@ -248,7 +257,8 @@ void initVariable() {
   SPIFFSAvailableSize=getAppOTAPartitionSize(ESP_PARTITION_TYPE_DATA,0x82);
   memset(activeCookie,'\0',COOKIE_SIZE); //init variable
   memset(currentSetCookie,'\0',COOKIE_SIZE); //init variable
-
+  pServer=nullptr;pAdvertising=nullptr;
+  webServerResponding=false;isBeaconAdvertising=false;
   
   //Read from EEPROM the values to be stored in the Config Variables
   //
@@ -290,6 +300,8 @@ void initVariable() {
   //Address 2FF-309: MQTT User name char []* (10 B+null=11 B)
   //Address 30A-314: MQTT User passw char []* (10 B+null=11 B)
   //Address 315-3DD: MQTT Topic name char []* (200 B+null=201 B)
+  //Address 3DE: bootCount - Number of restarts since last upgrade
+  //Address 3DF: resetCount - Number of non controlled resets since last upgrade
 
   //Adding the 3 latest mac bytes to the device name (in Hex format)
   WiFi.macAddress(mac);
@@ -305,7 +317,7 @@ void initVariable() {
   if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [initVariable] - firmwareVersion="+String(firmwareVersion)+", readChecksums="+String(readChecksum)+", computedChecksum="+String(computedChecksum));}
   
   if (readChecksum!=computedChecksum) {
-  //if (true) {
+  //if (true) { //<-- To force writing variables in EEPPROM during tests
     //It's the first run after the very first firmware upload
     //Variable inizialization to values configured in global_setup
 
@@ -730,6 +742,12 @@ void initVariable() {
     mqttClient.onMessage(onMqttMessage);
     mqttClient.onUnsubscribe(onMqttUnsubscribe);
     mqttClient.onPublish(onMqttPublish);
+
+    //Set the bootCount from EEPROM
+    bootCount=EEPROM.read(0x3DE);
+
+    //Set the resettCount from EEPROM
+    resetCount=EEPROM.read(0x3DF);
     
     if (updateEEPROM) {
       if (debugModeOn) {Serial.println(" [initVariable] - Update EEPROM variables with values taken from global_setup.h");}
@@ -745,6 +763,7 @@ void initVariable() {
   if (debugModeOn) {Serial.println(" [initVariable] - userName='"+userName+"', userPssw='"+userPssw+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - mqttServer='"+mqttServer+"', mqttTopicPrefix='"+mqttTopicPrefix+"', mqttTopicName='"+mqttTopicName+"', mqttUserName='"+mqttUserName+"', mqttUserPssw='"+mqttUserPssw+"'");}
   if (debugModeOn) {Serial.println(" [initVariable] - wifiCred.SiteAllow[0]='"+String(wifiCred.SiteAllow[0])+"'"+", wifiCred.SiteAllow[1]='"+String(wifiCred.SiteAllow[1])+"'"+", wifiCred.SiteAllow[2]='"+String(wifiCred.SiteAllow[2])+"'");}
+  if (debugModeOn) {Serial.println(" [initVariable] - bootCount="+String(bootCount)+", resetCount="+String(resetCount));}
 
   //If no SSID is setup, display message to warn and run AP mode
   if (wifiCred.wifiSSIDs[0]=="" && wifiEnabled) startAPMode=true;
@@ -859,7 +878,7 @@ void firstSetup() {
   scLL=scFL+scL-1;                      //Scroll Last Line Window
   pFL=scFL;                             //Pointer First Line
   pLL=pFL;                              //pointer Last Line written
-  
+
   //-->loadAllIcons();
   //-->loadAllWiFiIcons();
 
@@ -1136,6 +1155,7 @@ void firstSetup() {
       stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK); stext1.print("  Date: ");getLocalTime(&startTimeInfo);stext1.print(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
       stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print("  NTP Server: ");
       stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(ntpServers[ntpServerIndex]);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+      startTimeConfigure=true;
     }
   }
   else {
@@ -1151,28 +1171,8 @@ void firstSetup() {
 
   if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
-  //-->>BLE init
-  
-  if (debugModeOn) Serial.print("[setup] - BLE: ");
-  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - BLE:     [");
+  //BLE init
   BLEClurrentStatus=BLEOffStatus;
-  if (bluetoothEnabled) {  
-    if ((error_setup & ERROR_BLE_SETUP)==0 ) { 
-      if (debugModeOn) Serial.println("OK");
-      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
-      BLEClurrentStatus=BLEOnStatus;
-    } else {
-      if (debugModeOn) Serial.println("KO");
-      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
-    }
-  }
-  else {
-    if (debugModeOn) Serial.println("N/E");
-      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("N/E");
-  }
-  stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-  
-  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //-->>Battery and ADC init
   if (debugModeOn) Serial.print("[setup] - Bat. ADC: ");
@@ -1281,6 +1281,7 @@ void firstSetup() {
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+      iBeaconPeriod=iBEACON_PERIOD;
     break;
     case reducedEnergy:
       //If TFT is off then sleep mode is active, so let's reduce the VOLTAGE_CHECK_PERIOD period
@@ -1289,6 +1290,7 @@ void firstSetup() {
       else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
+      iBeaconPeriod=iBEACON_PERIOD_RE;
     break;
     case lowestEnergy:
       //If TFT is off then sleep mode is active, so let's reduce the VOLTAGE_CHECK_PERIOD period
@@ -1297,6 +1299,7 @@ void firstSetup() {
       else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
+      iBeaconPeriod=iBEACON_PERIOD_SE;
     break;
   }
   
@@ -1425,14 +1428,16 @@ boolean warmingUp() {
   
   button1.released(); //Avoids passing the button status to the loop()
   button2.released(); //Avoids passing the button status to the loop()
-  
+
+  //Release RAM
+  stext1.deleteSprite();
+
   return (false);
 }
 
 void setup() {
   loopStartTime=loopEndTime+millis()+sleepTimer/1000;
   nowTimeGlobal=loopStartTime;
-  bootCount++;
 
   // Initialize EEPROM with predefined size. Config variables ares stored there
   EEPROM.begin(EEPROM_SIZE);
@@ -1447,7 +1452,6 @@ void setup() {
     case ESP_SLEEP_WAKEUP_EXT1: //Wake up from Hibernate Mode by long pressing Button1
       initVariable(); //Init Global variables after hibernate mode
       loopStartTime=millis();loopEndTime=0;sleepTimer=0;nowTimeGlobal=loopStartTime;
-      bootCount=0;
       if (debugModeOn) {Serial.println("  - Wakeup caused by external signal using RTC_CNT - Ext1");Serial.println("   - loopEndTime="+String(loopEndTime)+", sleepTimer="+String(sleepTimer/1000)+", loopStartTime="+String(loopStartTime)+", nowTimeGlobal="+String(nowTimeGlobal));}
       //To wake from hibernate, Button1 must be preseed TIME_LONG_PRESS_BUTTON1_HIBERNATE seconds
       button1.begin();
@@ -1503,6 +1507,7 @@ void setup() {
       displayMode=sampleValue;  //To force refresh TFT with the sample value Screen
       lastDisplayMode=bootup;   //To force rendering the value graph
       forceWifiReconnect=true; //Force WiFi reconnection in the next loop - v1.1.0
+      forceWebServerInit=true; //Force webServer restart - v1.2.0
       if (debugModeOn) {Serial.println("    - end");}
     break;
     case ESP_SLEEP_WAKEUP_TIMER : 
@@ -1519,6 +1524,28 @@ void setup() {
       if (debugModeOn) {Serial.println("  - Wakeup was not caused by deep sleep: "+String(wakeup_reason)+" (0=POWERON_RESET, including HW Reset)");}
       lastBatCharge=0; //Can't be initiated in initVariable() as the value depends on the reason to wakeup.
       initVariable(); //Init Global variables (it makes sure configVariables take the values stored in EEPROM)
+      bootCount++;EEPROM.write(0x3DE,bootCount); //Update bootCount every time the device start (no wake up due to hibernate nor deep sleep)
+      //Check if resetCount needs to be updated
+      switch (esp_reset_reason()) { //v1.2.0 - https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/misc_system_api.html#_CPPv418esp_reset_reason_t
+        case ESP_RST_UNKNOWN: //Reset reason can not be determined
+        case ESP_RST_PANIC: //Software reset due to exception/panic
+        case ESP_RST_INT_WDT: //Reset (software or hardware) due to interrupt watchdog.
+        case ESP_RST_TASK_WDT: //Reset due to task watchdog
+        case ESP_RST_WDT: //Reset due to other watchdogs
+          //In all these cases, there was a wrong code that triggered the reset. Count it
+          resetCount++;
+          EEPROM.write(0x3DF,resetCount);
+        break;
+        case ESP_RST_POWERON: //Power-on event
+        case ESP_RST_EXT: //External pin (not applicable for ESP32)
+        case ESP_RST_SW: //Software reset via esp_restart()
+        case ESP_RST_DEEPSLEEP: //Reset after exiting deep sleep mode
+        case ESP_RST_BROWNOUT: //Brownout reset (software or hardware) - Supply voltage goes below safe level
+        case ESP_RST_SDIO: //Reset over SDIO
+        default:
+        break;
+      }
+      EEPROM.commit(); //Update bootCount and resetCount values
       firstSetup(); //Hard bootup - Run global setup during the first boot (HW reset or power ON)
       nowTimeGlobal=loopStartTime+millis();
       return;
@@ -1588,12 +1615,29 @@ void setup() {
   if (debugModeOn) {Serial.println("      - Restoring TZEnvVar="+String(TZEnvVar));}
   setenv("TZ",TZEnvVar,1); tzset(); //Restore TZ enviroment variable to show the right time
 
+  //Web variables that need to be initialized
+  flashSize = ESP.getFlashChipSize();
+  programSize = ESP.getSketchSize();
+  OTAAvailableSize=getAppOTAPartitionSize(ESP_PARTITION_TYPE_APP,ESP_PARTITION_SUBTYPE_ANY);
+  SPIFFSAvailableSize=getAppOTAPartitionSize(ESP_PARTITION_TYPE_DATA,0x82);
+  fileSystemSize=SPIFFS.totalBytes();
+  fileSystemUsed=SPIFFS.usedBytes();
+  
+  //Init users credentials
+  char auxUserName[WEB_USER_CREDENTIAL_LENGTH],auxUserPssw[WEB_PW_CREDENTIAL_LENGTH];
+  memset(auxUserName,'\0',WEB_USER_CREDENTIAL_LENGTH);EEPROM.get(0x2A8,auxUserName);userName=auxUserName;
+  memset(auxUserPssw,'\0',WEB_PW_CREDENTIAL_LENGTH);EEPROM.get(0x2B3,auxUserPssw); userPssw=auxUserPssw;
+  
   //Init MQTT String stuff
-  char auxMQTT[MQTT_SERVER_NAME_MAX_LENGTH],auxMqttTopicPrefix[MQTT_TOPIC_NAME_MAX_LENGTH],auxUserName[WEB_USER_CREDENTIAL_LENGTH],auxUserPssw[WEB_PW_CREDENTIAL_LENGTH];
+  char auxMQTT[MQTT_SERVER_NAME_MAX_LENGTH],auxMqttTopicPrefix[MQTT_TOPIC_NAME_MAX_LENGTH];
   memset(auxMQTT,'\0',MQTT_SERVER_NAME_MAX_LENGTH);EEPROM.get(0x2BF,auxMQTT);mqttServer=auxMQTT;
   memset(auxMqttTopicPrefix,'\0',MQTT_TOPIC_NAME_MAX_LENGTH);EEPROM.get(0x315,auxMqttTopicPrefix);mqttTopicPrefix=auxMqttTopicPrefix;mqttTopicName=mqttTopicPrefix+device;
   memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);EEPROM.get(0x2FF,auxUserName);mqttUserName=auxUserName;
   memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);EEPROM.get(0x30A,auxUserPssw);mqttUserPssw=auxUserPssw;
+
+  //Init BLE stuff
+  pServer=nullptr;pAdvertising=nullptr;
+  webServerResponding=false;isBeaconAdvertising=false;
 
   nowTimeGlobal=loopStartTime+millis();
   if (debugModeOn) {Serial.print(String(nowTimeGlobal)+" [SETUP] - Exit - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
@@ -1601,6 +1645,9 @@ void setup() {
 
 
 void loop() {
+  uint32_t minHeap=esp_get_minimum_free_heap_size();
+  if(minHeap<minHeapSeen) minHeapSeen=minHeap; //Track the minimun heap size (bytes)
+  
   nowTimeGlobal=loopStartTime+millis();
   loopCount++;
 
@@ -1766,6 +1813,34 @@ void loop() {
     if (forceGetSample) forceGetSample=false;
 
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - exit");}
+  }
+
+  //Regular actions every iBEACON_PERIOD seconds.
+  //Init and send iBecon periodically
+  //Doing that in the loop avoid to block huge amount of RAM that impacts in other processes (WEB server)
+  nowTimeGlobal=loopStartTime+millis();
+  if ( (((nowTimeGlobal-lastTimeiBeaconCheck) >= iBeaconPeriod) || firstBoot) &&  bluetoothEnabled ) {  
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - iBEACON_PERIOD");}
+
+    //BLE init only if heap size is enough and other conditions
+    // !webServerResponding avoid sending iBeacons if serving web pages - Avoid heap overflow
+    // !button1.pressed() and !button2.pressed() - Avoid button acting getting slow
+    // displayMode checks - Avoid button acting getting slow - Not allow in menus
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - displayMode="+String(displayMode)+", currentState="+String(currentState)+", heap="+String(esp_get_free_heap_size())+" B, webServerResponding="+String(webServerResponding));}
+    long auxRandom=random(1,16); //random < 2 ==> probability ~6%
+    if (esp_get_free_heap_size()>=BLE_MIN_HEAP_SIZE && !webServerResponding && !button1.pressed() && !button2.pressed() &&
+        (auxRandom<2 || currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
+      BLEClurrentStatus=BLEOnStatus;
+      if (sendiBeacon()!=0) {
+        BLEClurrentStatus=BLEOffStatus;
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Sending iBeacon failed. BLE disabled");}
+      }
+    } else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.");}
+
+    previousLastTimeiBeaconCheck=lastTimeiBeaconCheck;
+    lastTimeiBeaconCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
+    
+    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - iBEACON_PERIOD ends heap="+String(esp_get_free_heap_size())+" bytes  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
   }
 
   //Regular actions every ICON_STATUS_REFRESH_PERIOD seconds.
@@ -2179,7 +2254,7 @@ void loop() {
   if (batCharge<=BAT_CHG_THR_TO_HIBERNATE && onlyBattery==powerState) go_to_hibernate();
 
   //Going to sleep, but only if the display if OFF and not there's Battery power
-  //if (LOW==digitalRead(PIN_TFT_BACKLIGHT)) go_to_sleep();
+  //if (LOW==digitalRead(PIN_TFT_BACKLIGHT)) go_to_sleep(); //For testing in sleep mode
   //if (LOW==digitalRead(PIN_TFT_BACKLIGHT) && energyCurrentMode!=fullEnergy) go_to_sleep();
   if (LOW==digitalRead(PIN_TFT_BACKLIGHT) && onlyBattery==powerState) go_to_sleep();
 }

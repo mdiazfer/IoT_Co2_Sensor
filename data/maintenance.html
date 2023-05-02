@@ -83,14 +83,14 @@
           <fieldset name="OTA_Upgrade_fieldset"> <legend> OTA Upgrade</legend>
               File Type (Only .bin extension):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
               <label for="OTA_firmware_id">Firmware</label>	
-              <input name="OTA_upgrade" id="OTA_firmware_id" value="off" required="required" type="radio" />
+              <input name="OTA_upgrade" id="OTA_firmware_id" value="off" required="required" ~OTADISABLED~ type="radio" />
               &nbsp;&nbsp;
               <label for="OTA_system_file_id">File System Image</label>
-              <input name="OTA_upgrade" id="OTA_system_file_id" value="on" required="required" checked type="radio" />
+              <input name="OTA_upgrade" id="OTA_system_file_id" value="on" required="required" ~SPIFFSDISABLED~ ~SPIFFSCHECKED~ type="radio" />
               &nbsp;&nbsp;&nbsp;&nbsp;
               <br><br>
               <form method='POST' action='/maintenance_upload_firmware' enctype='multipart/form-data' id='upload_form'>
-                <input type='file' name='select_file' id='select_file_id' style="hidden:visibility" accept=".bin"  />
+                <input type='file' name='select_file' id='select_file_id' style="hidden:visibility" accept=".bin"  ~SELECTFILEBUTTONDISABLED~/>
                 <input type='submit' name='file-upload' id='file-upload_id' style="visibility:hidden" value='Upload File' onClick="return confirm('It mith take a while for the file to upload and to write into the device. Be patient as there is no progress indicator.....\n\nWhen the upload is finished the page will be refreshed and the device will be rebooted.\n\nAre you sure to continue?')">
                 <label id='prg' style="visibility:hidden"></label>
               </form>
@@ -181,6 +181,10 @@
               <p>Sample Update Errors:&nbsp; ~SAMPLEUPDTERRORS~</p>
               <p>NTP Sync Errors:&nbsp; ~NTPERRORS~</p>
               <p>SPIFFS Errors:&nbsp; ~SPIFFSERRORS~</p>
+              <p>Boots since last upgrade:&nbsp; ~BOOTCOUNT~</p>
+              <p>Uncontrolled resets since last upgrade:&nbsp; ~RESETCOUNT~</p>
+              <p>Current heap size:&nbsp; ~CURRENTHEAPSIZE~ (Bytes)</p>
+              <p>Minimum heap size since last boot:&nbsp; ~MINHEAPSIZE~ (Bytes)</p>
             </fieldset>
           </div>
           <!-- end of content column: put your content above this line -->

@@ -33,13 +33,14 @@
 #endif
 
 
-extern RTC_DATA_ATTR boolean debugModeOn;
+extern RTC_DATA_ATTR boolean debugModeOn,OTAUpgradeBinAllowed,SPIFFSUpgradeBinAllowed;
 extern RTC_DATA_ATTR uint64_t loopEndTime,loopStartTime,sleepTimer;
 extern RTC_DATA_ATTR float_t batCharge;
 extern RTC_DATA_ATTR struct tm startTimeInfo;
 extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled,mqttServerEnabled,secureMqttEnabled;
 extern RTC_DATA_ATTR AsyncWebServer webServer;
 extern RTC_DATA_ATTR AsyncMqttClient mqttClient;
+extern RTC_DATA_ATTR uint8_t bootCount,resetCount;
 extern wifiCredentials wifiCred;
 extern String TZEnvVariable,TZName;
 extern String ntpServers[4];
@@ -55,3 +56,4 @@ bool initTZVariables();
 IPAddress stringToIPAddress(String stringIPAddress);
 String getFileExt(const String& s);
 size_t getAppOTAPartitionSize(uint8_t type, uint8_t subtype);
+void logRamStats (const char text[]);

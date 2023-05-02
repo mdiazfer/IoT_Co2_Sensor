@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "1.1.0"
+#define VERSION "1.2.0"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -140,7 +140,7 @@
 #define TEXT_FONT_UNITS_CO2 1
 #define TEXT_SIZE_MENU 2
 #define TEXT_FONT_MENU 1
-#define SCROLL_PER_SPRITE 5.5
+#define SCROLL_PER_SPRITE 5.5 //5.5
 #define LINES_PER_TEXT_SCROLL 8
 #define LINES_PER_TEXT_SPRITE SCROLL_PER_SPRITE*LINES_PER_TEXT_SCROLL
 #define FIRST_LINE_TO_PRINT 5
@@ -260,6 +260,7 @@
 
 //WEB SERVER Stuff
 #define WEBSERVER_ENABLED true
+#define WEBSERVER_MIN_HEAP_SIZE  95000  //Based on tests
 #define WEBSERVER_PORT 80
 #define WEBSERVER_CSSSTYLES_PAGE "/styles.css"
 #define WEBSERVER_CSSNAVBAR_PAGE "/tswnavbar.css"
@@ -284,10 +285,6 @@
 #define WEBSERVER_GAUGESCRIPT_PAGE "/gauge.min.js"
 #define WEBSERVER_RESULTSCRIPT_PAGE "/result_script.js"
 #define COOKIE_SIZE 54 //32 Chars + null
-
-
-//BLE stuff
-#define BLE_ENABLED  false
 
 //Battery stuff
 #define SAVING_BATTERY_MODE  reducedEnergy //Other values: reducedEnergy lowestEnergy
@@ -329,6 +326,9 @@
 #define SAMPLE_T_LAST_HOUR_RE  60 //Seconds - Period of last hour samples to be recorded in Reduced Energy Mode (BAT powered)
 #define SAMPLE_T_LAST_HOUR_SE  300 //Seconds - Period of last hour samples to be recorded in Save Energy Mode (BAT powered)
 #define SAMPLE_T_LAST_DAY  450 //Seconds - Period of last day samples to be recorded
+#define iBEACON_PERIOD          3000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
+#define iBEACON_PERIOD_RE       60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
+#define iBEACON_PERIOD_SE      300000  //milliseconds - 5 mim in Saving Energy Mode
 #define TIME_LONG_PRESS_BUTTON1_HIBERNATE  5000 // 
 #define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // 
 #define TIME_TO_SLEEP_FULL_ENERGY 5*uS_TO_S_FACTOR 
@@ -383,6 +383,19 @@
   #define MQTT_TOPIC_PREFIX "the-iot-factory/"
 #endif
 #define MQTT_TOPIC_SUBSCRIPTION "the-iot-factory/info"
+
+//BLE stuff
+#define BLE_ENABLED  false
+#define BLE_MIN_HEAP_SIZE  95000  //Based on tests
+#define BEACON_UUID           "F7826DA6-4FA2-4E98-8024-BC5B71E0893E"  //Kontakt proximity
+#define BEACON_UUID_REV       "3E89E071-5BBC-2480-984E-A24FA66D82F7" //Kontakt proximity reverse
+#define BEACON_MANUFACTURER   0x4c00
+#define BEACON_RSSI           0xC5
+#define BEACON_FLAGS          0x06 //0x06 - Simulating Kontak TAG - 0x1A Real
+#define BLE_SERVICE_UUID      "9504ECB3-997C-4367-95FA-DA48461648CA"
+#define BLE_CHARACT_CO2_UUID      "055232CF-43A3-4373-92B8-090B630EA136"
+#define BLE_CHARACT_TEM_UUID      "D914B4BB-D7E7-4C81-9017-C9486FDEC3FA"
+#define BLE_CHARACT_HUM_UUID      "0EE3E2CC-4F7E-4E87-BEB7-C765BF8A75A6"
 
 #ifdef _DECLAREGLOBALPARAMETERS_
   #ifndef _WIFINETWORKINFO_

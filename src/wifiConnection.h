@@ -50,6 +50,7 @@ extern RTC_DATA_ATTR struct tm startTimeInfo;
 extern RTC_DATA_ATTR char TZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH];
 extern RTC_DATA_ATTR uint64_t lastTimeNTPCheck;
 extern struct tm nowTimeInfo;
+extern boolean startTimeConfigure;
 
 void printNetData();
 wifiNetworkInfo * printCurrentWiFi(boolean debugModeOn, int16_t *numberWiFiNetworks);

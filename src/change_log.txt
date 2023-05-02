@@ -8,6 +8,18 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 1.2.0 02/May/2023   - Added BLE support
+                        + Setup one only OTA APP partition due to BLE stack size constraints
+                        + stext1 variable (TFT_eSprite) cleaned up after bootup to reduce Dynamic RAM consume
+                        + Sends iBeacon Advertising
+                        + Add info heap in web server
+                        + Add info about restart in web server since last time
+                        + Don't allow OTA binary upgrade if there is no two OTA partitions (BLE support is compiled for 1 OTA partition due to BLE stack size)
+                        + Send random iBeacon even if in menu screens to avoid not sending iBeacons if in menu display for ever
+                      - Bug fixing after implementing BLE
+                          + Web server didn't restart after waking up from sleep with button
+                          + Slow button detection if sending iBeacon
+                          + Fixed wrong Uptime in web
 - 1.1.1 16/Apr/2023   - MQTT Support
                         + added MQTT-related variables
                         + added MQTT support in html pages (show and config)

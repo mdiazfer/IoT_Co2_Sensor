@@ -341,6 +341,14 @@ void factoryConfReset() {
   EEPROM.put(0x315,auxMqttTopicPrefix);
 
   if (debugModeOn) {Serial.println(" [initVariable] - Wrote mqttServer='"+String(auxMQTT)+"', mqttTopicPrefix='"+String(auxMqttTopicPrefix)+"', mqttUserName='"+String(auxUserName)+"', mqttUserPssw='"+String(auxUserPssw)+"'");}
+
+  //Initialize bootCount variable
+  bootCount=0;
+  EEPROM.write(0x3DE,bootCount); 
+
+  //Initialize resetCount variable
+  resetCount=0;
+  EEPROM.write(0x3DF,resetCount); 
 }
 
 bool initTZVariables() {
@@ -433,6 +441,7 @@ size_t getAppOTAPartitionSize(uint8_t type, uint8_t subtype) {
     case ESP_PARTITION_TYPE_APP:
     { const esp_partition_t* nonRunningPartition=nullptr;
       const esp_partition_t* runningPartition=esp_ota_get_running_partition();
+      OTAUpgradeBinAllowed=false; //v1.2.0 To block OTA upgrade if there is only one partition
       if (runningPartition==nullptr) {
         //Something wetn wrong
         if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Couldn't get the running partition");}
@@ -457,6 +466,7 @@ size_t getAppOTAPartitionSize(uint8_t type, uint8_t subtype) {
       if (appPartitionNumber!=2) {
         //Wrong number of app partitions by design of this firmware
         if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Wrong number of APP partitions. It should be 2 rather than "+String(appPartitionNumber));}
+        //OTA upgrade is not allowed
         return 0;
       }
 
@@ -484,11 +494,13 @@ size_t getAppOTAPartitionSize(uint8_t type, uint8_t subtype) {
       }
 
       if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Got the non-running partition and size "+String(nonRunningPartition->size)+" B");}
+      OTAUpgradeBinAllowed=true;  //v1.2.0 To block OTA upgrade if there is only one partition
       return nonRunningPartition->size;
     }  
     break;
     case ESP_PARTITION_TYPE_DATA:
-    { if (subtype!=0x82) return 0; //Not SPIFFS partition
+    { SPIFFSUpgradeBinAllowed=false;  //v1.2.0 To block SPIFFS upgrade if there is something wrong with SPIFFS partition
+      if (subtype!=0x82) return 0; //Not SPIFFS partition
 
       iter = esp_partition_find((esp_partition_type_t) type, (esp_partition_subtype_t) subtype, NULL);
       if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Name, type, subtype, offset, length");}
@@ -508,10 +520,12 @@ size_t getAppOTAPartitionSize(uint8_t type, uint8_t subtype) {
       }
 
       if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Got the SPIFFS partition and size "+String(partition->size)+" B");}
+      SPIFFSUpgradeBinAllowed=true; //v1.2.0 To block SPIFFS upgrade if there is something wrong with SPIFFS partition
       return partition->size;
     }
     break;
     default:
+      //It's supposed never get here
       return 0;
     break;
   }
@@ -531,4 +545,10 @@ size_t getAppOTAPartitionSize(uint8_t type, uint8_t subtype) {
   if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - "+String(partition->label)+" data "+String(partition->subtype)+" 0x"+String(partition->address,HEX)+" 0x"+String(partition->size,HEX)+" ("+String(partition->size)+" B)");}
   if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"   [getPartitionSize] - Ending partition conde");}
   */
+}
+
+void logRamStats (const char text[]) {
+  Serial.printf("\n----==========-----%s\n",text);
+  heap_caps_print_heap_info(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  Serial.printf("----==========-----\n");
 }

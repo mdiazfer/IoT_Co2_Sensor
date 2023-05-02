@@ -403,7 +403,16 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
   //Case for successfull NTP sync
   if (debugModeOn) {
       Serial.println("    - CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", lastTimeNTPCheck="+String(lastTimeNTPCheck)+", errorsNTPCnt="+String(errorsNTPCnt));
-      Serial.print(String(loopStartTime+millis())+"  - [setupNTPConfig] - Exit - Time:");getLocalTime(&startTimeInfo);Serial.println(&startTimeInfo,"%d/%m/%Y - %H:%M:%S");
+      Serial.print(String(loopStartTime+millis())+"  - [setupNTPConfig] - Exit - Time:");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo,"%d/%m/%Y - %H:%M:%S");
+  }
+
+  //Updating uptime if not done before. Rest the time since loopStatTime
+  if (!startTimeConfigure) {
+    getLocalTime(&startTimeInfo);
+    time_t temTimeT=mktime(&startTimeInfo)-(loopStartTime+millis());
+    struct tm *tempTime=localtime(&temTimeT);
+    memcpy(&startTimeInfo,tempTime,sizeof(tempTime));
+    startTimeConfigure=true;
   }
 
   if (auxLoopCounter!=nullptr) *auxLoopCounter=0;                 //To avoid resuming connection the next loop interacion
