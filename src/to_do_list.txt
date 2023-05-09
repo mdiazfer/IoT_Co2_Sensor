@@ -2,8 +2,19 @@ To do list
 -----------
 - Check code with TFT_eSprite stext1 in files other than main.cpp. After stext1 is free up in warming() is not longer usable.
 - BLE sutff
+  + General
+    * Connection icon
+    * Delete Descriptor object?
+    * Beacon Object deleted?
+    * Checks:
+       - WebServer & BLE togheter
+       - Stop and Delete BLE if webserver connection is established
   + Advertise
+    * iBeacon
+      - TX Random really needed. Avoid it if possible to track MAC device
     * Readings: CO2, Temperature, Humidity
+      - Test sending only Service Advertising, and then sniff the frames. Then add iBeacons and sniff againg frames
+    * Implement Notify
   + Scanning to find TAG frames
     * iBecons
     * Other frames (Location Frames, etc.)
@@ -12,7 +23,8 @@ To do list
 - Troubleshoot
   + WiFi connection failures (????)
   + Some times SPIFFS doesn't get mounted and no error detected. Find out how to check if mounted to detect error
-  + Bootup situation not detected in web page after device reset from maintenance page 
+  + Bootup situation not detected in web page after device reset from maintenance page
+  + if no MQTT server, menu/buttons are frozen 
 - Icon for the bootup screen
 - Candidate features
   + REST API to get results

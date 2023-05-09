@@ -8,6 +8,9 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 1.2.1 09/May/2023   - BLE modifications
+                        + Added CO2 Characteristic in the Advertising
+                        + Added BLEstop() funcion to stop Adverstising and realease memory
 - 1.2.0 02/May/2023   - Added BLE support
                         + Setup one only OTA APP partition due to BLE stack size constraints
                         + stext1 variable (TFT_eSprite) cleaned up after bootup to reduce Dynamic RAM consume

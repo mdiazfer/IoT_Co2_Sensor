@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "1.2.0"
+#define VERSION "1.2.1"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -326,9 +326,12 @@
 #define SAMPLE_T_LAST_HOUR_RE  60 //Seconds - Period of last hour samples to be recorded in Reduced Energy Mode (BAT powered)
 #define SAMPLE_T_LAST_HOUR_SE  300 //Seconds - Period of last hour samples to be recorded in Save Energy Mode (BAT powered)
 #define SAMPLE_T_LAST_DAY  450 //Seconds - Period of last day samples to be recorded
-#define iBEACON_PERIOD          3000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
-#define iBEACON_PERIOD_RE       60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
-#define iBEACON_PERIOD_SE      300000  //milliseconds - 5 mim in Saving Energy Mode
+#define BLE_ON_TIMEOUT           5000  //milliseconds - 2 sg in Full Energy Mode (USB powered)
+#define BLE_ON_TIMEOUT_RE        1000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
+#define BLE_ON_TIMEOUT_SE         500  //milliseconds - 5 mim in Saving Energy Mode
+#define BLE_PERIOD           20000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
+#define BLE_PERIOD_RE        60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
+#define BLE_PERIOD_SE        300000  //milliseconds - 5 mim in Saving Energy Mode
 #define TIME_LONG_PRESS_BUTTON1_HIBERNATE  5000 // 
 #define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // 
 #define TIME_TO_SLEEP_FULL_ENERGY 5*uS_TO_S_FACTOR 

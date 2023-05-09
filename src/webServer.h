@@ -10,6 +10,7 @@
 #include <EEPROM.h>
 #include <Arduino_JSON.h>
 #include <AsyncMqttClient.h>
+#include <BLEDevice.h>
 
 #ifndef _DISPLAYSUPPORTINFO_
   //enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
@@ -83,10 +84,11 @@ extern String fileUpdateName;
 extern char activeCookie[],currentSetCookie[];
 extern JSONVar samples;
 extern String mqttTopicName;
-extern bool webServerResponding,isBeaconAdvertising;
+extern bool webServerResponding,isBeaconAdvertising,forceBLEStop;
 
 String processor(const String& var);
 String processorAP(const String& var);
 uint32_t initWebServer();
 uint32_t initAPWebServer();
 extern uint32_t mqttClientInit(bool fromSetup, bool debugModeOn, bool TFTDisplayLogs);
+extern void BLEstop();

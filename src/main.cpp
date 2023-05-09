@@ -99,11 +99,12 @@ RTC_DATA_ATTR float_t lastDayTempSamples[24*3600/SAMPLE_T_LAST_DAY]; //4*(24*360
 RTC_DATA_ATTR float_t lastDayHumSamples[24*3600/SAMPLE_T_LAST_DAY];  //4*(24*3600/450)=768 B - Buffer to record last-day Hum values
 RTC_DATA_ATTR boolean firstBoot=true;  //1B - First boot flag.
 RTC_DATA_ATTR uint64_t nowTimeGlobal=0,timeUSBPowerGlobal=0,loopStartTime=0,loopEndTime=0,
-                        lastTimeSampleCheck=0,previousLastTimeSampleCheck=0,lastTimeiBeaconCheck=0,previousLastTimeiBeaconCheck=0,
+                        lastTimeSampleCheck=0,previousLastTimeSampleCheck=0,
+                        lastTimeBLECheck=0,previousLastTimeBLECheck=0,lastTimeBLEOnCheck=0,
                         lastTimeDisplayCheck=0,lastTimeDisplayModeCheck=0,lastTimeNTPCheck=0,lastTimeVOLTCheck=0,
                         lastTimeHourSampleCheck=0,lastTimeDaySampleCheck=0,lastTimeUploadSampleCheck=0,lastTimeIconStatusRefreshCheck=0,
                         lastTimeTurnOffBacklightCheck=0,lastTimeWifiReconnectionCheck=0; //16*8=128 B
-RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,iBeaconPeriod; //4*4=16B
+RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,BLEPeriod,BLEOnTimeout; //4*4=16B
 RTC_DATA_ATTR uint64_t sleepTimer=0; //8 B
 RTC_DATA_ATTR enum displayModes displayMode=bootup,lastDisplayMode=bootup; //2*4=8 B
 RTC_DATA_ATTR enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState; //3*4=12 B
@@ -116,7 +117,7 @@ RTC_DATA_ATTR boolean updateHourSample=true,updateDaySample=true,updateHourGraph
 RTC_DATA_ATTR enum powerModes powerState=off; //1*4=4 B
 RTC_DATA_ATTR enum batteryChargingStatus batteryStatus=battery000; //1*4=4 B
 RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode; //2*4=8 B
-RTC_DATA_ATTR uint8_t bootCount,resetCount,loopCount=0; //3*1=3 B
+RTC_DATA_ATTR uint8_t bootCount=0,resetCount=0,loopCount=0; //3*1=3 B
 RTC_DATA_ATTR const String co2SensorType=String(CO2_SENSOR_TYPE); //16 B
 RTC_DATA_ATTR const String tempHumSensorType=String(TEMP_HUM_SENSOR_TYPE); //16 B
 RTC_DATA_ATTR char co2SensorVersion[5]; //5 B
@@ -201,6 +202,17 @@ String userName,userPssw,mqttUserName,mqttUserPssw,mqttTopicPrefix,mqttTopicName
 BLEServer *pServer=nullptr;
 BLEAdvertising* pAdvertising=nullptr;
 bool webServerResponding=false,isBeaconAdvertising=false;
+bool deviceConnected = false;
+/*void* myServerCallbacksObject=new MyServerCallbacks();
+void* myCallbacksObject=new MyCallbacks();
+void* BLE2902Object=new BLE2902();*/
+void* myServerCallbacksObject=nullptr;
+void* myCallbacksObject=nullptr;
+void* BLE2902Object=nullptr;
+//BLEService* ptrService=nullptr;
+BLEBeacon* pBeacon=nullptr;
+BLEAdvertisementData* pAdvertisementData=nullptr;
+bool forceBLEStop=false;
 
 //Code
 
@@ -209,7 +221,7 @@ void initVariable() {
   firstBoot=true;
   nowTimeGlobal=0;timeUSBPowerGlobal=0;loopStartTime=0;loopEndTime=0;
   lastTimeSampleCheck=0;previousLastTimeSampleCheck=0;lastTimeDisplayCheck=0;lastTimeDisplayModeCheck=0;
-  lastTimeiBeaconCheck=0;previousLastTimeiBeaconCheck=0;
+  lastTimeBLECheck=0;previousLastTimeBLECheck=0;lastTimeBLEOnCheck=0;
   lastTimeNTPCheck=0;lastTimeVOLTCheck=0;lastTimeHourSampleCheck=0;lastTimeDaySampleCheck=0;
   lastTimeUploadSampleCheck=0;lastTimeIconStatusRefreshCheck=0;lastTimeTurnOffBacklightCheck=0;
   lastTimeWifiReconnectionCheck=0;
@@ -1281,7 +1293,9 @@ void firstSetup() {
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
-      iBeaconPeriod=iBEACON_PERIOD;
+      BLEPeriod=BLE_PERIOD;
+      BLEOnTimeout=BLE_ON_TIMEOUT;
+      if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
     break;
     case reducedEnergy:
       //If TFT is off then sleep mode is active, so let's reduce the VOLTAGE_CHECK_PERIOD period
@@ -1290,7 +1304,9 @@ void firstSetup() {
       else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
-      iBeaconPeriod=iBEACON_PERIOD_RE;
+      BLEPeriod=BLE_PERIOD_RE;
+      BLEOnTimeout=BLE_ON_TIMEOUT_RE;
+      if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
     break;
     case lowestEnergy:
       //If TFT is off then sleep mode is active, so let's reduce the VOLTAGE_CHECK_PERIOD period
@@ -1299,7 +1315,9 @@ void firstSetup() {
       else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
-      iBeaconPeriod=iBEACON_PERIOD_SE;
+      BLEPeriod=BLE_PERIOD_SE;
+      BLEOnTimeout=BLE_ON_TIMEOUT_SE;
+      if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
     break;
   }
   
@@ -1815,32 +1833,72 @@ void loop() {
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - exit");}
   }
 
-  //Regular actions every iBEACON_PERIOD seconds.
+  //Regular actions every BLE_PERIOD seconds.
   //Init and send iBecon periodically
   //Doing that in the loop avoid to block huge amount of RAM that impacts in other processes (WEB server)
   nowTimeGlobal=loopStartTime+millis();
-  if ( (((nowTimeGlobal-lastTimeiBeaconCheck) >= iBeaconPeriod) || firstBoot) &&  bluetoothEnabled ) {  
-    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - iBEACON_PERIOD");}
+  if ( (((nowTimeGlobal-lastTimeBLECheck) >= BLEPeriod) || firstBoot) &&  bluetoothEnabled ) {  
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLE_PERIOD");}
 
     //BLE init only if heap size is enough and other conditions
+    // Not already initiated
+    // There's enough heap size in memory for the BLE stack
     // !webServerResponding avoid sending iBeacons if serving web pages - Avoid heap overflow
     // !button1.pressed() and !button2.pressed() - Avoid button acting getting slow
     // displayMode checks - Avoid button acting getting slow - Not allow in menus
     if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - displayMode="+String(displayMode)+", currentState="+String(currentState)+", heap="+String(esp_get_free_heap_size())+" B, webServerResponding="+String(webServerResponding));}
     long auxRandom=random(1,16); //random < 2 ==> probability ~6%
-    if (esp_get_free_heap_size()>=BLE_MIN_HEAP_SIZE && !webServerResponding && !button1.pressed() && !button2.pressed() &&
+    if (!BLEDevice::getInitialized() && esp_get_free_heap_size()>=BLE_MIN_HEAP_SIZE && !webServerResponding && !button1.pressed() && !button2.pressed() &&
         (auxRandom<2 || currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
       BLEClurrentStatus=BLEOnStatus;
-      if (sendiBeacon()!=0) {
+      isBeaconAdvertising=true;
+      if (BLEinit()!=0) {
+      //if (sendiBeacon()!=0) {
+      //if (sendAdvertisings()!=0) {
         BLEClurrentStatus=BLEOffStatus;
+        isBeaconAdvertising=false;
         if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Sending iBeacon failed. BLE disabled");}
       }
-    } else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.");}
+    } else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice initiated, button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.");}
 
-    previousLastTimeiBeaconCheck=lastTimeiBeaconCheck;
-    lastTimeiBeaconCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
+    previousLastTimeBLECheck=lastTimeBLECheck;
+    lastTimeBLECheck=nowTimeGlobal; 
+    lastTimeBLEOnCheck=nowTimeGlobal;
     
-    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - iBEACON_PERIOD ends heap="+String(esp_get_free_heap_size())+" bytes  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
+    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - BLE_PERIOD check ends, heap="+String(esp_get_free_heap_size())+" bytes  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
+  }
+
+  //Checking BLE_ON_TIMEOUT - Switch BLE off if:
+  // - It's ON, BLE is enabled and one of the following occurs:
+  //   + timedout since swiched it on (last BLE_Period)
+  //   + heap is being reducing 
+  //   + webServerResponding - to release memory
+  //   + buttons are pressed
+  //   + Menu screens are displayed
+  nowTimeGlobal=loopStartTime+millis();
+  if ( isBeaconAdvertising &&  bluetoothEnabled && BLEDevice::getInitialized() && 
+      //((nowTimeGlobal-lastTimeBLEOnCheck) >= BLEOnTimeout) ) {
+       ( ((nowTimeGlobal-lastTimeBLEOnCheck) >= BLEOnTimeout) || forceBLEStop ||
+           webServerResponding || button1.pressed() || button2.pressed() ||
+           (currentState!=displayingSampleFixed && currentState!=displayingCo2LastHourGraphFixed && 
+           currentState!=displayingCo2LastDayGraphFixed && currentState!=displayingSequential ))
+     ) {  
+    //Switch BLE off
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT, heap size="+String(esp_get_free_heap_size())+" bytes, lastTimeBLEOnCheck="+String(lastTimeBLEOnCheck)+", BLEOnTimeout="+String(BLEOnTimeout)+", currentState="+String(currentState)+", deviceConnected="+String(deviceConnected)+", pServer->getConnectedCount()="+String(pServer->getConnectedCount()));}
+
+    if (!(pServer->getConnectedCount()!=0 && !webServerResponding && !button1.pressed() && !button2.pressed() &&
+           (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
+           currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential))) {
+      
+      //Stop Advertisings and release memory only if other device is not connected, but only if no other priority event occurs
+      BLEstop();
+      isBeaconAdvertising=false;
+      lastTimeBLEOnCheck=nowTimeGlobal;
+      if (forceBLEStop) forceBLEStop=false;
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Switch BLE off");}
+    }
+
+    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT check ends, heap="+String(esp_get_free_heap_size())+" bytes  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
   }
 
   //Regular actions every ICON_STATUS_REFRESH_PERIOD seconds.
@@ -2215,7 +2273,8 @@ void loop() {
       "&batADCVolt="+batADCVolt+"&batCharge="+batCharge+"&batteryStatus="+batteryStatus+
       "&energyCurrentMode="+energyCurrentMode+"&errorsWiFiCnt="+errorsWiFiCnt+
       "&errorsSampleUpts="+errorsSampleUpts+"&errorsNTPCnt="+errorsNTPCnt+"&webServerError1="+webServerError1+
-      "&webServerError2="+webServerError2+"&webServerError3="+webServerError3+"&SPIFFSErrors="+SPIFFSErrors+" HTTP/1.1";
+      "&webServerError2="+webServerError2+"&webServerError3="+webServerError3+"&SPIFFSErrors="+SPIFFSErrors+
+      "&heapSize="+String(esp_get_free_heap_size())+" HTTP/1.1";
 
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - serverToUploadSamplesIPAddress="+IpAddress2String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
                    ", httpRequest="+String(httpRequest));}
