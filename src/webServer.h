@@ -13,10 +13,14 @@
 #include <BLEDevice.h>
 
 #ifndef _DISPLAYSUPPORTINFO_
-  //enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
-  enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status};
   enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
   #define _DISPLAYSUPPORTINFO_
+#endif
+
+#ifndef _WIFISUPPORT_
+  enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status};
+  extern RTC_DATA_ATTR enum wifiStatus wifiCurrentStatus;
+  #define _WIFISUPPORT_
 #endif
 
 #ifndef _WIFINETWORKINFO_
@@ -54,6 +58,7 @@ extern RTC_DATA_ATTR const String co2SensorType;
 extern RTC_DATA_ATTR char co2SensorVersion[5];
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 extern RTC_DATA_ATTR uint32_t error_setup;
+extern RTC_DATA_ATTR uint64_t lastTimeBLECheck,loopStartTime;
 #ifdef __MHZ19B__
   extern MHZ19 co2Sensor;  //64 B
 #endif
@@ -68,11 +73,10 @@ extern IPAddress serverToUploadSamplesIPAddress;
 extern RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode;
 extern RTC_DATA_ATTR enum availableStates currentState;
 extern RTC_DATA_ATTR uint64_t lastTimeTurnOffBacklightCheck,loopStartTime,previousLastTimeSampleCheck,nowTimeGlobal;
-extern RTC_DATA_ATTR enum displayModes displayMode,lastDisplayMode;
-extern RTC_DATA_ATTR enum wifiStatus wifiCurrentStatus;
+//extern RTC_DATA_ATTR enum displayModes displayMode,lastDisplayMode;
 extern RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus;
-extern RTC_DATA_ATTR uint64_t nowTimeGlobal,lastTimeUploadSampleCheck;
-extern RTC_DATA_ATTR ulong uploadSamplesPeriod;
+extern RTC_DATA_ATTR uint64_t nowTimeGlobal,lastTimeUploadSampleCheck,lastTimeBLEOnCheck;
+extern RTC_DATA_ATTR ulong uploadSamplesPeriod,BLEOnTimeout;
 extern RTC_DATA_ATTR int errorsWiFiCnt,errorsSampleUpts,errorsNTPCnt,SPIFFSErrors;
 extern RTC_DATA_ATTR boolean OTAUpgradeBinAllowed,SPIFFSUpgradeBinAllowed;
 extern wifiCredentials wifiCred;
@@ -84,7 +88,9 @@ extern String fileUpdateName;
 extern char activeCookie[],currentSetCookie[];
 extern JSONVar samples;
 extern String mqttTopicName;
-extern bool webServerResponding,isBeaconAdvertising,forceBLEStop;
+extern bool webServerResponding,isBeaconAdvertising;
+
+extern void stopBLE(uint8_t caller);
 
 String processor(const String& var);
 String processorAP(const String& var);

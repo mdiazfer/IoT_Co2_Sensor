@@ -7,6 +7,7 @@
 #include <BLEBeacon.h>
 #include "global_setup.h"
 #include "misc.h"
+#include "soc/rtc_wdt.h"
 
 #ifndef _DISPLAYSUPPORTINFO_
   enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
@@ -15,9 +16,11 @@
 extern RTC_DATA_ATTR byte mac[6];
 extern RTC_DATA_ATTR boolean bluetoothEnabled;
 extern RTC_DATA_ATTR BLEStatus BLEClurrentStatus;
-extern RTC_DATA_ATTR float_t valueCO2, valueT;
+extern RTC_DATA_ATTR float_t valueCO2, valueT, valueHum;
 extern RTC_DATA_ATTR uint64_t lastTimeBLEOnCheck;
+extern RTC_DATA_ATTR uint32_t minHeapSeen;
 
+extern uint32_t heapSizeNow;
 extern TFT_eSprite stext1;
 extern uint8_t pixelsPerLine,
     spL,            //Number of Lines in the Sprite
@@ -34,34 +37,34 @@ extern BLEServer *pServer;
 extern BLEAdvertising* pAdvertising;
 extern bool isBeaconAdvertising;
 extern bool deviceConnected;
-extern BLEService* ptrService;
+extern BLECharacteristic* pCharacteristicCO2;
+extern BLECharacteristic* pCharacteristicT;
+extern BLECharacteristic* pCharacteristicHum;
+extern BLEService* pService;
 extern BLEBeacon* pBeacon;
 extern BLEAdvertisementData* pAdvertisementData;
 
-
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
-      BLECharacteristic* pCharacteristic;
-      pCharacteristic=pServer->getServiceByUUID(BLEUUID(BLE_SERVICE_UUID))->getCharacteristic(BLEUUID(BLE_CHARACT_CO2_UUID));
-      pCharacteristic->setValue(valueT);
-      
+      //pServer->getServiceByUUID(BLEUUID(BLE_SERVICE_UUID))->getCharacteristic(BLEUUID(BLE_CHARACT_CO2_UUID))->setValue(valueCO2);
+      pCharacteristicCO2->setValue(valueCO2);  //pCharacteristicCO2 is global pointer
+      pCharacteristicT->setValue(valueT);  //pCharacteristicT is global pointer
+      pCharacteristicHum->setValue(valueHum);  //pCharacteristicHum is global pointer
+
       deviceConnected = true;
+      BLEClurrentStatus=BLEConnectedStatus;
       if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onConnect] - deviceConnected = true");
-      BLEAdvertising* pAdvertising;
-      pAdvertising = pServer->getAdvertising();
-      pAdvertising->stop();
-      if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onConnect] - Advertising stopped");
     };
 
     void onDisconnect(BLEServer* pServer) {
       if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onDisconnect] - deviceConnected = false");
 
       // Restart advertising to be visible and connectable again
-      BLEAdvertising* pAdvertising;
-      pAdvertising = pServer->getAdvertising();
-      pAdvertising->start();
+      //pServer->getAdvertising()->start();
+      pAdvertising->start(); //pAdvertising is global pointer
       if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onDisconnect] - Advertising restarted");
       deviceConnected = false;
+      BLEClurrentStatus=BLEOnStatus;
     }
 };
 
@@ -81,9 +84,12 @@ class MyCallbacks: public BLECharacteristicCallbacks {
     }
 
     void onRead(BLECharacteristic *pCharacteristic) {
+      BLEUUID Co2BLEUUID;
 
-      if (pCharacteristic->getUUID().equals(BLEUUID(BLE_CHARACT_CO2_UUID))) {
-          pCharacteristic->setValue(valueT);
+      Co2BLEUUID=pCharacteristic->getUUID();
+
+      if (Co2BLEUUID.equals(BLEUUID(BLE_CHARACT_CO2_UUID))) {
+          pCharacteristic->setValue(valueCO2);
           if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onRead] - Sent CO2 value");
       }
 
@@ -91,12 +97,12 @@ class MyCallbacks: public BLECharacteristicCallbacks {
     }
 };
 
-extern void* myServerCallbacksObject;
-extern void* myCallbacksObject;
-extern void* BLE2902Object;
+extern MyServerCallbacks* pMyServerCallbacks;
+extern MyCallbacks* pMyCallbacks;
+extern BLE2902* pBLE2902CO2;
+extern BLE2902* pBLE2902T;
+extern BLE2902* pBLE2902Hum;
 
-void BLEstop();
-uint32_t BLEinit();
-void setService(BLEAdvertising* pAdvertising);
-void setiBeacon(BLEBeacon* ptriBeacon, BLEAdvertisementData* ptrAdvertisementData);
-uint32_t  sendiBeacon();
+uint32_t setupBLE();
+uint32_t startBLEAdvertising();
+void stopBLE(uint8_t caller=0);

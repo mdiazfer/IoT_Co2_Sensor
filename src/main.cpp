@@ -198,21 +198,22 @@ char activeCookie[COOKIE_SIZE];
 char currentSetCookie[COOKIE_SIZE];
 JSONVar samples;
 String userName,userPssw,mqttUserName,mqttUserPssw,mqttTopicPrefix,mqttTopicName;
-//uint32_t heapSizeNow=0,heapSizeLast=0;
-BLEServer *pServer=nullptr;
-BLEAdvertising* pAdvertising=nullptr;
+uint32_t heapSizeNow=0;//,heapSizeLast=0;
 bool webServerResponding=false,isBeaconAdvertising=false;
 bool deviceConnected = false;
-/*void* myServerCallbacksObject=new MyServerCallbacks();
-void* myCallbacksObject=new MyCallbacks();
-void* BLE2902Object=new BLE2902();*/
-void* myServerCallbacksObject=nullptr;
-void* myCallbacksObject=nullptr;
-void* BLE2902Object=nullptr;
-//BLEService* ptrService=nullptr;
-BLEBeacon* pBeacon=nullptr;
-BLEAdvertisementData* pAdvertisementData=nullptr;
-bool forceBLEStop=false;
+BLEServer* pServer=nullptr;
+BLEAdvertising* pAdvertising=nullptr;
+MyServerCallbacks* pMyServerCallbacks=new MyServerCallbacks();
+MyCallbacks* pMyCallbacks=new MyCallbacks();
+BLE2902* pBLE2902CO2=new BLE2902();
+BLE2902* pBLE2902T=new BLE2902();
+BLE2902* pBLE2902Hum=new BLE2902();
+BLEBeacon* pBeacon=new BLEBeacon();
+BLEAdvertisementData* pAdvertisementData=new BLEAdvertisementData();
+BLEService* pService=nullptr;
+BLECharacteristic* pCharacteristicCO2=nullptr;
+BLECharacteristic* pCharacteristicT=nullptr;
+BLECharacteristic* pCharacteristicHum=nullptr;
 
 //Code
 
@@ -269,8 +270,9 @@ void initVariable() {
   SPIFFSAvailableSize=getAppOTAPartitionSize(ESP_PARTITION_TYPE_DATA,0x82);
   memset(activeCookie,'\0',COOKIE_SIZE); //init variable
   memset(currentSetCookie,'\0',COOKIE_SIZE); //init variable
-  pServer=nullptr;pAdvertising=nullptr;
+  //BLE variables and pointers
   webServerResponding=false;isBeaconAdvertising=false;
+  deviceConnected = false;
   
   //Read from EEPROM the values to be stored in the Config Variables
   //
@@ -796,7 +798,7 @@ void firstSetup() {
   timeTest.setTime(0,0,0,1,1,2022);  // 1st Jan 2022 00:00:00
   if (debugModeOn) {Serial.println("[setup] - Initial date set to 1st Jan 2022 00:00:00. Will be updated after NTP sync");}
   getLocalTime(&startTimeInfo); //Getting initial local time. Will be overwritten if NTP sync suceeds
-  error_setup=NO_ERROR;
+  //error_setup=NO_ERROR;
 
   //-->>Buttons init
   if (debugModeOn) Serial.print("[setup] - Buttons: ");
@@ -821,7 +823,7 @@ void firstSetup() {
   tft.drawPixel(30,30,wr);
   rd = tft.readPixel(30,30);
   if (rd!=wr) {
-    error_setup=ERROR_DISPLAY_SETUP;
+    error_setup|=ERROR_DISPLAY_SETUP;
     if (debugModeOn) {
       Serial.println("[setup] - Display: KO");
       Serial.println("          Pixel value wrote = ");Serial.println(wr,HEX);
@@ -1183,9 +1185,6 @@ void firstSetup() {
 
   if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
-  //BLE init
-  BLEClurrentStatus=BLEOffStatus;
-
   //-->>Battery and ADC init
   if (debugModeOn) Serial.print("[setup] - Bat. ADC: ");
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Bat. ADC [");
@@ -1464,6 +1463,22 @@ void setup() {
   if (debugModeOn) {Serial.println("\n"+String(nowTimeGlobal)+" [SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}
   randomSeed(analogRead(GPIO_NUM_32));
 
+  //Init BLE pointers before using TFT Sprite due to memory size constraints
+  //BLE Memory is released after setupBLE is finished
+  BLEClurrentStatus=BLEOffStatus;
+  if (EEPROM.read(0x08) & 0x08) { //bluetoothEnabled
+    //error_setup=0;
+    error_setup=setupBLE();
+    if (error_setup==0) {
+      BLEClurrentStatus=BLEOnStatus;
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SETUP] - BLE init OK");}
+    }
+    else
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SETUP] - BLE init KO");}
+  }
+  else
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SETUP] - BLE N/E");}
+    
   wakeup_reason = esp_sleep_get_wakeup_cause();
   switch(wakeup_reason)
   {
@@ -1653,10 +1668,6 @@ void setup() {
   memset(auxUserName,'\0',MQTT_USER_CREDENTIAL_LENGTH);EEPROM.get(0x2FF,auxUserName);mqttUserName=auxUserName;
   memset(auxUserPssw,'\0',MQTT_PW_CREDENTIAL_LENGTH);EEPROM.get(0x30A,auxUserPssw);mqttUserPssw=auxUserPssw;
 
-  //Init BLE stuff
-  pServer=nullptr;pAdvertising=nullptr;
-  webServerResponding=false;isBeaconAdvertising=false;
-
   nowTimeGlobal=loopStartTime+millis();
   if (debugModeOn) {Serial.print(String(nowTimeGlobal)+" [SETUP] - Exit - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
 }
@@ -1665,7 +1676,7 @@ void setup() {
 void loop() {
   uint32_t minHeap=esp_get_minimum_free_heap_size();
   if(minHeap<minHeapSeen) minHeapSeen=minHeap; //Track the minimun heap size (bytes)
-  
+
   nowTimeGlobal=loopStartTime+millis();
   loopCount++;
 
@@ -1803,8 +1814,8 @@ void loop() {
     samples["humidity"] =  String(valueHum);
     samples["dateUpdate"] =  String(s);
     
-    // Send Events to the web client with the new samples
-    if (wifiEnabled && webServerEnabled && WiFi.status()==WL_CONNECTED) {
+    // If there's web client connected, send Events it with the new readings
+    if (wifiEnabled && webServerEnabled && WiFi.status()==WL_CONNECTED && webEvents.count()>0) {
       webEvents.send("ping",NULL,nowTimeGlobal);
       webEvents.send(JSON.stringify(samples).c_str(),"new_samples",nowTimeGlobal);
       if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new SSE sample sent: "+JSON.stringify(samples));
@@ -1828,6 +1839,13 @@ void loop() {
       }
     }
 
+    // Notify the new readings to the BLE client (if there's connections)
+    if ( deviceConnected && bluetoothEnabled && BLEClurrentStatus!=BLEOffStatus && BLEDevice::getInitialized() ) {
+      pCharacteristicCO2->setValue(valueCO2); pCharacteristicCO2->notify();
+      pCharacteristicT->setValue(valueT); pCharacteristicT->notify();
+      pCharacteristicHum->setValue(valueHum); pCharacteristicHum->notify();
+    }
+
     if (forceGetSample) forceGetSample=false;
 
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - exit");}
@@ -1837,35 +1855,45 @@ void loop() {
   //Init and send iBecon periodically
   //Doing that in the loop avoid to block huge amount of RAM that impacts in other processes (WEB server)
   nowTimeGlobal=loopStartTime+millis();
-  if ( (((nowTimeGlobal-lastTimeBLECheck) >= BLEPeriod) || firstBoot) &&  bluetoothEnabled ) {  
+  if ( ((((nowTimeGlobal-lastTimeBLECheck) >= BLEPeriod) && (nowTimeGlobal>=lastTimeBLECheck)) || firstBoot) &&  bluetoothEnabled ) {  
     if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLE_PERIOD");}
-
-    //BLE init only if heap size is enough and other conditions
-    // Not already initiated
-    // There's enough heap size in memory for the BLE stack
-    // !webServerResponding avoid sending iBeacons if serving web pages - Avoid heap overflow
-    // !button1.pressed() and !button2.pressed() - Avoid button acting getting slow
-    // displayMode checks - Avoid button acting getting slow - Not allow in menus
-    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - displayMode="+String(displayMode)+", currentState="+String(currentState)+", heap="+String(esp_get_free_heap_size())+" B, webServerResponding="+String(webServerResponding));}
-    long auxRandom=random(1,16); //random < 2 ==> probability ~6%
-    if (!BLEDevice::getInitialized() && esp_get_free_heap_size()>=BLE_MIN_HEAP_SIZE && !webServerResponding && !button1.pressed() && !button2.pressed() &&
-        (auxRandom<2 || currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
-      BLEClurrentStatus=BLEOnStatus;
-      isBeaconAdvertising=true;
-      if (BLEinit()!=0) {
-      //if (sendiBeacon()!=0) {
-      //if (sendAdvertisings()!=0) {
+    if (webServerResponding) {
+      //To avoid heap leak don't start BLE as there's webServer actvitiy
+      if(BLEDevice::getInitialized())
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - forceStop=1 - Exit - Adversiting ON");}
+      else 
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - forceStop=1 - Exit - Adversiting OFF");}
+    }
+    else {
+      //BLE init only if the following conditions are met:
+      //  - Not already initiated
+      //  - There's enough heap size in memory for the BLE stack
+      //  - !webServerResponding avoid sending iBeacons if serving web pages - Avoid heap overflow
+      //  - !button1.pressed() and !button2.pressed() - Avoid button acting getting slow
+      //  - displayMode checks - Avoid button acting getting slow - Not allow in menus
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - displayMode="+String(displayMode)+", currentState="+String(currentState)+", heap="+String(esp_get_free_heap_size())+" B, minHeap="+String(minHeapSeen)+" B, webServerResponding="+String(webServerResponding));}
+      long auxRandom=random(1,16); //random < 2 ==> probability ~6%
+      if (!BLEDevice::getInitialized() && esp_get_free_heap_size()>=BLE_MIN_HEAP_SIZE && !webServerResponding && !button1.pressed() && !button2.pressed() && 
+          (auxRandom<2 || currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
         BLEClurrentStatus=BLEOffStatus;
         isBeaconAdvertising=false;
-        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Sending iBeacon failed. BLE disabled");}
-      }
-    } else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice initiated, button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.");}
+        if (startBLEAdvertising()==0) {
+        //if (setupBLE()==0) {
+          BLEClurrentStatus=BLEOnStatus;
+          isBeaconAdvertising=true;
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Advertising ON");}
+        } 
+        else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Sending iBeacon failed. BLE disabled");}
+      } 
+      else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice initiated, button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.\n"+String(nowTimeGlobal)+"  - Advertising OFF");}
+    }
 
+    //Control variables setup
     previousLastTimeBLECheck=lastTimeBLECheck;
     lastTimeBLECheck=nowTimeGlobal; 
     lastTimeBLEOnCheck=nowTimeGlobal;
     
-    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - BLE_PERIOD check ends, heap="+String(esp_get_free_heap_size())+" bytes  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
+    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - BLE_PERIOD check ends, heap="+String(esp_get_free_heap_size())+" B, minHeap="+String(minHeapSeen)+" B,  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
   }
 
   //Checking BLE_ON_TIMEOUT - Switch BLE off if:
@@ -1876,29 +1904,52 @@ void loop() {
   //   + buttons are pressed
   //   + Menu screens are displayed
   nowTimeGlobal=loopStartTime+millis();
-  if ( isBeaconAdvertising &&  bluetoothEnabled && BLEDevice::getInitialized() && 
-      //((nowTimeGlobal-lastTimeBLEOnCheck) >= BLEOnTimeout) ) {
-       ( ((nowTimeGlobal-lastTimeBLEOnCheck) >= BLEOnTimeout) || forceBLEStop ||
+  //if ( isBeaconAdvertising &&  bluetoothEnabled && BLEDevice::getInitialized() ) {
+  if ( isBeaconAdvertising &&  bluetoothEnabled ) {
+    //Doing some tasks during the time window that the BLE is active
+    
+    //Reset WatchDogTimer to avoid "Task watchdog got triggered" error if a HTML Request needs to be served
+    rtc_wdt_feed();
+
+    heapSizeNow=esp_get_free_heap_size();
+    //heapSizeNow=40000;
+    //Stop BLE Advertising if conditions are met
+    //webServerResponding=true if serving a HTTPPage
+    if ( ((nowTimeGlobal-lastTimeBLEOnCheck) >= BLEOnTimeout) || heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD  ||
            webServerResponding || button1.pressed() || button2.pressed() ||
            (currentState!=displayingSampleFixed && currentState!=displayingCo2LastHourGraphFixed && 
            currentState!=displayingCo2LastDayGraphFixed && currentState!=displayingSequential ))
-     ) {  
-    //Switch BLE off
-    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT, heap size="+String(esp_get_free_heap_size())+" bytes, lastTimeBLEOnCheck="+String(lastTimeBLEOnCheck)+", BLEOnTimeout="+String(BLEOnTimeout)+", currentState="+String(currentState)+", deviceConnected="+String(deviceConnected)+", pServer->getConnectedCount()="+String(pServer->getConnectedCount()));}
+    {  
+      //Switch BLE off
+      //if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT, heap="+String(heapSizeNow)+" B, minHeap="+String(minHeapSeen)+" B, lastTimeBLEOnCheck="+String(lastTimeBLEOnCheck)+", BLEOnTimeout="+String(BLEOnTimeout)+", currentState="+String(currentState)+", deviceConnected="+String(deviceConnected)+", pServer->getConnectedCount()="+String(pServer->getConnectedCount()));}
 
-    if (!(pServer->getConnectedCount()!=0 && !webServerResponding && !button1.pressed() && !button2.pressed() &&
-           (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
-           currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential))) {
-      
-      //Stop Advertisings and release memory only if other device is not connected, but only if no other priority event occurs
-      BLEstop();
-      isBeaconAdvertising=false;
-      lastTimeBLEOnCheck=nowTimeGlobal;
-      if (forceBLEStop) forceBLEStop=false;
-      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Switch BLE off");}
+      if (!(pServer->getConnectedCount()!=0 && !button1.pressed() && !button2.pressed() &&
+            (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
+            currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential))
+            || webServerResponding || heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD) {
+        
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT, heap="+String(heapSizeNow)+" B, minHeap="+String(minHeapSeen)+" B, lastTimeBLEOnCheck="+String(lastTimeBLEOnCheck)+", BLEOnTimeout="+String(BLEOnTimeout)+", currentState="+String(currentState)+", deviceConnected="+String(deviceConnected)+", pServer->getConnectedCount()="+String(pServer->getConnectedCount()));}
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - pServer->getConnectedCount()="+String(pServer->getConnectedCount())+", deviceConnected="+String(deviceConnected));}
+        if (webServerResponding && debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - webServerResponding="+String(webServerResponding)+" -  Stop BLE");}
+        if ((heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD) && debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD ("+String(ABSULUTE_MIN_HEAP_THRESHOLD)+" B) - Stop BLE");}
+                
+        //Stop Advertisings and release memory only if other device is not connected, but only if no other priority event occurs
+        stopBLE();
+        isBeaconAdvertising=false;
+        lastTimeBLEOnCheck=nowTimeGlobal;
+
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Switch BLE off");}
+
+        //Release more memory if needed
+        /*if (heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD) {
+          if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  - Release more memory as heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD");
+          detachNetwork();
+        }*/
+
+        heapSizeNow=esp_get_free_heap_size();
+        if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT check ends, heap="+String(heapSizeNow)+" B, minHeap="+String(minHeapSeen)+" B,  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
+      }
     }
-
-    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT check ends, heap="+String(esp_get_free_heap_size())+" bytes  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
   }
 
   //Regular actions every ICON_STATUS_REFRESH_PERIOD seconds.
@@ -2060,6 +2111,7 @@ void loop() {
   // 2) after configuring WiFi = ON in the Config Menu
   // 3) or wake up from sleep (either by pressing buttons or timer)
   // 4) or previous WiFi re-connection try was ABORTED (button pressed) or BREAK (need to refresh display)
+  // 5) after heap size was below ABSULUTE_MIN_HEAP_THRESHOLD
   nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeWifiReconnectionCheck) >= WIFI_RECONNECT_PERIOD) || forceWifiReconnect ) && 
       wifiEnabled && !firstBoot && (wifiCurrentStatus==wifiOffStatus || WiFi.status()!=WL_CONNECTED) ) {
@@ -2141,6 +2193,7 @@ void loop() {
   //forceWebServerInit==true if:
   // 1) wake up from sleep, including hibernate (either by pressing buttons or timer)
   // 2) WiFi set ON from the config menu
+  // 3) after heap size was below ABSULUTE_MIN_HEAP_THRESHOLD
   if (wifiEnabled && webServerEnabled && WiFi.status()==WL_CONNECTED && forceWebServerInit) { //v0.9.9 - Re-init the built-in WebServer after waking up from sleep
     if (debugModeOn) Serial.println("    - After leaving WIFI_RECONNECT_PERIOD entering to re-init the Web Server");    
     if(SPIFFS.begin(true)) {

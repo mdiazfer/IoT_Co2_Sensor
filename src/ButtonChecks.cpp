@@ -278,7 +278,12 @@ void checkButton2() {
           }
         }
         if (bluetoothEnabled) {if (BLEClurrentStatus==BLEOffStatus) BLEClurrentStatus=BLEOnStatus;}
-        else {if (BLEClurrentStatus==BLEOnStatus) BLEClurrentStatus=BLEOffStatus;}
+        else {
+          if (BLEClurrentStatus==BLEOnStatus) {
+            BLEClurrentStatus=BLEOffStatus;
+            lastTimeBLEOnCheck=nowTimeGlobal-BLEOnTimeout; //To force stop BLE advertisings in the next loop cycle.
+          }
+        }
         if (uploadSamplesEnabled) {} //Do nothing else. CloudSyncCurrentStatus update and Upload will be done just right after WiFi (re-)connection.
         else {CloudSyncCurrentStatus=CloudSyncOffStatus;}//Do nothing else
         if (reducedEnergy==configSavingEnergyMode) {}//Do nothing esle. Update is done through the regular loop() flow

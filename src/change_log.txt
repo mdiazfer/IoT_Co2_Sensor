@@ -8,6 +8,17 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 1.3.0 15/May/2023   - BLE modificactions
+                        + Self protection mechanism to avoid overflows and heap leak
+                          * Deinit BLE after sending Advertisings
+                          * Add Service, Characteristics and Descriptos to the GATT table before BLE init
+                          * Extend WDT timeout when sending Advertisings
+                          * No send BLE Advertisings if heap is below threshold
+                          * Stop BLE Advertising if heap is below absolute minimum threshold
+                          * Stop BLE Advertising when serving a web page
+                          * Extend lastTimeBLECheck when serving a web page to avoid sending Advertisings when webserver activity
+                          * Delay a bit serving HTTP Requests to give time to stop Adverstisings and deinit BLE stack
+                        + Sending readins and notify with BLE
 - 1.2.1 09/May/2023   - BLE modifications
                         + Added CO2 Characteristic in the Advertising
                         + Added BLEstop() funcion to stop Adverstising and realease memory

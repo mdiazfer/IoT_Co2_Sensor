@@ -11,7 +11,6 @@
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
     enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncOffStatus};
-    enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status};
     enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
     #define _DISPLAYSUPPORTINFO_
   #endif
@@ -20,17 +19,23 @@
     enum callingAction {mainloop,askAPloop,ntpcheck,wificheck,webcheck};
     #define _BUTTONSFRAMEWORK_
   #endif
+
+  #ifndef _WIFISUPPORT_
+    enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status};
+    extern RTC_DATA_ATTR enum wifiStatus wifiCurrentStatus;
+    #define _WIFISUPPORT_
+  #endif
 #endif
 
 extern enum availableStates currentState,lastState,stateSelected;
 extern uint8_t configVariables;
-extern ulong timePressButton1,timeReleaseButton1,timePressButton2,timeReleaseButton2;
+extern ulong timePressButton1,timeReleaseButton1,timePressButton2,timeReleaseButton2,BLEOnTimeout;
 extern RTC_DATA_ATTR enum displayModes displayMode,lastDisplayMode;
 extern RTC_DATA_ATTR uint64_t lastTimeSampleCheck,lastTimeDisplayCheck,lastTimeDisplayModeCheck,nowTimeGlobal,lastTimeTurnOffBacklightCheck,lastTimeIconStatusRefreshCheck,previousLastTimeSampleCheck;
 extern RTC_DATA_ATTR boolean autoBackLightOff,updateHourGraph,updateDayGraph;
 extern RTC_DATA_ATTR boolean forceWifiReconnect,forceGetSample,forceGetVolt,forceDisplayRefresh,forceDisplayModeRefresh,
                               forceNTPCheck,buttonWakeUp;
-extern RTC_DATA_ATTR uint64_t nowTimeGlobal,loopStartTime,loopEndTime;
+extern RTC_DATA_ATTR uint64_t nowTimeGlobal,loopStartTime,loopEndTime,lastTimeBLEOnCheck;
 extern RTC_DATA_ATTR boolean  button1Pressed,button2Pressed;
 extern RTC_DATA_ATTR Button  button1; //16 B
 extern RTC_DATA_ATTR Button  button2;
@@ -38,7 +43,6 @@ extern RTC_DATA_ATTR boolean debugModeOn;
 extern RTC_DATA_ATTR boolean firstBoot;
 extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled;
 extern RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus;
-extern RTC_DATA_ATTR enum wifiStatus wifiCurrentStatus;
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 
 

@@ -32,6 +32,11 @@
   #define _WIFINETWORKINFO_ 
 #endif
 
+#ifndef _WIFISUPPORT_
+  enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status};
+  extern RTC_DATA_ATTR enum wifiStatus wifiCurrentStatus;
+  #define _WIFISUPPORT_
+#endif
 
 extern RTC_DATA_ATTR boolean debugModeOn,OTAUpgradeBinAllowed,SPIFFSUpgradeBinAllowed;
 extern RTC_DATA_ATTR uint64_t loopEndTime,loopStartTime,sleepTimer;
@@ -41,6 +46,11 @@ extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,w
 extern RTC_DATA_ATTR AsyncWebServer webServer;
 extern RTC_DATA_ATTR AsyncMqttClient mqttClient;
 extern RTC_DATA_ATTR uint8_t bootCount,resetCount;
+extern RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus;
+extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
+extern RTC_DATA_ATTR enum MqttSyncStatus MqttSyncCurrentStatus;
+extern RTC_DATA_ATTR AsyncEventSource webEvents;
+
 extern wifiCredentials wifiCred;
 extern String TZEnvVariable,TZName;
 extern String ntpServers[4];
@@ -57,3 +67,4 @@ IPAddress stringToIPAddress(String stringIPAddress);
 String getFileExt(const String& s);
 size_t getAppOTAPartitionSize(uint8_t type, uint8_t subtype);
 void logRamStats (const char text[]);
+void detachNetwork(void);

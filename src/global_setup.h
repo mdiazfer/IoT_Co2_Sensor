@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "1.2.1"
+#define VERSION "1.3.0"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -261,6 +261,7 @@
 //WEB SERVER Stuff
 #define WEBSERVER_ENABLED true
 #define WEBSERVER_MIN_HEAP_SIZE  95000  //Based on tests
+#define WEBSERVER_SEND_DELAY 800  //milliseconds - Delay to allow stop BLE Advertisings before sending HTTP Answer
 #define WEBSERVER_PORT 80
 #define WEBSERVER_CSSSTYLES_PAGE "/styles.css"
 #define WEBSERVER_CSSNAVBAR_PAGE "/tswnavbar.css"
@@ -326,12 +327,13 @@
 #define SAMPLE_T_LAST_HOUR_RE  60 //Seconds - Period of last hour samples to be recorded in Reduced Energy Mode (BAT powered)
 #define SAMPLE_T_LAST_HOUR_SE  300 //Seconds - Period of last hour samples to be recorded in Save Energy Mode (BAT powered)
 #define SAMPLE_T_LAST_DAY  450 //Seconds - Period of last day samples to be recorded
-#define BLE_ON_TIMEOUT           5000  //milliseconds - 2 sg in Full Energy Mode (USB powered)
+#define BLE_ON_TIMEOUT           2000  //milliseconds - 2 sg in Full Energy Mode (USB powered)
 #define BLE_ON_TIMEOUT_RE        1000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define BLE_ON_TIMEOUT_SE         500  //milliseconds - 5 mim in Saving Energy Mode
 #define BLE_PERIOD           20000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
 #define BLE_PERIOD_RE        60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define BLE_PERIOD_SE        300000  //milliseconds - 5 mim in Saving Energy Mode
+#define BLE_PERIOD_EXTENSION 10000  //120000  //milliseconds - 2 mim extension due to webServer activity
 #define TIME_LONG_PRESS_BUTTON1_HIBERNATE  5000 // 
 #define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // 
 #define TIME_TO_SLEEP_FULL_ENERGY 5*uS_TO_S_FACTOR 
@@ -345,6 +347,7 @@
 #define VOLTAGE_CHECK_PERIOD_RE 300000 //Milliseconds - 5 min in Reduced Energy Mode
 #define VOLTAGE_CHECK_PERIOD_SE 300000 //Milliseconds - 5 min in Save Energy Mode
 #define WIFI_RECONNECT_PERIOD  300000 //milliseconds - 5 min
+#define WD_TIMEOUT             20000 //milliseconds - 20 s
 
 //Binary header stuff
 //https://github.com/espressif/esp-idf/blob/8fbb63c2a701c22ccf4ce249f43aded73e134a34/components/bootloader_support/include/esp_image_format.h#L58
@@ -390,6 +393,7 @@
 //BLE stuff
 #define BLE_ENABLED  false
 #define BLE_MIN_HEAP_SIZE  95000  //Based on tests
+#define ABSULUTE_MIN_HEAP_THRESHOLD  25000  //Bellow this threshold garbage collection is needed
 #define BEACON_UUID           "F7826DA6-4FA2-4E98-8024-BC5B71E0893E"  //Kontakt proximity
 #define BEACON_UUID_REV       "3E89E071-5BBC-2480-984E-A24FA66D82F7" //Kontakt proximity reverse
 #define BEACON_MANUFACTURER   0x4c00
@@ -432,12 +436,17 @@
     enum displayModes {bootup,bootAP,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
     enum availableStates {bootupScreen,bootAPScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode,factResetMenu,factReset};
-    RTC_DATA_ATTR enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
+    //RTC_DATA_ATTR enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
     enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
     enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncOffStatus};
     #define _DISPLAYSUPPORTINFO_
+  #endif
+
+  #ifndef _WIFISUPPORT_
+    RTC_DATA_ATTR enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
+    #define _WIFISUPPORT_
   #endif
 
   #ifndef _BATTERYFRAMEWORK_

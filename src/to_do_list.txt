@@ -10,21 +10,31 @@ To do list
        - WebServer & BLE togheter
        - Stop and Delete BLE if webserver connection is established
   + Advertise
+    * Analize why sometimes BLE_PERIOD is triggered if it is not the right time
     * iBeacon
       - TX Random really needed. Avoid it if possible to track MAC device
     * Readings: CO2, Temperature, Humidity
       - Test sending only Service Advertising, and then sniff the frames. Then add iBeacons and sniff againg frames
     * Implement Notify
+    * Web form to setup iBeacon Proximity, Major and Minor
   + Scanning to find TAG frames
     * iBecons
     * Other frames (Location Frames, etc.)
   + Scanning to find other devices
     * iPhone, Android, airtags, etc.
+- Tests
+  + Button and menu whith BLE enabled
 - Troubleshoot
   + WiFi connection failures (????)
+  + BLE
+    * Still error "task_wdt: Task watchdog got triggered" when surfering
+    * With BLE ON, configure BLE OFF -> BLE ON -> can't get connected with Bluetooth from the smartphone (app issue?)
+    * Reset from browser crash after bootup as ESP has to serve the webpage with the BLE stack loaded (memory leak)
   + Some times SPIFFS doesn't get mounted and no error detected. Find out how to check if mounted to detect error
   + Bootup situation not detected in web page after device reset from maintenance page
-  + if no MQTT server, menu/buttons are frozen 
+  + if no MQTT server, menu/buttons are frozen
+  + No http connection if SSID changes or maybe wokeup from sleep (investigate)
+  + No NTP sync if SSID 2nd or 3rd is connected 
 - Icon for the bootup screen
 - Candidate features
   + REST API to get results

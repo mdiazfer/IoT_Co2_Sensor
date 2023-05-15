@@ -552,3 +552,22 @@ void logRamStats (const char text[]) {
   heap_caps_print_heap_info(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
   Serial.printf("----==========-----\n");
 }
+
+void detachNetwork(void) {
+  //Reinit modules to release memory in the hope to increase heap size
+  //Close WiFi connection and go to sleep
+  webServer.removeHandler(&webEvents);
+  webServer.end();
+  SPIFFS.end();
+  mqttClient.disconnect(true);
+  WiFi.disconnect(true,false);
+  wifiCurrentStatus=wifiOffStatus;
+  CloudSyncCurrentStatus=CloudSyncOffStatus;
+  CloudClockCurrentStatus=CloudClockOffStatus;
+  MqttSyncCurrentStatus=MqttSyncOffStatus;
+  forceWifiReconnect=true; //Force to reconnect WiFi in the next loop cycle
+  forceWebServerInit=true; //Force to reinit the webServer
+  //CloudSyncCurrentStatus (External HTTP server) and  CloudClockCurrentStatus (NTP Server) will be init by their own
+  
+  if (debugModeOn) Serial.println(String(nowTimeGlobal)+"   [detachNetwork] - WiFi related modules stoped. They will be initiated in the next loop cycle");
+}
