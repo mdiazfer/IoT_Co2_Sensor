@@ -1878,7 +1878,7 @@ void loop() {
         //if (setupBLE()==0) {
           BLECurrentStatus=BLEOnStatus;
           isBeaconAdvertising=true;
-          lastTimeIconStatusRefreshCheck=nowTimeGlobal-ICON_STATUS_REFRESH_PERIOD; //Refresh Icons in the next loop cycle
+          if (displayMode==sampleValue) forceDisplayRefresh=true; //Refresh Icons in the next loop cycle
         } 
         else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Sending iBeacon failed. BLE disabled");}
       } 
@@ -1938,7 +1938,7 @@ void loop() {
         isBeaconAdvertising=false;
         BLECurrentStatus=BLEStandbyStatus;
         lastTimeBLEOnCheck=nowTimeGlobal;
-        lastTimeIconStatusRefreshCheck=nowTimeGlobal-ICON_STATUS_REFRESH_PERIOD; //Refresh Icons in the next loop cycle
+        if (displayMode==sampleValue) forceDisplayRefresh=true; //Refresh Icons in the next loop cycle
 
         if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Switch BLE off");}
 

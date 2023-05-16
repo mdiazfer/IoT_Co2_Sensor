@@ -14,11 +14,12 @@
 #endif
 
 extern RTC_DATA_ATTR byte mac[6];
-extern RTC_DATA_ATTR boolean bluetoothEnabled;
+extern RTC_DATA_ATTR boolean bluetoothEnabled,forceDisplayRefresh;
 extern RTC_DATA_ATTR BLEStatus BLECurrentStatus;
 extern RTC_DATA_ATTR float_t valueCO2, valueT, valueHum;
-extern RTC_DATA_ATTR uint64_t lastTimeBLEOnCheck,lastTimeIconStatusRefreshCheck,nowTimeGlobal;
+extern RTC_DATA_ATTR uint64_t lastTimeBLEOnCheck;
 extern RTC_DATA_ATTR uint32_t minHeapSeen;
+extern RTC_DATA_ATTR enum displayModes displayMode;
 
 extern uint32_t heapSizeNow;
 extern TFT_eSprite stext1;
@@ -52,7 +53,7 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
       deviceConnected = true;
       BLECurrentStatus=BLEConnectedStatus;
-      lastTimeIconStatusRefreshCheck=nowTimeGlobal-ICON_STATUS_REFRESH_PERIOD; //Refresh Icons in the next loop cycle
+      if (displayMode==sampleValue) forceDisplayRefresh=true; //Refresh Icons in the next loop cycle
       if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onConnect] - deviceConnected = true");
     };
 
@@ -65,7 +66,7 @@ class MyServerCallbacks: public BLEServerCallbacks {
       if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onDisconnect] - Advertising restarted");
       deviceConnected = false;
       BLECurrentStatus=BLEStandbyStatus;
-      lastTimeIconStatusRefreshCheck=nowTimeGlobal-ICON_STATUS_REFRESH_PERIOD; //Refresh Icons in the next loop cycle
+      if (displayMode==sampleValue) forceDisplayRefresh=true; //Refresh Icons in the next loop cycle
     }
 };
 
