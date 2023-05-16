@@ -11,7 +11,7 @@
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
     enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncOffStatus};
-    enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
+    enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEStandbyStatus,BLEOffStatus};
     #define _DISPLAYSUPPORTINFO_
   #endif
 
@@ -42,7 +42,7 @@ extern RTC_DATA_ATTR Button  button2;
 extern RTC_DATA_ATTR boolean debugModeOn;
 extern RTC_DATA_ATTR boolean firstBoot;
 extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled;
-extern RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus;
+extern RTC_DATA_ATTR enum BLEStatus BLECurrentStatus;
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 
 

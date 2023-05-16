@@ -1,22 +1,24 @@
 To do list
 -----------
 - Check code with TFT_eSprite stext1 in files other than main.cpp. After stext1 is free up in warming() is not longer usable.
+- General/Stability
+  + Reset device in some circumstances
+    * Lost all network connections, including ping to all checking points (default gw, google.com, etc.) but WiFi is OK
+      This was a sympthon of heap leak during BLE+WebServer tests
+    * Error "task_wdt: Task watchdog got triggered" has been triggered. How to detect it after reboot?
+    * Sanity check (once a day/week)??
+  + Save in memory (SPIFFS file??) the current 24h and 60m readings arrays before controlled reset and read them at boot time.
+- Web server
+  + Web form to setup iBeacon Proximity, Major and Minor
+  + Extend lastTimeBLECheck even more when upgrading firmware/SPIFFS files
 - BLE sutff
   + General
-    * Connection icon
-    * Delete Descriptor object?
-    * Beacon Object deleted?
+    * clean-up of Serial.prints
     * Checks:
-       - WebServer & BLE togheter
-       - Stop and Delete BLE if webserver connection is established
+      - Analize why sometimes BLE_PERIOD is triggered if it is not the right time
+    * New Icon for BLE enabled but no BLE Advertising (gray color). Current BLEON icon to be set when BLE Advertising is ON
   + Advertise
-    * Analize why sometimes BLE_PERIOD is triggered if it is not the right time
-    * iBeacon
-      - TX Random really needed. Avoid it if possible to track MAC device
-    * Readings: CO2, Temperature, Humidity
-      - Test sending only Service Advertising, and then sniff the frames. Then add iBeacons and sniff againg frames
-    * Implement Notify
-    * Web form to setup iBeacon Proximity, Major and Minor
+    * Remove log: [203359][E][BLEService.cpp:253] setHandle(): !!! Handle is already set 28
   + Scanning to find TAG frames
     * iBecons
     * Other frames (Location Frames, etc.)
@@ -24,12 +26,19 @@ To do list
     * iPhone, Android, airtags, etc.
 - Tests
   + Button and menu whith BLE enabled
+  + MQTT enabled and buttons/BLE impact
 - Troubleshoot
   + WiFi connection failures (????)
   + BLE
-    * Still error "task_wdt: Task watchdog got triggered" when surfering
+    * Still error "task_wdt: Task watchdog got triggered" when surfering after v1.3.1
+      + Quite often when changing display mode from web and BLE is Advertising
+      + issue only in development due to the sort BLE_PERIOD (3s) ???
     * With BLE ON, configure BLE OFF -> BLE ON -> can't get connected with Bluetooth from the smartphone (app issue?)
     * Reset from browser crash after bootup as ESP has to serve the webpage with the BLE stack loaded (memory leak)
+    * Some times WIFI stack looks to crash (no ping, no NTP sync) just right after receiving an HTTP request enven with all the 
+      improvements (in v1.3.1)
+      + Concurrence of HTTP Request and sending uploads, NTP chects, etc??
+      + issue only in development due to the sort BLE_PERIOD (3s) ???
   + Some times SPIFFS doesn't get mounted and no error detected. Find out how to check if mounted to detect error
   + Bootup situation not detected in web page after device reset from maintenance page
   + if no MQTT server, menu/buttons are frozen

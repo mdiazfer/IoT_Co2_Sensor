@@ -784,12 +784,15 @@ void showIcons() {
   }
   
   //-->>Get BLE status
-  switch (BLEClurrentStatus) {
+  switch (BLECurrentStatus) {
     case BLEOnStatus:
       tft.pushImage(30,0,24,24,bluetooth);
     break;
     case BLEConnectedStatus:
       tft.pushImage(30,0,24,24,bluetoothConnected);
+    break;
+    case BLEStandbyStatus:
+      tft.pushImage(30,0,24,24,bluetoothStandby);
     break;
     case BLEOffStatus:
       tft.pushImage(30,0,24,24,bluetoothOff);

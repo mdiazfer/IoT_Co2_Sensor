@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "1.3.0"
+#define VERSION "1.3.2"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -330,7 +330,7 @@
 #define BLE_ON_TIMEOUT           2000  //milliseconds - 2 sg in Full Energy Mode (USB powered)
 #define BLE_ON_TIMEOUT_RE        1000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define BLE_ON_TIMEOUT_SE         500  //milliseconds - 5 mim in Saving Energy Mode
-#define BLE_PERIOD           20000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
+#define BLE_PERIOD           3000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
 #define BLE_PERIOD_RE        60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define BLE_PERIOD_SE        300000  //milliseconds - 5 mim in Saving Energy Mode
 #define BLE_PERIOD_EXTENSION 10000  //120000  //milliseconds - 2 mim extension due to webServer activity
@@ -437,7 +437,7 @@
     enum availableStates {bootupScreen,bootAPScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode,factResetMenu,factReset};
     //RTC_DATA_ATTR enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
-    enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
+    enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEStandbyStatus,BLEOffStatus};
     enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
     enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
     enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncOffStatus};

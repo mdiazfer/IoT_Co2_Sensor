@@ -10,14 +10,14 @@
 #include "soc/rtc_wdt.h"
 
 #ifndef _DISPLAYSUPPORTINFO_
-  enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
+  enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEStandbyStatus,BLEOffStatus};
 #endif
 
 extern RTC_DATA_ATTR byte mac[6];
 extern RTC_DATA_ATTR boolean bluetoothEnabled;
-extern RTC_DATA_ATTR BLEStatus BLEClurrentStatus;
+extern RTC_DATA_ATTR BLEStatus BLECurrentStatus;
 extern RTC_DATA_ATTR float_t valueCO2, valueT, valueHum;
-extern RTC_DATA_ATTR uint64_t lastTimeBLEOnCheck;
+extern RTC_DATA_ATTR uint64_t lastTimeBLEOnCheck,lastTimeIconStatusRefreshCheck,nowTimeGlobal;
 extern RTC_DATA_ATTR uint32_t minHeapSeen;
 
 extern uint32_t heapSizeNow;
@@ -35,8 +35,7 @@ extern uint8_t pixelsPerLine,
 //extern uint32_t heapSizeNow,heapSizeLast;
 extern BLEServer *pServer;
 extern BLEAdvertising* pAdvertising;
-extern bool isBeaconAdvertising;
-extern bool deviceConnected;
+extern bool isBeaconAdvertising,deviceConnected,webServerResponding;
 extern BLECharacteristic* pCharacteristicCO2;
 extern BLECharacteristic* pCharacteristicT;
 extern BLECharacteristic* pCharacteristicHum;
@@ -52,7 +51,8 @@ class MyServerCallbacks: public BLEServerCallbacks {
       pCharacteristicHum->setValue(valueHum);  //pCharacteristicHum is global pointer
 
       deviceConnected = true;
-      BLEClurrentStatus=BLEConnectedStatus;
+      BLECurrentStatus=BLEConnectedStatus;
+      lastTimeIconStatusRefreshCheck=nowTimeGlobal-ICON_STATUS_REFRESH_PERIOD; //Refresh Icons in the next loop cycle
       if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onConnect] - deviceConnected = true");
     };
 
@@ -64,7 +64,8 @@ class MyServerCallbacks: public BLEServerCallbacks {
       pAdvertising->start(); //pAdvertising is global pointer
       if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onDisconnect] - Advertising restarted");
       deviceConnected = false;
-      BLEClurrentStatus=BLEOnStatus;
+      BLECurrentStatus=BLEStandbyStatus;
+      lastTimeIconStatusRefreshCheck=nowTimeGlobal-ICON_STATUS_REFRESH_PERIOD; //Refresh Icons in the next loop cycle
     }
 };
 

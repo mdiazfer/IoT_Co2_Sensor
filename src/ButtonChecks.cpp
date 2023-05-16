@@ -277,10 +277,10 @@ void checkButton2() {
             CloudClockCurrentStatus=CloudClockOffStatus;
           }
         }
-        if (bluetoothEnabled) {if (BLEClurrentStatus==BLEOffStatus) BLEClurrentStatus=BLEOnStatus;}
+        if (bluetoothEnabled) {if (BLECurrentStatus==BLEOffStatus) BLECurrentStatus=BLEStandbyStatus;}
         else {
-          if (BLEClurrentStatus==BLEOnStatus) {
-            BLEClurrentStatus=BLEOffStatus;
+          if ((BLECurrentStatus==BLEOnStatus) || (BLECurrentStatus==BLEStandbyStatus)) {
+            BLECurrentStatus=BLEOffStatus;
             lastTimeBLEOnCheck=nowTimeGlobal-BLEOnTimeout; //To force stop BLE advertisings in the next loop cycle.
           }
         }

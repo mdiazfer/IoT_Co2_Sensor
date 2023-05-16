@@ -1212,7 +1212,7 @@ uint32_t initWebServer() {
         if (String(p->name()).compareTo("Bluetooth_enabled")==0) {
           if ((String(p->value().c_str()).compareTo("on")==0) && !bluetoothEnabled) {
             bluetoothEnabled=true;
-            if (BLEClurrentStatus==BLEOffStatus) BLEClurrentStatus=BLEOnStatus;
+            if (BLECurrentStatus==BLEOffStatus) BLECurrentStatus=BLEStandbyStatus;
             uint8_t configVariables=EEPROM.read(0x08);
             configVariables|=0x08; //Set bluetoothEnabled bit to true (enabled)
             EEPROM.write(0x08,configVariables);
@@ -1220,7 +1220,7 @@ uint32_t initWebServer() {
           }
           if ((String(p->value().c_str()).compareTo("off")==0) && bluetoothEnabled) {
             bluetoothEnabled=false;
-            if (BLEClurrentStatus==BLEOnStatus) BLEClurrentStatus=BLEOffStatus;
+            if ((BLECurrentStatus==BLEOnStatus) || (BLECurrentStatus==BLEStandbyStatus)) BLECurrentStatus=BLEOffStatus;
             lastTimeBLEOnCheck=nowTimeGlobal-BLEOnTimeout; //To force stop BLE advertisings in the next loop cycle.
             uint8_t configVariables=EEPROM.read(0x08);
             configVariables&=0xF7; //Set bluetoothEnabled bit to false (disabled)

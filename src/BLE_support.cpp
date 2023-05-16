@@ -197,7 +197,7 @@ uint32_t startBLEAdvertising() {
   
   if (pAdvertising==nullptr) { 
     if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  [startBLEAdvertising] - pAdvertising is nullptr");}
-    BLEClurrentStatus=BLEOffStatus;
+    BLECurrentStatus=BLEOffStatus;
     return ERROR_BLE_SETUP;
   }
 
@@ -216,7 +216,7 @@ uint32_t startBLEAdvertising() {
     return 0;
   }
   else {
-    BLEClurrentStatus=BLEOffStatus;
+    BLECurrentStatus=BLEOffStatus;
     return ERROR_BLE_SETUP;
   }
 }
@@ -242,12 +242,20 @@ void stopBLE(uint8_t caller) {
   BLEDevice::stopAdvertising();
   BLEDevice::deinit(false);
 
-  //Turn the WDT back to automatic with default timeout
-  rtc_wdt_disable();         //Turns it off manually
-  rtc_wdt_set_time(RTC_WDT_STAGE0, 9000);  //Define default dog wait.
-  rtc_wdt_protect_on();  //Turns on the automatic wdt service again
-  rtc_wdt_get_timeout(RTC_WDT_STAGE0, &wdt_timeout);
-  if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  [stopBLE] - WDT turned back to automatic with timeout=9000 ms");}
+  //Turn the WDT back to automatic with default timeout if no webServerResponding to avoid 
+  // error "task_wdt: Task watchdog got triggered" due to race conditions when the webServer serves
+  // the HTTP Request (it takes too long).
+  if (!webServerResponding) {
+    rtc_wdt_disable();         //Turns it off manually
+    rtc_wdt_set_time(RTC_WDT_STAGE0, 9000);  //Define default dog wait.
+    rtc_wdt_protect_on();  //Turns on the automatic wdt service again
+    rtc_wdt_get_timeout(RTC_WDT_STAGE0, &wdt_timeout);
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  [stopBLE] - WDT turned back to automatic with timeout=9000 ms");}
+  }
+  else {
+    //WDT will be turned back to automatic in the next loop cycle that webServerResponding is false
+    //Nothing to be done here
+  }
 
   //Control variables update
   //nowTimeGlobal=loopStartTime+millis();

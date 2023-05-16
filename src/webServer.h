@@ -13,7 +13,7 @@
 #include <BLEDevice.h>
 
 #ifndef _DISPLAYSUPPORTINFO_
-  enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEOffStatus};
+  enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEStandbyStatus,BLEOffStatus};
   #define _DISPLAYSUPPORTINFO_
 #endif
 
@@ -74,7 +74,7 @@ extern RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode;
 extern RTC_DATA_ATTR enum availableStates currentState;
 extern RTC_DATA_ATTR uint64_t lastTimeTurnOffBacklightCheck,loopStartTime,previousLastTimeSampleCheck,nowTimeGlobal;
 //extern RTC_DATA_ATTR enum displayModes displayMode,lastDisplayMode;
-extern RTC_DATA_ATTR enum BLEStatus BLEClurrentStatus;
+extern RTC_DATA_ATTR enum BLEStatus BLECurrentStatus;
 extern RTC_DATA_ATTR uint64_t nowTimeGlobal,lastTimeUploadSampleCheck,lastTimeBLEOnCheck;
 extern RTC_DATA_ATTR ulong uploadSamplesPeriod,BLEOnTimeout;
 extern RTC_DATA_ATTR int errorsWiFiCnt,errorsSampleUpts,errorsNTPCnt,SPIFFSErrors;
