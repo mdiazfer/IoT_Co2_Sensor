@@ -17,8 +17,6 @@ To do list
     * Checks:
       - Analize why sometimes BLE_PERIOD is triggered if it is not the right time
     * New Icon for BLE enabled but no BLE Advertising (gray color). Current BLEON icon to be set when BLE Advertising is ON
-  + Advertise
-    * Remove log: [203359][E][BLEService.cpp:253] setHandle(): !!! Handle is already set 28
   + Scanning to find TAG frames
     * iBecons
     * Other frames (Location Frames, etc.)

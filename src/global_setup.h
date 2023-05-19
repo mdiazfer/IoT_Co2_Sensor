@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "1.3.2"
+#define VERSION "1.3.3"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -317,6 +317,7 @@
 #define FULL_CHARGE_TIME 9000000 //Milliseconds for 100% charge 9000000=2h30m
 #define HTTP_ANSWER_TIMEOUT 20000 //7000  //Millisenconds
 #define ICON_STATUS_REFRESH_PERIOD  DISPLAY_REFRESH_PERIOD  //milliseconds
+#define ICON_ON_TIMEOUT       750 //Time the icons shows activity (MQTT, Upload readings, NTP sync)   
 #define NTP_KO_CHECK_PERIOD  60000 //Milliseconds. 1 minute
 #define NTP_CHECK_TIMEOUT     5000  //Millisecons. Should have NTP anser within 2 sc.
 #define POWER_ENABLE_DELAY 50 //250 //Milliseconds
@@ -330,7 +331,7 @@
 #define BLE_ON_TIMEOUT           2000  //milliseconds - 2 sg in Full Energy Mode (USB powered)
 #define BLE_ON_TIMEOUT_RE        1000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define BLE_ON_TIMEOUT_SE         500  //milliseconds - 5 mim in Saving Energy Mode
-#define BLE_PERIOD           3000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
+#define BLE_PERIOD           10000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
 #define BLE_PERIOD_RE        60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define BLE_PERIOD_SE        300000  //milliseconds - 5 mim in Saving Energy Mode
 #define BLE_PERIOD_EXTENSION 10000  //120000  //milliseconds - 2 mim extension due to webServer activity
@@ -438,9 +439,9 @@
                           displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode,factResetMenu,factReset};
     //RTC_DATA_ATTR enum wifiStatus {wifiOffStatus,wifi0Status,wifi25Status,wifi50Status,wifi75Status,wifi100Status} wifiCurrentStatus;
     enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEStandbyStatus,BLEOffStatus};
-    enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
-    enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
-    enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncOffStatus};
+    enum CloudClockStatus {CloudClockOnStatus,CloudClockSendStatus,CloudClockOffStatus};
+    enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncSendStatus,CloudSyncOffStatus};
+    enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncSendStatus,MqttSyncOffStatus};
     #define _DISPLAYSUPPORTINFO_
   #endif
 

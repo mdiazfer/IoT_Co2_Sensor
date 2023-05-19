@@ -282,8 +282,9 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
     return(ERROR_NTP_SERVER);
   }
   
-  CloudClockStatus previousCloudClockCurrentStatus=CloudClockCurrentStatus;
+  //CloudClockStatus previousCloudClockCurrentStatus=CloudClockCurrentStatus;
   CloudClockCurrentStatus=CloudClockOffStatus;
+
   //User credentials definition
   /*ntpServers[0]="\0";ntpServers[1]="\0";ntpServers[2]="\0";ntpServers[3]="\0";
   #ifdef NTP_SERVER
@@ -332,7 +333,8 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
                 if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - checkButtonsActions() returns 1, 2 or 3 - Returning with ERROR_ABORT_NTP_SETUP");}
                 if (sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED) { //Actions required as the process is aborted
                   forceNTPCheck=true; //Let's grant NTP check again in the next loop interaction
-                  CloudClockCurrentStatus=previousCloudClockCurrentStatus; //Restore Cloud Clock status 
+                  //CloudClockCurrentStatus=previousCloudClockCurrentStatus; //Restore Cloud Clock status
+                  CloudClockCurrentStatus=CloudClockSendStatus;
                   loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String); //Ends the for loop
                   //whileFlagOn=false; //Breaks the while loop and continue to the regular loop() flow
                   auxForLoop=loopCounter;
@@ -354,6 +356,7 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
                     currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) )
                 )
               ) {
+              CloudClockCurrentStatus=CloudClockSendStatus;
               return (ERROR_BREAK_NTP_SETUP); //Returns to refresh the display
             }
           }
@@ -375,7 +378,8 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
             Serial.print("  Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo,"%d/%m/%Y - %H:%M:%S");
             Serial.print("[setup] - NTP: ");Serial.println("OK");
           }
-          CloudClockCurrentStatus=CloudClockOnStatus;
+          //CloudClockCurrentStatus=CloudClockOnStatus;
+          CloudClockCurrentStatus=CloudClockSendStatus;  //Will be CloudClockOnStatus after refreshing Icons
           ntpServerIndex=loopCounter;
           loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String);
           memset(TZEnvVar,'\0',sizeof(TZEnvVar)); //Fill null character first to avoid overflow

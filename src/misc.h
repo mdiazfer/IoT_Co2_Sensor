@@ -50,6 +50,7 @@ extern RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus;
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 extern RTC_DATA_ATTR enum MqttSyncStatus MqttSyncCurrentStatus;
 extern RTC_DATA_ATTR AsyncEventSource webEvents;
+extern RTC_DATA_ATTR ulong BLEPeriod,BLEOnTimeout;
 
 extern wifiCredentials wifiCred;
 extern String TZEnvVariable,TZName;

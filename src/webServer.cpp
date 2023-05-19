@@ -14,6 +14,7 @@
 #include "webServer.h"
 
 String processor(const String& var){
+  log_v(">> processor");
   if(var == "CO2") {
     return roundFloattoString(valueCO2,0)+" ppm";
   } else if (var == "TEMPERATURE") {
@@ -382,6 +383,7 @@ String processor(const String& var){
   } else {
     return String();
   }
+  log_v("<< processor. Exit");
 }
 
 uint32_t initWebServer() {
@@ -519,14 +521,12 @@ uint32_t initWebServer() {
 
     //Setup a new response to send Set Cookie headers in the maintenance.html answer
     AsyncWebServerResponse * auxResp=new AsyncFileResponse(SPIFFS, WEBSERVER_MAINTENANCE_PAGE, String(), false, processor);
-    auxResp->setCode(200);
 
     //If comes with a valid cookie and there is an ongoing upload, return the same cookie
     //This way, a broser-based abort action can be detected
     if (Update.progress()!=0 && request->hasHeader("Cookie") &&
         (request->getHeader("Cookie")->value().length() <= COOKIE_SIZE-1) &&
         memcmp(device.c_str(),request->getHeader("Cookie")->value().c_str()+3,device.length())==0 ) {
-
           memcpy(currentSetCookie,request->getHeader("Cookie")->value().c_str(),request->getHeader("Cookie")->value().length()); //End null not included
           if (debugModeOn) Serial.println(String(nowTimeGlobal)+" [maintenance GET] - Valid cookie deteced="+String(currentSetCookie)+" kept");
           auxResp->addHeader("Set-Cookie", String(currentSetCookie));
@@ -540,7 +540,6 @@ uint32_t initWebServer() {
       auxResp->addHeader("Set-Cookie", setCookie);
     }
     request->send(auxResp);
-
     webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
@@ -1299,7 +1298,7 @@ uint32_t initWebServer() {
     fileUpdateError=ERROR_UPLOAD_FILE_NOERROR;
     updateCommand=-1;
     AsyncWebServerResponse * auxResp=new AsyncFileResponse(SPIFFS, WEBSERVER_CONTAINER_PAGE, String(), false, processor);
-
+    
     int params = request->params();
     for(int i=0;i<params;i++) {
       AsyncWebParameter* p = request->getParam(i);

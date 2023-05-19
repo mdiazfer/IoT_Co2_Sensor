@@ -805,6 +805,9 @@ void showIcons() {
     case (CloudClockOnStatus):
       tft.pushImage(95,0,24,24,cloudClockOn);
     break;
+    case (CloudClockSendStatus):
+      tft.pushImage(95,0,24,24,cloudClockSend);
+    break;
     case (CloudClockOffStatus):
       tft.pushImage(95,0,24,24,cloudClockOff);
     break;
@@ -815,6 +818,9 @@ void showIcons() {
     case (MqttSyncOnStatus):
       tft.pushImage(125,0,24,24,mqttSyncOn);
     break;
+    case (MqttSyncSendStatus):
+      tft.pushImage(125,0,24,24,mqttSyncSend);
+    break;
     case (MqttSyncOffStatus):
       tft.pushImage(125,0,24,24,mqttSyncOff);
     break;
@@ -824,6 +830,9 @@ void showIcons() {
   switch (CloudSyncCurrentStatus) {
     case (CloudSyncOnStatus):
       tft.pushImage(155,0,24,24,cloudSyncOn);
+    break;
+    case (CloudSyncSendStatus):
+      tft.pushImage(155,0,24,24,cloudSyncSend);
     break;
     case (CloudSyncOffStatus):
       tft.pushImage(155,0,24,24,cloudSyncOff);

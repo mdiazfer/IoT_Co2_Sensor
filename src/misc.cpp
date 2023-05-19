@@ -44,18 +44,27 @@ void go_to_sleep() {
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+      BLEPeriod=BLE_PERIOD;
+      BLEOnTimeout=BLE_ON_TIMEOUT;
+      if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
     break;
     case reducedEnergy:
       sleepTimer=TIME_TO_SLEEP_REDUCED_ENERGY>((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000)?TIME_TO_SLEEP_REDUCED_ENERGY-((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000):TIME_TO_SLEEP_REDUCED_ENERGY;
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //It's supposed display is off, so no checks on display
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
+      BLEPeriod=BLE_PERIOD_RE;
+      BLEOnTimeout=BLE_ON_TIMEOUT_RE;
+      if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
     break;
     case lowestEnergy:
       sleepTimer=TIME_TO_SLEEP_SAVE_ENERGY>((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000)?TIME_TO_SLEEP_SAVE_ENERGY-((loopEndTime-loopStartTime+INITIAL_BOOTIME)*1000):TIME_TO_SLEEP_SAVE_ENERGY;
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //It's supposed display is off, so no checks on display
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
+      BLEPeriod=BLE_PERIOD_SE;
+      BLEOnTimeout=BLE_ON_TIMEOUT_SE;
+      if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
     break;
   }
   

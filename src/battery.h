@@ -54,9 +54,9 @@ There are 4 different Saving Energy modes:
     enum displayModes {bootup,bootAP,menu,sampleValue,co2LastHourGraph,co2LastDayGraph,AutoSwitchOffMessage};
     enum availableStates {bootupScreen,bootAPScreen,mainMenu,showOptMenu,infoMenu,infoMenu1,infoMenu2,infoMenu3,infoMenu4,displayingSampleFixed,displayingCo2LastHourGraphFixed,
                           displayingCo2LastDayGraphFixed,displayingSequential,configMenu,confMenuWifi,confMenuBLE,confMenuUpMeas,confMenuSavBatMode,factResetMenu,factReset};
-    enum CloudClockStatus {CloudClockOnStatus,CloudClockOffStatus};
-    enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncOffStatus};
-    enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncOffStatus};
+    enum CloudClockStatus {CloudClockOnStatus,CloudClockSendStatus,CloudClockOffStatus};
+    enum CloudSyncStatus {CloudSyncOnStatus,CloudSyncSendStatus,CloudSyncOffStatus};
+    enum MqttSyncStatus {MqttSyncOnStatus,MqttSyncSendStatus,MqttSyncOffStatus};
     //#define _DISPLAYSUPPORTINFO_
   #endif
 

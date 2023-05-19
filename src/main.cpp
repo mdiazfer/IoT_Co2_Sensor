@@ -43,10 +43,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   1439 B
+// RTC memory variables:                   1475 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     4519 B
-// RTC memory left:     8000 B - 4519 B = 3481 B 
+// RTC memorty TOTAL:                     4555 B
+// RTC memory left:     8000 B - 4555 B = 3445 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -103,14 +103,18 @@ RTC_DATA_ATTR uint64_t nowTimeGlobal=0,timeUSBPowerGlobal=0,loopStartTime=0,loop
                         lastTimeBLECheck=0,previousLastTimeBLECheck=0,lastTimeBLEOnCheck=0,
                         lastTimeDisplayCheck=0,lastTimeDisplayModeCheck=0,lastTimeNTPCheck=0,lastTimeVOLTCheck=0,
                         lastTimeHourSampleCheck=0,lastTimeDaySampleCheck=0,lastTimeUploadSampleCheck=0,lastTimeIconStatusRefreshCheck=0,
-                        lastTimeTurnOffBacklightCheck=0,lastTimeWifiReconnectionCheck=0; //16*8=128 B
+                        lastTimeTurnOffBacklightCheck=0,lastTimeWifiReconnectionCheck=0,
+                        lastMQTTChangeCheck=0,lastCloudChangeCheck=0,lastCloudClockChangeCheck=0; //19*8=152 B
 RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,BLEPeriod,BLEOnTimeout; //4*4=16B
 RTC_DATA_ATTR uint64_t sleepTimer=0; //8 B
 RTC_DATA_ATTR enum displayModes displayMode=bootup,lastDisplayMode=bootup; //2*4=8 B
 RTC_DATA_ATTR enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState; //3*4=12 B
 RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus; //4 B
+RTC_DATA_ATTR enum CloudClockStatus CloudClockLastStatus; //4 B
 RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus; // 4B
+RTC_DATA_ATTR enum CloudSyncStatus CloudSyncLastStatus; // 4B
 RTC_DATA_ATTR enum MqttSyncStatus MqttSyncCurrentStatus; // 4B
+RTC_DATA_ATTR enum MqttSyncStatus MqttSyncLastStatus; // 4B
 RTC_DATA_ATTR boolean updateHourSample=true,updateDaySample=true,updateHourGraph=true,updateDayGraph=true,
               autoBackLightOff=true,button1Pressed=false,button2Pressed=false,reconnectWifiAndRestartWebServer=false,
               resyncNTPServer=false,deviceReset=false,factoryReset=false; //12*1=12 B 
@@ -214,6 +218,7 @@ BLEService* pService=nullptr;
 BLECharacteristic* pCharacteristicCO2=nullptr;
 BLECharacteristic* pCharacteristicT=nullptr;
 BLECharacteristic* pCharacteristicHum=nullptr;
+enum CloudClockStatus previousCloudClockCurrentStatus;
 
 //Code
 
@@ -225,6 +230,7 @@ void initVariable() {
   lastTimeBLECheck=0;previousLastTimeBLECheck=0;lastTimeBLEOnCheck=0;
   lastTimeNTPCheck=0;lastTimeVOLTCheck=0;lastTimeHourSampleCheck=0;lastTimeDaySampleCheck=0;
   lastTimeUploadSampleCheck=0;lastTimeIconStatusRefreshCheck=0;lastTimeTurnOffBacklightCheck=0;
+  lastMQTTChangeCheck=0,lastCloudChangeCheck=0,lastCloudClockChangeCheck=0;
   lastTimeWifiReconnectionCheck=0;
   sleepTimer=0;
   displayMode=bootup;lastDisplayMode=bootup;
@@ -1146,6 +1152,7 @@ void firstSetup() {
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
     }
   }
+  CloudSyncLastStatus=CloudSyncCurrentStatus;
 
   if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
@@ -1176,12 +1183,14 @@ void firstSetup() {
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("No WiFi");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   }
+  CloudClockLastStatus=CloudClockCurrentStatus;
 
   if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
   //Setting up MQTT server
   MqttSyncCurrentStatus=MqttSyncOffStatus;
   error_setup|=mqttClientInit(true,true,true);
+  MqttSyncLastStatus=MqttSyncCurrentStatus;
 
   if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
 
@@ -1745,6 +1754,57 @@ void loop() {
     if (forceGetVolt) forceGetVolt=false;
   }
 
+  //Regular actions every DISPLAY_ICONS_CHECK_PERIOD seconds
+  //Checking if the display must be refreshed because either MQTT or NTP or HTTP upload activity
+  if ( ((MqttSyncLastStatus!=MqttSyncCurrentStatus) || (CloudSyncLastStatus!=CloudSyncCurrentStatus) || (CloudClockLastStatus!=CloudClockCurrentStatus) ||
+        (((nowTimeGlobal-lastMQTTChangeCheck)  >= ICON_ON_TIMEOUT) && (MqttSyncCurrentStatus==MqttSyncSendStatus)) || 
+        (((nowTimeGlobal-lastCloudChangeCheck) >= ICON_ON_TIMEOUT) && (CloudSyncCurrentStatus==CloudSyncSendStatus)) ||
+        (((nowTimeGlobal-lastCloudClockChangeCheck) >= ICON_ON_TIMEOUT) && (CloudClockCurrentStatus==CloudClockSendStatus)) ) && !firstBoot ) {
+
+    Serial.println(String(nowTimeGlobal)+"  - DISPLAY_ICONS_CHECK_PERIOD");
+    if (MqttSyncLastStatus!=MqttSyncCurrentStatus) {
+      MqttSyncLastStatus=MqttSyncCurrentStatus;
+      lastMQTTChangeCheck=nowTimeGlobal;
+    }
+    else { 
+      if ( ((nowTimeGlobal-lastMQTTChangeCheck) >= ICON_ON_TIMEOUT) && (MqttSyncCurrentStatus==MqttSyncSendStatus) ) {
+        if (mqttServerEnabled && mqttClient.connected()) MqttSyncCurrentStatus=MqttSyncOnStatus;
+        else MqttSyncCurrentStatus=MqttSyncOffStatus;
+        MqttSyncLastStatus=MqttSyncCurrentStatus; //Avoid trigger the check next loop cycle
+      }
+      lastMQTTChangeCheck=nowTimeGlobal;
+    }
+
+    if (CloudSyncLastStatus!=CloudSyncCurrentStatus) {
+      CloudSyncLastStatus=CloudSyncCurrentStatus;
+      lastCloudChangeCheck=nowTimeGlobal;
+    }
+    else { 
+      if ((nowTimeGlobal-lastCloudChangeCheck) >= ICON_ON_TIMEOUT) {
+        if (uploadSamplesEnabled) CloudSyncCurrentStatus=CloudSyncOnStatus;
+        else CloudSyncCurrentStatus=CloudSyncOffStatus;
+        CloudSyncLastStatus=CloudSyncCurrentStatus; //Avoid trigger the check next loop cycle
+      }
+      lastCloudChangeCheck=nowTimeGlobal;
+    }
+
+    if (CloudClockLastStatus!=CloudClockCurrentStatus) {
+      CloudClockLastStatus=CloudClockCurrentStatus;
+      lastCloudClockChangeCheck=nowTimeGlobal;
+    }
+    else { 
+      if ((nowTimeGlobal-lastCloudClockChangeCheck) >= ICON_ON_TIMEOUT) {
+        CloudClockCurrentStatus=previousCloudClockCurrentStatus; //Last known status
+        CloudSyncLastStatus=CloudSyncCurrentStatus; //Avoid trigger the check next loop cycle
+      }
+      lastCloudClockChangeCheck=nowTimeGlobal;
+    }
+    
+    if (displayMode==sampleValue)
+      if (currentState==displayingSequential) forceDisplayRefresh=true; //Display to be refreshed in the next DISPLAY_REFRESH_CHECK to avoid dirty display
+      else showIcons(); //Refresh now
+  }
+
   //Regular actions every SAMPLE_PERIOD seconds.
   //Taking CO2, Temp & Hum samples. Moving buffers at the right time
   //forceGetSample==true if buttons are pressed
@@ -1825,17 +1885,17 @@ void loop() {
     if (wifiEnabled && mqttServerEnabled && WiFi.status()==WL_CONNECTED) {
       if (mqttClient.connected()) {
         //MQTT Client connected
-        if (MqttSyncCurrentStatus!=MqttSyncOnStatus) MqttSyncCurrentStatus=MqttSyncOnStatus;
         if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new MQTT messages published:\n    "+mqttTopicName+"/temperature "+String(valueT)+", packetId="+String(mqttClient.publish(String(mqttTopicName+"/temperature").c_str(), 0, true, String(valueT).c_str()))+
                       "\n    "+mqttTopicName+"/humidity "+String(valueHum)+", packetID="+String(mqttClient.publish(String(mqttTopicName+"/humidity").c_str(), 0, true, String(valueHum).c_str()))+
                       "\n    "+mqttTopicName+"/co2 "+String(valueCO2)+", packetId="+String(mqttClient.publish(String(mqttTopicName+"/co2").c_str(), 0, true, String(valueCO2).c_str())));
+        if (MqttSyncCurrentStatus==MqttSyncOnStatus) MqttSyncCurrentStatus=MqttSyncSendStatus;
       }
       else {
         //MQTT Client disconnected
-        if (MqttSyncCurrentStatus!=MqttSyncOffStatus) MqttSyncCurrentStatus=MqttSyncOffStatus;
         //Connect to MQTT broker
-        if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new MQTT messages can't be published as MQTT broker is disconnected. Trying to get connected again...");
+        if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new MQTT messages can't be published as MQTT broker is disconnected. Trying to get connected again...\nMqttSyncLastStatus("+String(MqttSyncLastStatus)+")!=MqttSyncCurrentStatus("+String(MqttSyncCurrentStatus)+")");
         mqttClientInit(true,true,false);
+        if (MqttSyncCurrentStatus!=MqttSyncOffStatus) MqttSyncCurrentStatus=MqttSyncOnStatus;
       }
     }
 
@@ -1878,11 +1938,23 @@ void loop() {
         //if (setupBLE()==0) {
           BLECurrentStatus=BLEOnStatus;
           isBeaconAdvertising=true;
-          if (displayMode==sampleValue) forceDisplayRefresh=true; //Refresh Icons in the next loop cycle
+          if (displayMode==sampleValue)
+            if (currentState==displayingSequential) forceDisplayRefresh=true; //Display to be refreshed in the next DISPLAY_REFRESH_CHECK to avoid dirty display
+            else showIcons(); //Refresh now
         } 
         else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Sending iBeacon failed. BLE disabled");}
       } 
-      else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice initiated, button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.");}
+      else {
+        //Make sure BLE is deinitialized
+        if (BLEDevice::getInitialized()) { 
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice initiated (should not and will try to deinit), button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.");}
+          BLEDevice::stopAdvertising();BLEDevice::deinit(false); //Stop Advertisings and release memory 
+          if (BLEDevice::getInitialized()) if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice successfully deinitiated. heap="+String(esp_get_free_heap_size())+" B . Required min "+BLE_MIN_HEAP_SIZE+" B. to init BLE");}
+          else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice unsuccessfully deinitiated. heap="+String(esp_get_free_heap_size())+" B . Required min "+BLE_MIN_HEAP_SIZE+" B. to init BLE");}
+        }
+        else
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.");}
+      }
     }
 
     if (BLEDevice::getInitialized()) if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Advertising ON");}
@@ -1912,7 +1984,6 @@ void loop() {
     rtc_wdt_feed();
 
     heapSizeNow=esp_get_free_heap_size();
-    //heapSizeNow=40000;
     //Stop BLE Advertising if conditions are met
     //webServerResponding=true if serving a HTTPPage
     if ( ((nowTimeGlobal-lastTimeBLEOnCheck) >= BLEOnTimeout) || heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD  ||
@@ -1921,8 +1992,6 @@ void loop() {
            currentState!=displayingCo2LastDayGraphFixed && currentState!=displayingSequential ))
     {  
       //Switch BLE off
-      //if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT, heap="+String(heapSizeNow)+" B, minHeap="+String(minHeapSeen)+" B, lastTimeBLEOnCheck="+String(lastTimeBLEOnCheck)+", BLEOnTimeout="+String(BLEOnTimeout)+", currentState="+String(currentState)+", deviceConnected="+String(deviceConnected)+", pServer->getConnectedCount()="+String(pServer->getConnectedCount()));}
-
       if (!(pServer->getConnectedCount()!=0 && !button1.pressed() && !button2.pressed() &&
             (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || 
             currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential))
@@ -1938,15 +2007,11 @@ void loop() {
         isBeaconAdvertising=false;
         BLECurrentStatus=BLEStandbyStatus;
         lastTimeBLEOnCheck=nowTimeGlobal;
-        if (displayMode==sampleValue) forceDisplayRefresh=true; //Refresh Icons in the next loop cycle
+        if (displayMode==sampleValue)
+          if (currentState==displayingSequential) forceDisplayRefresh=true; //Display to be refreshed in the next DISPLAY_REFRESH_CHECK to avoid dirty display
+          else showIcons(); //Refresh now
 
         if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Switch BLE off");}
-
-        //Release more memory if needed
-        /*if (heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD) {
-          if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  - Release more memory as heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD");
-          detachNetwork();
-        }*/
 
         heapSizeNow=esp_get_free_heap_size();
         if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT check ends, heap="+String(heapSizeNow)+" B, minHeap="+String(minHeapSeen)+" B,  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
@@ -2216,7 +2281,7 @@ void loop() {
   //Regular actions every NTP_KO_CHECK_PERIOD seconds. Cheking if NTP is off or should be checked
   //forceNTPCheck is true if:
   // 1) After NTP server config in firstSetup()
-  // 2) If the previous NTP check was aborted due eithe Button action or Display Refresh
+  // 2) If the previous NTP check was aborted due either Button action or Display Refresh
   // 2) WiFi has been setup ON in config menu
   nowTimeGlobal=loopStartTime+millis();
   if ((nowTimeGlobal-lastTimeNTPCheck) >= NTP_KO_CHECK_PERIOD || forceNTPCheck) {
@@ -2236,11 +2301,12 @@ void loop() {
     // - If the previous NTP check was aborted due to Button action (forceNTPCheck=true)
     
     long auxRandom=random(1,7);
-    if( wifiCurrentStatus!=wifiOffStatus && wifiEnabled &&
+    if (true) {
+    /*if( wifiCurrentStatus!=wifiOffStatus && wifiEnabled &&
         ( CloudClockCurrentStatus==CloudClockOffStatus || forceNTPCheck ||
           (fullEnergy==energyCurrentMode && (auxRandom<2)) ||
            reducedEnergy==energyCurrentMode || 
-           lowestEnergy==energyCurrentMode ) ) {
+           lowestEnergy==energyCurrentMode ) ) {*/
       if (debugModeOn) {
         Serial.println("      - setupNTPConfig() for NTP Sync");
         if (CloudClockCurrentStatus==CloudClockOffStatus) Serial.println("        - Reason: CloudClockCurrentStatus==CloudClockOffStatus");
@@ -2250,28 +2316,36 @@ void loop() {
         if (lowestEnergy==energyCurrentMode) Serial.println("        - Reason: lowestEnergy==energyCurrentMode");
       }
       forceNTPCheck=false;
+      if (CloudClockCurrentStatus!=CloudClockSendStatus) CloudClockLastStatus=CloudClockCurrentStatus; //To enter in DISPLAY_ICONS_REFRESH_TIMEOUT in the next loop cycle
       switch(setupNTPConfig(false,&auxLoopCounter2,&whileLoopTimeLeft)) { //NTP Sync and CloudClockCurrentStatus update
         case ERROR_ABORT_NTP_SETUP: //Button pressed. NTP reconnection aborted. Exit now but force reconnection next loop interaction 
           forceNTPCheck=true; //Force NTP reconnection in the next loop interaction
           NTPResuming=true;
+          CloudClockCurrentStatus=CloudClockSendStatus;
           if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with ERROR_ABORT_NTP_SETUP. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
         break;
         case ERROR_BREAK_NTP_SETUP: //Button pressed. NTP reconnection aborted. Exit now but force reconnection next loop interaction
           forceNTPCheck=true; //Force NTP reconnection in the next loop interaction
           NTPResuming=true;
+          CloudClockCurrentStatus=CloudClockSendStatus;
           if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with ERROR_BREAK_NTP_SETUP. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
         break;
         case ERROR_NTP_SERVER:
           forceNTPCheck=false;
           NTPResuming=false;
+          previousCloudClockCurrentStatus=CloudClockOffStatus; //CloudClock Status to be back after DISPLAY_ICONS_REFRESH_TIMEOUT
+          CloudClockCurrentStatus=CloudClockSendStatus;
           if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with ERROR_NTP_SERVER. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
         break;
         case NO_ERROR:
           forceNTPCheck=false;
           NTPResuming=false;
+          previousCloudClockCurrentStatus=CloudClockOnStatus; //CloudClock Status to be back after DISPLAY_ICONS_REFRESH_TIMEOUT
+          CloudClockCurrentStatus=CloudClockSendStatus;
           if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - setupNTPConfig() finish with NO_ERROR. CloudClockCurrentStatus="+String(CloudClockCurrentStatus)+", forceNTPCheck="+String(forceNTPCheck));}
         break;
       }
+      lastCloudClockChangeCheck=nowTimeGlobal; //Reset Cloud Clock Change Timeout
     }
     else
       if( wifiCurrentStatus==wifiOffStatus || !wifiEnabled) if (forceNTPCheck) forceNTPCheck=false; //v0.9.9 If no WiFi, don't enter in NTP_KO_CHECK_PERIOD even if it was BREAK or ABORT in previous intercation
@@ -2354,6 +2428,7 @@ void loop() {
       case NO_ERROR:
         forceWEBCheck=false;
         webResuming=false;
+        CloudSyncCurrentStatus=CloudSyncSendStatus;
         if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - sendAsyncHttpRequest() finish with NO_ERROR. CloudSyncCurrentStatus="+String(CloudSyncCurrentStatus)+", forceWEBCheck="+String(forceWEBCheck));}
       break;
     }
