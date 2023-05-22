@@ -10,3 +10,4 @@ extern struct tm nowTimeInfo;
 String IpAddress2String(const IPAddress& ipAddress);
 uint8_t sendHttpRequest (boolean debugModeOn, IPAddress server, uint16_t port, String httpRequest);
 uint32_t sendAsyncHttpRequest (boolean debugModeOn, boolean fromSetup, uint32_t error_setup, IPAddress server, uint16_t port, String httpRequest, uint64_t* whileLoopTimeLeft);
+uint32_t checkURL(boolean debugModeOn,boolean fromSetup,uint32_t error_setup,IPAddress server,uint16_t port,String httpRequest);

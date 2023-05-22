@@ -43,10 +43,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   1475 B
+// RTC memory variables:                   1507 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     4555 B
-// RTC memory left:     8000 B - 4555 B = 3445 B 
+// RTC memorty TOTAL:                     4587 B
+// RTC memory left:     8000 B - 4587 B = 3413 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -104,7 +104,7 @@ RTC_DATA_ATTR uint64_t nowTimeGlobal=0,timeUSBPowerGlobal=0,loopStartTime=0,loop
                         lastTimeDisplayCheck=0,lastTimeDisplayModeCheck=0,lastTimeNTPCheck=0,lastTimeVOLTCheck=0,
                         lastTimeHourSampleCheck=0,lastTimeDaySampleCheck=0,lastTimeUploadSampleCheck=0,lastTimeIconStatusRefreshCheck=0,
                         lastTimeTurnOffBacklightCheck=0,lastTimeWifiReconnectionCheck=0,
-                        lastMQTTChangeCheck=0,lastCloudChangeCheck=0,lastCloudClockChangeCheck=0; //19*8=152 B
+                        lastMQTTChangeCheck=0,lastCloudChangeCheck=0,lastCloudClockChangeCheck=0,lastTimeWebServerCheck=0; //20*8=160 B
 RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,BLEPeriod,BLEOnTimeout; //4*4=16B
 RTC_DATA_ATTR uint64_t sleepTimer=0; //8 B
 RTC_DATA_ATTR enum displayModes displayMode=bootup,lastDisplayMode=bootup; //2*4=8 B
@@ -121,7 +121,7 @@ RTC_DATA_ATTR boolean updateHourSample=true,updateDaySample=true,updateHourGraph
 RTC_DATA_ATTR enum powerModes powerState=off; //1*4=4 B
 RTC_DATA_ATTR enum batteryChargingStatus batteryStatus=battery000; //1*4=4 B
 RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode; //2*4=8 B
-RTC_DATA_ATTR uint8_t bootCount=0,resetCount=0,loopCount=0; //3*1=3 B
+RTC_DATA_ATTR uint8_t bootCount=0,resetCount=0,loopCount=0,BLEnoLoadedCount=0,BLEunloadsCount=0,softResetReason=0; //6*1=6 B
 RTC_DATA_ATTR const String co2SensorType=String(CO2_SENSOR_TYPE); //16 B
 RTC_DATA_ATTR const String tempHumSensorType=String(TEMP_HUM_SENSOR_TYPE); //16 B
 RTC_DATA_ATTR char co2SensorVersion[5]; //5 B
@@ -138,12 +138,13 @@ RTC_DATA_ATTR char TZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH]="\0"; //57 B Should be e
 RTC_DATA_ATTR struct tm startTimeInfo; //36 B
 RTC_DATA_ATTR boolean firstWifiCheck=true,forceWifiReconnect=false,forceGetSample=false,forceGetVolt=false,
         forceDisplayRefresh=false,forceDisplayModeRefresh=false,forceNTPCheck=false,buttonWakeUp=false,
-        forceWEBCheck=false,forceWEBTestCheck=false,forceWebServerInit=false; // 12*1=12 B
+        forceWEBCheck=false,forceWEBTestCheck=false,forceWebServerInit=false,softResetOn=false; // 13*1=13 Bº
 RTC_DATA_ATTR int uploadServerIPAddressOctectArray[4]; // 4*4B = 16B - To store upload server's @IP
 RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
 RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0,webServerError1=0,
-                  webServerError2=0,webServerError3=0,SPIFFSErrors=0; //7*4=28B - Error stats
+                  webServerError2=0,webServerError3=0,SPIFFSErrors=0,softResetCounter=0,
+                  BLEnoLoadedCounter=0,BLEunloadsCounter=0,minHeapSeenCounter=0,webServerFailsCounter=0; //12*4=48B - Error stats
 RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled,mqttServerEnabled,secureMqttEnabled;//5*1=5B
 RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON,startTimeConfigure=false; //2*1=1B
 RTC_DATA_ATTR enum BLEStatus BLECurrentStatus=BLEOffStatus; //1*4=4B
@@ -204,7 +205,7 @@ JSONVar samples;
 String userName,userPssw,mqttUserName,mqttUserPssw,mqttTopicPrefix,mqttTopicName;
 uint32_t heapSizeNow=0;//,heapSizeLast=0;
 bool webServerResponding=false,isBeaconAdvertising=false;
-bool deviceConnected = false;
+bool deviceConnected=false,BLEtoBeLoaded=false;
 BLEServer* pServer=nullptr;
 BLEAdvertising* pAdvertising=nullptr;
 MyServerCallbacks* pMyServerCallbacks=new MyServerCallbacks();
@@ -231,7 +232,7 @@ void initVariable() {
   lastTimeNTPCheck=0;lastTimeVOLTCheck=0;lastTimeHourSampleCheck=0;lastTimeDaySampleCheck=0;
   lastTimeUploadSampleCheck=0;lastTimeIconStatusRefreshCheck=0;lastTimeTurnOffBacklightCheck=0;
   lastMQTTChangeCheck=0,lastCloudChangeCheck=0,lastCloudClockChangeCheck=0;
-  lastTimeWifiReconnectionCheck=0;
+  lastTimeWifiReconnectionCheck=0;lastTimeWebServerCheck=0;
   sleepTimer=0;
   displayMode=bootup;lastDisplayMode=bootup;
   stateSelected=displayingSampleFixed;currentState=bootupScreen;lastState=currentState;
@@ -239,7 +240,7 @@ void initVariable() {
   autoBackLightOff=true;button1Pressed=false;button2Pressed=false;
   powerState=off;
   batteryStatus=battery000;
-  loopCount=0;
+  loopCount=0;BLEnoLoadedCount=0;BLEunloadsCount=0;softResetReason=0;
   circularGauge=CircularGauge(0,0,CO2_GAUGE_RANGE,CO2_GAUGE_X,CO2_GAUGE_Y,CO2_GAUGE_R,
                             CO2_GAUGE_WIDTH,CO2_GAUGE_SECTOR,TFT_DARKGREEN,
                             CO2_GAUGE_TH1,TFT_YELLOW,CO2_GAUGE_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
@@ -248,9 +249,11 @@ void initVariable() {
                               TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
   firstWifiCheck=true;forceWifiReconnect=false;forceGetSample=false;forceGetVolt=false;
   forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;
-  forceWEBCheck=false;forceWEBTestCheck=false;forceWebServerInit=false;
+  forceWEBCheck=false;forceWEBTestCheck=false;forceWebServerInit=false;softResetOn=false;
   valueCO2=0;valueT=0;valueHum=0;lastValueCO2=-1;tempMeasure=0;
-  errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;webServerError1=0;webServerError2=0;webServerError3=0;SPIFFSErrors=0;
+  errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;webServerError1=0;webServerError2=0;webServerError3=0;
+  SPIFFSErrors=0;webServerFailsCounter=0;softResetCounter=0;
+  BLEnoLoadedCounter=0;BLEunloadsCounter=0;minHeapSeenCounter=0;
   error_setup=NO_ERROR;remainingBootupSeconds=0;
   previousTime=0;remainingBootupTime=BOOTUP_TIMEOUT*1000;
   static const char hex_digits[] = "0123456789ABCDEF";
@@ -278,7 +281,7 @@ void initVariable() {
   memset(currentSetCookie,'\0',COOKIE_SIZE); //init variable
   //BLE variables and pointers
   webServerResponding=false;isBeaconAdvertising=false;
-  deviceConnected = false;
+  deviceConnected=false;BLEtoBeLoaded=false;
   
   //Read from EEPROM the values to be stored in the Config Variables
   //
@@ -1050,53 +1053,6 @@ void firstSetup() {
   }
 
   if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
-
-  //WEB SERVER
-  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - WEB SERVER: [");
-  if (wifiEnabled & webServerEnabled) {//Only if both Wifi WebServer is enabled
-  //if (wifiEnabled & true) {//Only if both Wifi WebServer is enabled
-    //error_setup|=initWebServer(webServer);
-    error_setup|=initWebServer();
-    
-    //print Logs
-    if ((error_setup & ERROR_WEB_SERVER)==0 ) { 
-      if (debugModeOn) Serial.println("[setup] - WEB SERVER: OK");
-      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
-      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    } else {
-      if (debugModeOn) {Serial.println("[setup] - WEB SERVER: KO");}
-      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
-      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-    }
-  }
-  else {//If either WiFi or webServer is not enabled, then inform
-    if (debugModeOn) Serial.println("[setup] - WEB SERVER: N/E");
-    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("N/E");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-  }
-
-  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
-  
-  //SPIFFS
-  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - SPIFFS: [");
-  
-  if(!SPIFFS.begin(true)){
-    error_setup|=ERROR_SPIFFS_SETUP;
-    SPIFFSErrors++;
-    if (debugModeOn) Serial.println("[setup] - SPIFFS.begin=KO, SPIFFSErrors="+String(SPIFFSErrors));
-    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-  }
-  else {
-    if (debugModeOn) Serial.println("[setup] - SPIFFS.begin=OK, SPIFFSErrors="+String(SPIFFSErrors));
-    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
-    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
-
-    fileSystemSize = SPIFFS.totalBytes();
-    fileSystemUsed = SPIFFS.usedBytes();
-  }
-
-  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
   
   //Pre-setting up URL things to upload samples to an external server
   //Converting SERVER_UPLOAD_SAMPLES into IPAddress variable
@@ -1178,6 +1134,8 @@ void firstSetup() {
       stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);stext1.print(ntpServers[ntpServerIndex]);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
       startTimeConfigure=true;
     }
+    if ((error_setup & ERROR_NTP_SERVER)==0) CloudClockCurrentStatus=CloudClockOnStatus;
+    else CloudClockCurrentStatus=CloudClockOffStatus;
   }
   else {
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("No WiFi");
@@ -1261,6 +1219,54 @@ void firstSetup() {
     if (debugModeOn) Serial.println("KO");
     stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
     stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  }
+
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+
+  //SPIFFS
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - SPIFFS: [");
+  
+  if(!SPIFFS.begin(true)){
+    error_setup|=ERROR_SPIFFS_SETUP;
+    SPIFFSErrors++;
+    if (debugModeOn) Serial.println("[setup] - SPIFFS.begin=KO, SPIFFSErrors="+String(SPIFFSErrors));
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+  }
+  else {
+    if (debugModeOn) Serial.println("[setup] - SPIFFS.begin=OK, SPIFFSErrors="+String(SPIFFSErrors));
+    stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+
+    fileSystemSize = SPIFFS.totalBytes();
+    fileSystemUsed = SPIFFS.usedBytes();
+  }
+
+  if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
+  
+  //WEB SERVER
+  stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - WEB SERVER: [");
+  if (wifiEnabled && webServerEnabled && ((error_setup & ERROR_SPIFFS_SETUP)==0)) {//Only if both Wifi WebServer are enabled and no SPIFFS errors
+  //if (wifiEnabled & true) {//Only if both Wifi WebServer is enabled
+    //error_setup|=initWebServer(webServer);
+    error_setup|=initWebServer();
+    
+    //print Logs
+    if ((error_setup & ERROR_WEB_SERVER)==0 ) { 
+      if (debugModeOn) Serial.println("[setup] - WEB SERVER: OK");
+      stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    } else {
+      if (debugModeOn) {Serial.println("[setup] - WEB SERVER: KO");}
+      stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
+      stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("] ");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    }
+  }
+  else {//If either WiFi or webServer is not enabled, then inform
+    if (debugModeOn) Serial.println("[setup] - WEB SERVER: N/E");
+    stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK);stext1.print("N/E");
+    stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
+    webServerEnabled=false;
   }
 
   if (debugModeOn) Serial.println(" [setup] - error_setup="+String(error_setup));
@@ -1489,6 +1495,7 @@ void setup() {
     if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SETUP] - BLE N/E");}
     
   wakeup_reason = esp_sleep_get_wakeup_cause();
+  if (softResetOn && (wakeup_reason==ESP_SLEEP_WAKEUP_TIMER)) wakeup_reason=ESP_SLEEP_WAKEUP_EXT0; //Force variables init -v1.3.4
   switch(wakeup_reason)
   {
     case ESP_SLEEP_WAKEUP_EXT1: //Wake up from Hibernate Mode by long pressing Button1
@@ -1524,23 +1531,26 @@ void setup() {
         go_to_hibernate();
       } 
     break;
-    case ESP_SLEEP_WAKEUP_EXT0: //Wake up from Deep Sleep Mode by pressing Button1
+    case ESP_SLEEP_WAKEUP_EXT0: //Wake up from Deep Sleep Mode by pressing Button1 or softReset
       // No need to initit lastBatCharge
       if (debugModeOn) {
-        Serial.println("  - Wakeup caused by external signal using RTC_IO - Ext0");
+        if (!softResetOn) Serial.println("  - Wakeup caused by external signal using RTC_IO - Ext0"); // -v1.3.4
+        else Serial.println("  - Wakeup caused by timer after the softReset"); //-v1.3.4
         Serial.println("    - setting things up back again after deep sleep specific for ad-hod wakeup");
         Serial.println("      - TFT init");
       }
       initTZVariables(); //To make sure that both NTP sync and NTP info in web are right
+      wifiCurrentStatus=wifiOffStatus;
       CloudClockCurrentStatus=CloudClockOffStatus; //To update icons as WiFi is disconnect
       CloudSyncCurrentStatus=CloudSyncOffStatus; //To update icons as WiFi is disconnect
+      MqttSyncCurrentStatus=MqttSyncOffStatus; //To update MQTT is disconnected
       //Display init
       pinMode(PIN_TFT_BACKLIGHT,OUTPUT); 
       tft.init();
       digitalWrite(PIN_TFT_BACKLIGHT,LOW); //To force checkButton1() function to setup things
       tft.setRotation(1);
       tft.fillScreen(TFT_BLACK);
-      if (debugModeOn) {Serial.println("      - checkButton1() & buttonWakeUp=true");}
+      if (debugModeOn and !softResetOn) {Serial.println("      - checkButton1() & buttonWakeUp=true");}
       checkButton1();
       buttonWakeUp=true;
       //buttonWakeUp is used for Web Server init and SPFIS init in the next WiFi interaction
@@ -1550,10 +1560,11 @@ void setup() {
       lastDisplayMode=bootup;   //To force rendering the value graph
       forceWifiReconnect=true; //Force WiFi reconnection in the next loop - v1.1.0
       forceWebServerInit=true; //Force webServer restart - v1.2.0
+      if(softResetOn) softResetOn=false;
       if (debugModeOn) {Serial.println("    - end");}
     break;
     case ESP_SLEEP_WAKEUP_TIMER : 
-      // No need to initit lastBatCharge
+      // No need to init lastBatCharge
       if (debugModeOn) {
         Serial.println("  - Wakeup caused by timer");
         Serial.println("    - setting things up back again after deep sleep specific for periodic wakeup");
@@ -1685,6 +1696,14 @@ void setup() {
 void loop() {
   uint32_t minHeap=esp_get_minimum_free_heap_size();
   if(minHeap<minHeapSeen) minHeapSeen=minHeap; //Track the minimun heap size (bytes)
+  if(minHeapSeen<=MIN_HEAP_SEEN_THRESHOLD) {
+    //Sanity softReset as the min heap is very low
+    minHeapSeenCounter++;
+    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - Min heap seen since last reboot is too low. Go to softReset, minHeapSeenCounter="+String(minHeapSeenCounter)+", heap="+String(esp_get_free_heap_size())+" B, minHeap="+String(minHeapSeen)+" B,  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
+    softResetCounter++;  //Stats
+    softResetReason=ERROR_MIN_HEAP;
+    softReset();
+  }
 
   nowTimeGlobal=loopStartTime+millis();
   loopCount++;
@@ -1762,6 +1781,15 @@ void loop() {
         (((nowTimeGlobal-lastCloudClockChangeCheck) >= ICON_ON_TIMEOUT) && (CloudClockCurrentStatus==CloudClockSendStatus)) ) && !firstBoot ) {
 
     Serial.println(String(nowTimeGlobal)+"  - DISPLAY_ICONS_CHECK_PERIOD");
+    /*Serial.println(String(nowTimeGlobal)+"      + Reasons");
+    if (!firstBoot) Serial.printf("        * !firstBoot=%d\n",!firstBoot);
+    if (MqttSyncLastStatus!=MqttSyncCurrentStatus) Serial.printf("        * MqttSyncLastStatus(%d)!=MqttSyncCurrentStatus(%d)\n",MqttSyncLastStatus,MqttSyncCurrentStatus);
+    if (CloudSyncLastStatus!=CloudSyncCurrentStatus) Serial.printf("        * CloudSyncLastStatus(%d)!=CloudSyncCurrentStatus(%d)\n",CloudSyncLastStatus,CloudSyncCurrentStatus);
+    if (CloudClockLastStatus!=CloudClockCurrentStatus) Serial.printf("        * CloudClockLastStatus(%d)!=CloudClockCurrentStatus(%d)\n",CloudClockLastStatus,CloudClockCurrentStatus);
+    if (((nowTimeGlobal-lastMQTTChangeCheck)  >= ICON_ON_TIMEOUT) && (MqttSyncCurrentStatus==MqttSyncSendStatus)) Serial.println("        * (((nowTimeGlobal-lastMQTTChangeCheck)  >= ICON_ON_TIMEOUT) && (MqttSyncCurrentStatus==MqttSyncSendStatus))");
+    if (((nowTimeGlobal-lastCloudChangeCheck) >= ICON_ON_TIMEOUT) && (CloudSyncCurrentStatus==CloudSyncSendStatus)) Serial.println("        * (((nowTimeGlobal-lastCloudChangeCheck) >= ICON_ON_TIMEOUT) && (CloudSyncCurrentStatus==CloudSyncSendStatus))");
+    if (((nowTimeGlobal-lastCloudClockChangeCheck) >= ICON_ON_TIMEOUT) && (CloudClockCurrentStatus==CloudClockSendStatus)) Serial.println("        * (((nowTimeGlobal-lastCloudClockChangeCheck) >= ICON_ON_TIMEOUT) && (CloudClockCurrentStatus==CloudClockSendStatus))");*/
+    
     if (MqttSyncLastStatus!=MqttSyncCurrentStatus) {
       MqttSyncLastStatus=MqttSyncCurrentStatus;
       lastMQTTChangeCheck=nowTimeGlobal;
@@ -1800,9 +1828,16 @@ void loop() {
       lastCloudClockChangeCheck=nowTimeGlobal;
     }
     
-    if (displayMode==sampleValue)
+    if (displayMode==sampleValue) {
       if (currentState==displayingSequential) forceDisplayRefresh=true; //Display to be refreshed in the next DISPLAY_REFRESH_CHECK to avoid dirty display
-      else showIcons(); //Refresh now
+      else if (currentState==displayingSampleFixed) showIcons(); //Refresh only Icons now
+    }
+
+    Serial.println(String(nowTimeGlobal)+"  - DISPLAY_ICONS_CHECK_PERIOD - Exit");
+    /*Serial.printf("        * MqttSyncLastStatus(%d), MqttSyncCurrentStatus(%d), CloudSyncLastStatus(%d), CloudSyncCurrentStatus(%d), CloudClockLastStatus(%d), CloudClockCurrentStatus(%d)\n",
+      MqttSyncLastStatus,MqttSyncCurrentStatus,CloudSyncLastStatus,CloudSyncCurrentStatus,CloudClockLastStatus,CloudClockCurrentStatus);  
+    Serial.printf("        * forceDisplayRefresh(%d), forceDisplayModeRefresh(%d), currentState(%d), digitalRead(PIN_TFT_BACKLIGHT)(%d), CloudClockLastStatus(%d), CloudClockCurrentStatus(%d)\n",
+      forceDisplayRefresh,forceDisplayModeRefresh,currentState,digitalRead(PIN_TFT_BACKLIGHT));*/
   }
 
   //Regular actions every SAMPLE_PERIOD seconds.
@@ -1900,7 +1935,7 @@ void loop() {
     }
 
     // Notify the new readings to the BLE client (if there's connections)
-    if ( deviceConnected && bluetoothEnabled && (BLECurrentStatus==BLEOffStatus || BLECurrentStatus==BLEStandbyStatus) && BLEDevice::getInitialized() ) {
+    if ( deviceConnected && bluetoothEnabled && (BLECurrentStatus==BLEConnectedStatus || BLECurrentStatus==BLEOnStatus) && BLEDevice::getInitialized() ) {
       pCharacteristicCO2->setValue(valueCO2); pCharacteristicCO2->notify();
       pCharacteristicT->setValue(valueT); pCharacteristicT->notify();
       pCharacteristicHum->setValue(valueHum); pCharacteristicHum->notify();
@@ -1911,11 +1946,20 @@ void loop() {
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - exit");}
   }
 
+  //Regular actions every BLE_PRE_PERIOD seconds.
+  //Warn webServer the BLE module is about to be loaded
+  //Doing that to give time the control variables to be updated and the BLE module to be deinit
+  nowTimeGlobal=loopStartTime+millis();
+  if ( ((nowTimeGlobal+BLE_PRE_PERIOD-lastTimeBLECheck) >= BLEPeriod) && (nowTimeGlobal+BLE_PRE_PERIOD>=lastTimeBLECheck) && !firstBoot &&  bluetoothEnabled ) {  
+    BLEtoBeLoaded=true;
+  }
+  
   //Regular actions every BLE_PERIOD seconds.
   //Init and send iBecon periodically
   //Doing that in the loop avoid to block huge amount of RAM that impacts in other processes (WEB server)
   nowTimeGlobal=loopStartTime+millis();
-  if ( ((((nowTimeGlobal-lastTimeBLECheck) >= BLEPeriod) && (nowTimeGlobal>=lastTimeBLECheck)) || firstBoot) &&  bluetoothEnabled ) {  
+  if ( ((nowTimeGlobal-lastTimeBLECheck) >= BLEPeriod) && (nowTimeGlobal>=lastTimeBLECheck) && !firstBoot &&  bluetoothEnabled ) {  
+    BLEtoBeLoaded=false;
     if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLE_PERIOD");}
     if (webServerResponding) {
       //To avoid heap leak don't start BLE as there's webServer actvitiy
@@ -1929,36 +1973,54 @@ void loop() {
       //  - !button1.pressed() and !button2.pressed() - Avoid button acting getting slow
       //  - displayMode checks - Avoid button acting getting slow - Not allow in menus
       if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - displayMode="+String(displayMode)+", currentState="+String(currentState)+", heap="+String(esp_get_free_heap_size())+" B, minHeap="+String(minHeapSeen)+" B, webServerResponding="+String(webServerResponding));}
-      long auxRandom=random(1,16); //random < 2 ==> probability ~6%
+      long auxRandom=random(1,16); //auxRandom < 2 ==> probability ~6%
       if (!BLEDevice::getInitialized() && esp_get_free_heap_size()>=BLE_MIN_HEAP_SIZE && !webServerResponding && !button1.pressed() && !button2.pressed() && 
           (auxRandom<2 || currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed || currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) ) {
         BLECurrentStatus=BLEStandbyStatus;
         isBeaconAdvertising=false;
         if (startBLEAdvertising()==0) {
-        //if (setupBLE()==0) {
           BLECurrentStatus=BLEOnStatus;
           isBeaconAdvertising=true;
-          if (displayMode==sampleValue)
+          if (displayMode==sampleValue) {
             if (currentState==displayingSequential) forceDisplayRefresh=true; //Display to be refreshed in the next DISPLAY_REFRESH_CHECK to avoid dirty display
-            else showIcons(); //Refresh now
+            else if (currentState==displayingSampleFixed) showIcons(); //Refresh only Icons now
+          }
+          BLEnoLoadedCount=0;  //Clean the counter
         } 
-        else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Sending iBeacon failed. BLE disabled");}
+        else  {
+          BLEnoLoadedCount++;
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Sending iBeacon failed. BLE disabled");}
+        }
       } 
       else {
         //Make sure BLE is deinitialized
-        if (BLEDevice::getInitialized()) { 
+        if (BLEDevice::getInitialized() && pServer->getConnectedCount()==0) { //BLE initiated with no BLE clients connected
+          BLEnoLoadedCount++;
           if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice initiated (should not and will try to deinit), button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.");}
-          BLEDevice::stopAdvertising();BLEDevice::deinit(false); //Stop Advertisings and release memory 
-          if (BLEDevice::getInitialized()) if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice successfully deinitiated. heap="+String(esp_get_free_heap_size())+" B . Required min "+BLE_MIN_HEAP_SIZE+" B. to init BLE");}
-          else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice unsuccessfully deinitiated. heap="+String(esp_get_free_heap_size())+" B . Required min "+BLE_MIN_HEAP_SIZE+" B. to init BLE");}
+          BLEDevice::stopAdvertising();BLEDevice::deinit(false); delay(750); //Stop Advertisings, release memory and give time to execute everything
+          if (!BLEDevice::getInitialized()) {if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice successfully deinitiated. heap="+String(esp_get_free_heap_size())+" B . Required min "+BLE_MIN_HEAP_SIZE+" B. to init BLE");}}
+          else {if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLEDevice unsuccessfully deinitiated. heap="+String(esp_get_free_heap_size())+" B . Required min "+BLE_MIN_HEAP_SIZE+" B. to init BLE");}}
+          BLEnoLoadedCount=0;  //Clean the counter
         }
-        else
-          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.");}
+        else {
+          if (pServer->getConnectedCount()!=0) {if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLE client connected");}}
+          else {if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Button pressed, wrong displayMode ("+String(displayMode)+") or webServerResponding "+String(webServerResponding)+" or NOT enough heap ("+String(esp_get_free_heap_size())+" B) to init BLEDevice. Required min "+BLE_MIN_HEAP_SIZE+" B.");}}
+        }
       }
     }
 
     if (BLEDevice::getInitialized()) if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Advertising ON");}
     else if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Advertising OFF");}
+
+    if (BLEnoLoadedCount>=BLE_MAX_LOAD_ERRORS) {
+      //Sanity softReset as there were too many consecutive unsuccesfully tries to load the BLE module
+      BLEnoLoadedCounter++;
+      if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - BLE_PERIOD check ends, Too many unsuccesfully tries to load BLE. Go to softReset, BLEnoLoadedCount="+String(BLEnoLoadedCount)+", heap="+String(esp_get_free_heap_size())+" B, minHeap="+String(minHeapSeen)+" B,  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
+      softResetCounter++;  //Stats
+      BLEnoLoadedCount=0;
+      softResetReason=ERROR_BLE_NO_LOAD;
+      softReset();
+    }
 
     //Control variables setup
     previousLastTimeBLECheck=lastTimeBLECheck;
@@ -1979,7 +2041,8 @@ void loop() {
   //if ( isBeaconAdvertising &&  bluetoothEnabled && BLEDevice::getInitialized() ) {
   if ( isBeaconAdvertising &&  bluetoothEnabled ) {
     //Doing some tasks during the time window that the BLE is active
-    
+    BLEtoBeLoaded=false;
+  
     //Reset WatchDogTimer to avoid "Task watchdog got triggered" error if a HTML Request needs to be served
     rtc_wdt_feed();
 
@@ -2000,20 +2063,34 @@ void loop() {
         if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT, heap="+String(heapSizeNow)+" B, minHeap="+String(minHeapSeen)+" B, lastTimeBLEOnCheck="+String(lastTimeBLEOnCheck)+", BLEOnTimeout="+String(BLEOnTimeout)+", currentState="+String(currentState)+", deviceConnected="+String(deviceConnected)+", pServer->getConnectedCount()="+String(pServer->getConnectedCount()));}
         if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - pServer->getConnectedCount()="+String(pServer->getConnectedCount())+", deviceConnected="+String(deviceConnected));}
         if (webServerResponding && debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - webServerResponding="+String(webServerResponding)+" -  Stop BLE");}
-        if ((heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD) && debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD ("+String(ABSULUTE_MIN_HEAP_THRESHOLD)+" B) - Stop BLE");}
+        if (heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD) {
+          BLEunloadsCount++;
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD ("+String(ABSULUTE_MIN_HEAP_THRESHOLD)+" B) - Stop BLE");}
+        }
+        else BLEunloadsCount=0;
                 
         //Stop Advertisings and release memory only if other device is not connected, but only if no other priority event occurs
         stopBLE();
         isBeaconAdvertising=false;
         BLECurrentStatus=BLEStandbyStatus;
         lastTimeBLEOnCheck=nowTimeGlobal;
-        if (displayMode==sampleValue)
+        if (displayMode==sampleValue) {
           if (currentState==displayingSequential) forceDisplayRefresh=true; //Display to be refreshed in the next DISPLAY_REFRESH_CHECK to avoid dirty display
-          else showIcons(); //Refresh now
+          else if (currentState==displayingSampleFixed) showIcons(); //Refresh only Icons now
+        }
 
         if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Switch BLE off");}
 
         heapSizeNow=esp_get_free_heap_size();
+        if (BLEunloadsCount>=BLE_MAX_HEAP_UNLOAD_ERRORS) {
+          //Sanity softReset as there were too many consecutive BLE unloads due to lack of heap (heapSizeNow<ABSULUTE_MIN_HEAP_THRESHOLD)
+          BLEunloadsCounter++;
+          if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT check ends, Too many consecutive BLE unloads due to lack of heap. Go to softReset, BLEunloadsCount="+String(BLEunloadsCount)+", heap="+String(esp_get_free_heap_size())+" B, minHeap="+String(minHeapSeen)+" B,  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
+          softResetCounter++;  //Stats
+          BLEunloadsCount=0;
+          softResetReason=ERROR_BLE_UNLOAD;
+          softReset();
+        }
         if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - BLE_ON_TIMEOUT check ends, heap="+String(heapSizeNow)+" B, minHeap="+String(minHeapSeen)+" B,  ****** - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S ****");}
       }
     }
@@ -2179,6 +2256,7 @@ void loop() {
   // 3) or wake up from sleep (either by pressing buttons or timer)
   // 4) or previous WiFi re-connection try was ABORTED (button pressed) or BREAK (need to refresh display)
   // 5) after heap size was below ABSULUTE_MIN_HEAP_THRESHOLD
+  // 6) after detection the webServer is down
   nowTimeGlobal=loopStartTime+millis();
   if ((((nowTimeGlobal-lastTimeWifiReconnectionCheck) >= WIFI_RECONNECT_PERIOD) || forceWifiReconnect ) && 
       wifiEnabled && !firstBoot && (wifiCurrentStatus==wifiOffStatus || WiFi.status()!=WL_CONNECTED) ) {
@@ -2261,6 +2339,7 @@ void loop() {
   // 1) wake up from sleep, including hibernate (either by pressing buttons or timer)
   // 2) WiFi set ON from the config menu
   // 3) after heap size was below ABSULUTE_MIN_HEAP_THRESHOLD
+  // 4) Webserver detected down.
   if (wifiEnabled && webServerEnabled && WiFi.status()==WL_CONNECTED && forceWebServerInit) { //v0.9.9 - Re-init the built-in WebServer after waking up from sleep
     if (debugModeOn) Serial.println("    - After leaving WIFI_RECONNECT_PERIOD entering to re-init the Web Server");    
     if(SPIFFS.begin(true)) {
@@ -2301,12 +2380,11 @@ void loop() {
     // - If the previous NTP check was aborted due to Button action (forceNTPCheck=true)
     
     long auxRandom=random(1,7);
-    if (true) {
-    /*if( wifiCurrentStatus!=wifiOffStatus && wifiEnabled &&
+    if( wifiCurrentStatus!=wifiOffStatus && wifiEnabled &&
         ( CloudClockCurrentStatus==CloudClockOffStatus || forceNTPCheck ||
           (fullEnergy==energyCurrentMode && (auxRandom<2)) ||
            reducedEnergy==energyCurrentMode || 
-           lowestEnergy==energyCurrentMode ) ) {*/
+           lowestEnergy==energyCurrentMode ) ) {
       if (debugModeOn) {
         Serial.println("      - setupNTPConfig() for NTP Sync");
         if (CloudClockCurrentStatus==CloudClockOffStatus) Serial.println("        - Reason: CloudClockCurrentStatus==CloudClockOffStatus");
@@ -2403,7 +2481,7 @@ void loop() {
       "&energyCurrentMode="+energyCurrentMode+"&errorsWiFiCnt="+errorsWiFiCnt+
       "&errorsSampleUpts="+errorsSampleUpts+"&errorsNTPCnt="+errorsNTPCnt+"&webServerError1="+webServerError1+
       "&webServerError2="+webServerError2+"&webServerError3="+webServerError3+"&SPIFFSErrors="+SPIFFSErrors+
-      "&heapSize="+String(esp_get_free_heap_size())+" HTTP/1.1";
+      +"&webServerFailsCounter="+webServerFailsCounter+"&softResetCounter="+softResetCounter+"&heapSize="+String(esp_get_free_heap_size())+" HTTP/1.1";
 
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - serverToUploadSamplesIPAddress="+IpAddress2String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
                    ", httpRequest="+String(httpRequest));}
@@ -2436,14 +2514,47 @@ void loop() {
     if (debugModeOn) {Serial.print(String(loopStartTime+millis())+"  - UPLOAD_SAMPLES_PERIOD - Exit - Time: ");getLocalTime(&nowTimeInfo);Serial.print(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println(", lastTimeUploadSampleCheck="+String(lastTimeUploadSampleCheck));}
   }
 
+  //Regular actions every WEBSERVER_CHECK_PERIOD seconds
+  //Check webServer responsiveness and reset it if needed
+  nowTimeGlobal=loopStartTime+millis();
+  if ( ((nowTimeGlobal-lastTimeWebServerCheck) >= WEBSERVER_CHECK_PERIOD) && WiFi.status()==WL_CONNECTED && 
+          wifiEnabled && webServerEnabled && !firstBoot) {
+    //Get http://WiFi.localIP/samples
+    
+    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - WEBSERVER_CHECK_PERIOD webServerFailsCounter="+String(webServerFailsCounter)+", heap="+String(esp_get_free_heap_size())+" B, xPortGetFreeHeapSize()="+String(xPortGetFreeHeapSize())+" B, minHeap="+String(minHeapSeen)+" B - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+    switch (checkURL(false,false,0,WiFi.localIP(),80,String("GET ")+String(WEBSERVER_SAMPLES_PAGE)))
+    {
+      case ERROR_WEB_SERVER:
+        //Reinit WiFi and network services
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - WEBSERVER_CHECK_PERIOD - Web Server is KO. Reinit network services, heap="+String(esp_get_free_heap_size())+" B, xPortGetFreeHeapSize()="+String(xPortGetFreeHeapSize())+" B, minHeap="+String(minHeapSeen)+" B");}
+        softResetCounter++;  //Stats
+        webServerFailsCounter++;
+        softResetReason=ERROR_WEBSERVER_NO_RESPOND;
+        softReset();
+      break;
+      case ERROR_ABORT_WEB_SETUP:
+        //New check in the next loop cycle
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - WEBSERVER_CHECK_PERIOD - Button presed. Wait till next loop cycle");}
+      break;
+      case NO_ERROR:
+        //New check in the next WEBSERVER_CHECK_PERIOD
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - WEBSERVER_CHECK_PERIOD - Web Server is OK");}
+        lastTimeWebServerCheck=nowTimeGlobal;
+      default:
+      break;
+    }
+
+    if (debugModeOn) {Serial.print(String(loopStartTime+millis())+"  - WEBSERVER_CHECK_PERIOD webServerFailsCounter="+String(webServerFailsCounter)+", heap="+String(esp_get_free_heap_size())+" B, xPortGetFreeHeapSize()="+String(xPortGetFreeHeapSize())+" B, minHeap="+String(minHeapSeen)+" B - Exit - Time: ");
+        getLocalTime(&nowTimeInfo);Serial.print(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println(", lastTimeWebServerCheck="+String(lastTimeUploadSampleCheck));}
+  }
+
   if (firstBoot) firstBoot=false;
   if (buttonWakeUp) buttonWakeUp=false;
 
   //Go to hibernate if battery is ran out
   if (batCharge<=BAT_CHG_THR_TO_HIBERNATE && onlyBattery==powerState) go_to_hibernate();
 
-  //Going to sleep, but only if the display if OFF and not there's Battery power
+  //Going to sleep, but only if the display if OFF and there's Battery power
   //if (LOW==digitalRead(PIN_TFT_BACKLIGHT)) go_to_sleep(); //For testing in sleep mode
-  //if (LOW==digitalRead(PIN_TFT_BACKLIGHT) && energyCurrentMode!=fullEnergy) go_to_sleep();
   if (LOW==digitalRead(PIN_TFT_BACKLIGHT) && onlyBattery==powerState) go_to_sleep();
 }

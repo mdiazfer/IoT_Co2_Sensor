@@ -191,7 +191,7 @@ uint32_t sendAsyncHttpRequest(boolean debugModeOn, boolean fromSetup, uint32_t e
       if (debugModeOn) {Serial.write(c);}
     }
     CloudSyncCurrentStatus=CloudSyncOnStatus;
-    if (debugModeOn) {Serial.println("\n"+String(loopStartTime+millis())+" [sendAsyncHttpRequest]++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
+    if (debugModeOn) {Serial.println("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
   }
 
   //This point is reached if either the while() loop timed out or successful WEB sync
@@ -233,4 +233,88 @@ uint32_t sendAsyncHttpRequest(boolean debugModeOn, boolean fromSetup, uint32_t e
       return(NO_ERROR);
     }
   }
+}
+
+uint32_t checkURL(boolean debugModeOn,boolean fromSetup,uint32_t error_setup,IPAddress server,uint16_t port,String httpRequest) {
+  //Sending httpRequest
+  // Parameters:
+  // - logOn: whether to print logs out or not
+  //      Value false: logs are printed out
+  //      Value true:  logs are not printed out
+  // - fromSetup: where the function was called from. Diferent prints out are done base on its value
+  //      Value false: from main loop
+  //      Value true:  from the firstSetup() function
+  // - server: IP address of the HTTP server where to send the HTTP Request to
+  // - port: HTTP Server's Port number
+  // - httpRequest: HTTP request with no HTTP headers. They are set in here.
+  uint64_t timeLeft=0;
+  
+  if (debugModeOn) {Serial.print(String(loopStartTime+millis())+" [checkURL] - Trying connection to ");Serial.print(IpAddress2String(server));Serial.print(" to send httpRequest: '");Serial.print(httpRequest);Serial.println("'");}
+
+  if (client.connect(server, 80)) {
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [checkURL] - connected");}
+    // Send a HTTP request:
+    client.println(httpRequest);
+    client.print("Host: "); client.println(IpAddress2String(server));
+    client.println("User-Agent: Arduino/1.0");
+    client.println("Accept-Language: es-es");
+    client.println("Connection: close");
+    client.println();
+  }
+  else {
+    if (debugModeOn) {Serial.print(String(loopStartTime+millis())+" [checkURL] - No server connection. ERROR_WEB_SERVER - Exit - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+    return(ERROR_WEB_SERVER); //No WEB server connection
+  }
+
+  if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [checkURL]    - waiting for HTTP client.available()");}
+  timeLeft=HTTP_ANSWER_TIMEOUT;
+  while ( !client.available() && timeLeft>0) {
+    delay(50);
+    timeLeft-=50;
+    if (timeLeft>HTTP_ANSWER_TIMEOUT) timeLeft=0; //Negative value
+  
+    //Check if buttons are pressed during WEB connection handshake
+    switch (checkButtonsActions(webcheck)) {
+      case 1:
+      case 2:
+      case 3:
+        //Button1 or Button2 pressed or released. WEB Connection process aborted if not Sync is completed
+        if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [checkURL]  - checkButtonsActions() returns 1, 2 or 3 - Returning with ERROR_ABORT_WEB_SETUP");}
+        client.stop();
+        return(ERROR_ABORT_WEB_SETUP);
+      break;
+      case 0:
+      default:
+        //Regular exit. Do nothing else
+      break;
+    }
+  } //end while() loop
+
+  if (timeLeft==0) { //Case if while() loop timeout.
+    //Too long with no server answer. Something was wrong
+    if (!client.connected()) client.stop();
+    if (debugModeOn) {Serial.print(String(loopStartTime+millis())+" [checkURL] - No server connection. ERROR_WEB_SERVER - Exit - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+    return(ERROR_WEB_SERVER); //No WEB server connection
+  }
+  else { 
+    //End of while() due to successful WEB sync
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [checkURL] Server answer\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
+    while (client.available()) {//Should be very fast.
+      char c = client.read();
+      if (debugModeOn) {Serial.write(c);}
+    }
+    if (debugModeOn) {Serial.println("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
+  }
+
+  //This point is reached everthing is right
+  
+  // if the server's disconnected, stop the client:
+  if (!client.connected()) {
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [checkURL] - Disconnecting from server. Bye!");}
+    client.stop();
+  }
+
+  if (debugModeOn) {Serial.print(String(loopStartTime+millis())+" [checkURL] - GOT URL. NO_ERROR - Exit - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+  return(NO_ERROR); //WEB server connection fine
+  //return(ERROR_WEB_SERVER); //WEB server connection fine - Test
 }

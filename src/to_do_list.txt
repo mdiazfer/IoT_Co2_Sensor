@@ -1,50 +1,37 @@
 To do list
 -----------
-- Check code with TFT_eSprite stext1 in files other than main.cpp. After stext1 is free up in warming() is not longer usable.
-- General/Stability
-  + Reset device in some circumstances
-    * Lost all network connections, including ping to all checking points (default gw, google.com, etc.) but WiFi is OK
-      This was a sympthon of heap leak during BLE+WebServer tests
-    * Error "task_wdt: Task watchdog got triggered" has been triggered. How to detect it after reboot?
-    * Sanity check (once a day/week)??
-  + Save in memory (SPIFFS file??) the current 24h and 60m readings arrays before controlled reset and read them at boot time.
 - Web server
   + Web form to setup iBeacon Proximity, Major and Minor
   + Extend lastTimeBLECheck even more when upgrading firmware/SPIFFS files
+  + Add graphs
+  + Enrich the provided info in the REST API /samples
 - BLE sutff
   + General
     * clean-up of Serial.prints
-    * Checks:
-      - Analize why sometimes BLE_PERIOD is triggered if it is not the right time
-    * New Icon for BLE enabled but no BLE Advertising (gray color). Current BLEON icon to be set when BLE Advertising is ON
   + Scanning to find TAG frames
     * iBecons
     * Other frames (Location Frames, etc.)
   + Scanning to find other devices
     * iPhone, Android, airtags, etc.
-- Tests
+- Tests/Checks
   + Button and menu whith BLE enabled
   + MQTT enabled and buttons/BLE impact
+  + Check NTP icons if WiFi is disabled/OFF
+  + Analize/check improvements in the sleep/hibernate modes
+    * BLE On
+    * Error counters (softResetCounter++, webServerFailsCounter, minHeapSeenCounter, BLEnoLoadedCounter, BLEnoLoadedCount, BLEunloadsCounter, BLEunloadsCount)
+    * heap and minHeapSeen
 - Troubleshoot
-  + WiFi connection failures (????)
   + BLE
-    * Still error "task_wdt: Task watchdog got triggered" when surfering after v1.3.1
-      + Quite often when changing display mode from web and BLE is Advertising
-      + issue only in development due to the sort BLE_PERIOD (3s) ???
-    * With BLE ON, configure BLE OFF -> BLE ON -> can't get connected with Bluetooth from the smartphone (app issue?)
-    * Reset from browser crash after bootup as ESP has to serve the webpage with the BLE stack loaded (memory leak)
-    * Some times WIFI stack looks to crash (no ping, no NTP sync) just right after receiving an HTTP request enven with all the 
-      improvements (in v1.3.1)
-      + Concurrence of HTTP Request and sending uploads, NTP chects, etc??
-      + issue only in development due to the sort BLE_PERIOD (3s) ???
+    * Analize why sometimes BLE_PERIOD is triggered if it is not the right time
+  + MQTT
+    * Ping packets sent, but no readings packets
   + Some times SPIFFS doesn't get mounted and no error detected. Find out how to check if mounted to detect error
-  + Bootup situation not detected in web page after device reset from maintenance page
-  + if no MQTT server, menu/buttons are frozen
+  + If MQTT server is down, menu/buttons are frozen
   + No http connection if SSID changes or maybe wokeup from sleep (investigate)
-  + No NTP sync if SSID 2nd or 3rd is connected 
+  + No NTP sync if 2nd or 3rd SSID is connected 
 - Icon for the bootup screen
 - Candidate features
-  + REST API to get results
   + Triger alarms
   + Save CO2 samples in cloud to not lose graph pictures when the battery runs out
   + Adding Bootup info Option to the Display Info Menu

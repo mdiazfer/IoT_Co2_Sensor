@@ -1,6 +1,48 @@
 #include "misc.h"
 #include <EEPROM.h>
 
+void softReset() {
+  //Function to release memory and clean Network clases, etc. up
+  //Normally it is called when:
+  // 1) Detecting the webServer failed to serve pages
+  // 2) Failures to load the BLE module
+  // 3) BLE unloads because lack of heap
+  // 4) Min heap seen since last boot too low
+              
+  //Other symthoms about memory leaks are (not checkeck)
+  // - WIFI connected, but not ping anser
+  // - No NTP sync
+  // - No MQTT conneciton
+  // - No uploadServerRequest to the cloud
+  //The function disconect services and goes to deep sleep for just a few millisenconds
+  //The init process is done after waking up
+
+  CloudSyncLastStatus=CloudSyncCurrentStatus;CloudClockLastStatus=CloudClockLastStatus;MqttSyncLastStatus=MqttSyncCurrentStatus;
+  CloudClockCurrentStatus=CloudClockOffStatus;CloudSyncCurrentStatus=CloudSyncOffStatus;MqttSyncCurrentStatus=MqttSyncOffStatus;
+  wifiCurrentStatus=wifiOffStatus;
+  softResetOn=true;  //Force complete variable init after wake-up
+  previousLastTimeBLECheck=lastTimeBLECheck;lastTimeBLECheck=nowTimeGlobal;lastTimeBLEOnCheck=nowTimeGlobal; //Avoid BLE init next loop cycle after waking-up
+  lastTimeWebServerCheck=nowTimeGlobal;
+  sleepTimer=300000; //us - 300 millisecons
+
+  //Make sure BLE is deinitialized first
+  if (bluetoothEnabled && BLEDevice::getInitialized()) { //BLE initiated with no BLE clients connected
+    BLEDevice::stopAdvertising();BLEDevice::deinit(false); delay(750); //Stop Advertisings, release memory and give time to execute everything
+  }
+
+  //Close Network services and WiFi connection
+  SPIFFS.end();
+  webServer.end();
+  if (mqttServerEnabled) mqttClient.disconnect(true);
+  WiFi.disconnect(true,false);
+  
+  //Going to sleep
+  esp_sleep_enable_timer_wakeup(sleepTimer);
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_35,0); //1 = High, 0 = Low        
+  loopEndTime=loopStartTime+millis();
+  esp_deep_sleep_start();
+}
+
 void go_to_hibernate() {
   //Going to hibernate (switch the device off)
   if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - [go_to_hibernate] - Time: ");Serial.println("    - Setting up Power Domains OFF before going into Deep Sleep");}
@@ -79,9 +121,15 @@ void go_to_sleep() {
   esp_sleep_enable_ext0_wakeup(GPIO_NUM_35,0); //1 = High, 0 = Low
   if (debugModeOn) {Serial.println("    - Setup ESP32 to wake up when ext0 GPIO "+String(GPIO_NUM_35)+" is LOW");}
   
-  //Close WiFi connection and go to sleep
+  //Make sure BLE is deinitialized first
+  if (bluetoothEnabled && BLEDevice::getInitialized()) { //BLE initiated with no BLE clients connected
+    BLEDevice::stopAdvertising();BLEDevice::deinit(false); delay(750); //Stop Advertisings, release memory and give time to execute everything
+  }
+
+  //Close Network services, WiFi connection and go to sleep
+  SPIFFS.end();
   webServer.end();
-  mqttClient.disconnect(true);
+  if (mqttServerEnabled) mqttClient.disconnect(true);
   WiFi.disconnect(true,false);
   esp_deep_sleep_start();
 }

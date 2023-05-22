@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include <AsyncMqttClient.h>
+#include <BLEDevice.h>
 
 
 #ifndef _WIFINETWORKINFO_
@@ -38,8 +39,8 @@
   #define _WIFISUPPORT_
 #endif
 
-extern RTC_DATA_ATTR boolean debugModeOn,OTAUpgradeBinAllowed,SPIFFSUpgradeBinAllowed;
-extern RTC_DATA_ATTR uint64_t loopEndTime,loopStartTime,sleepTimer;
+extern RTC_DATA_ATTR boolean debugModeOn,OTAUpgradeBinAllowed,SPIFFSUpgradeBinAllowed,softResetOn;
+extern RTC_DATA_ATTR uint64_t loopEndTime,loopStartTime,sleepTimer,previousLastTimeBLECheck,lastTimeBLECheck,lastTimeBLEOnCheck,lastTimeWebServerCheck;
 extern RTC_DATA_ATTR float_t batCharge;
 extern RTC_DATA_ATTR struct tm startTimeInfo;
 extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled,mqttServerEnabled,secureMqttEnabled;
@@ -49,6 +50,9 @@ extern RTC_DATA_ATTR uint8_t bootCount,resetCount;
 extern RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus;
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 extern RTC_DATA_ATTR enum MqttSyncStatus MqttSyncCurrentStatus;
+extern RTC_DATA_ATTR enum CloudClockStatus CloudClockLastStatus;
+extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncLastStatus;
+extern RTC_DATA_ATTR enum MqttSyncStatus MqttSyncLastStatus;
 extern RTC_DATA_ATTR AsyncEventSource webEvents;
 extern RTC_DATA_ATTR ulong BLEPeriod,BLEOnTimeout;
 
@@ -58,6 +62,7 @@ extern String ntpServers[4];
 extern struct tm nowTimeInfo;
 extern String userName,userPssw,mqttUserName,mqttUserPssw,mqttServer,mqttTopicPrefix,mqttTopicName,device;
 
+void softReset();
 void go_to_hibernate();
 void go_to_sleep();
 String roundFloattoString(float_t number, uint8_t decimals);

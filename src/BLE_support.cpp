@@ -173,6 +173,11 @@ uint32_t setupBLE() {
   //if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [setupBLE] - Advertising started");
   
   //Release memory
+  if (!BLEDevice::getInitialized()) {
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  [setupBLE] - BLEDevice failed to ge initiated and heap="+String(esp_get_free_heap_size())+". Exit");}
+    return ERROR_BLE_SETUP;
+  }
+  
   BLEDevice::deinit(false);
   if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  [setupBLE] - BLEDevice deinitiated and heap="+String(esp_get_free_heap_size())+". Exit");}
 
@@ -236,7 +241,10 @@ void stopBLE(uint8_t caller) {
   if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  [stopBLE] - Init and heap="+String(esp_get_free_heap_size())+", rtc_wdt_get_timeout="+String(wdt_timeout)+", rtc_wdt_get_protect_status="+String(rtc_wdt_get_protect_status())+", rtc_wdt_is_on="+String(rtc_wdt_is_on()));}
   
   //Overflow protection mechanism
-  if (pServer==nullptr) return;
+  if (pServer==nullptr || !BLEDevice::getInitialized()) {
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  [stopBLE] - BLE looks already disconnected and heap="+String(heapSizeNow)+" B. Exit");}
+    return;
+  }
   
   //Stop Advertisings and release memory
   BLEDevice::stopAdvertising();

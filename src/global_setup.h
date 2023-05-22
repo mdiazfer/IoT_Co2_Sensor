@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "1.3.3"
+#define VERSION "1.4.0"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -127,6 +127,10 @@
 #define ERROR_UPLOAD_FILE_BADCOOKIE_FORMAT  0x12
 #define ERROR_UPLOAD_FILE_UPLOAD_ONGOING    0x13
 #define ERROR_UPLOAD_FILE_BADCOOKIE         0x14
+#define ERROR_WEBSERVER_NO_RESPOND          0X20
+#define ERROR_BLE_NO_LOAD                   0X21
+#define ERROR_BLE_UNLOAD                    0x22
+#define ERROR_MIN_HEAP                      0X23
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240
@@ -263,6 +267,7 @@
 #define WEBSERVER_MIN_HEAP_SIZE  95000  //Based on tests
 #define WEBSERVER_SEND_DELAY 800  //milliseconds - Delay to allow stop BLE Advertisings before sending HTTP Answer
 #define WEBSERVER_PORT 80
+#define WEBSERVER_CHECK_PERIOD 240000  //milliseconds - Check webServer responsiveness every 4 min
 #define WEBSERVER_CSSSTYLES_PAGE "/styles.css"
 #define WEBSERVER_CSSNAVBAR_PAGE "/tswnavbar.css"
 #define WEBSERVER_LOGO_ICON "/The_IoT_Factory.png"
@@ -321,7 +326,7 @@
 #define NTP_KO_CHECK_PERIOD  60000 //Milliseconds. 1 minute
 #define NTP_CHECK_TIMEOUT     5000  //Millisecons. Should have NTP anser within 2 sc.
 #define POWER_ENABLE_DELAY 50 //250 //Milliseconds
-#define SAMPLE_PERIOD          20000  //milliseconds - Full Energy Mode (USB powered)
+#define SAMPLE_PERIOD          10000 //20000  //milliseconds - Full Energy Mode (USB powered)
 #define SAMPLE_PERIOD_RE       60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define SAMPLE_PERIOD_SE      300000  //milliseconds - 5 mim in Saving Energy Mode
 #define SAMPLE_T_LAST_HOUR     20 //Seconds - Period of last hour samples to be recorded
@@ -331,10 +336,13 @@
 #define BLE_ON_TIMEOUT           2000  //milliseconds - 2 sg in Full Energy Mode (USB powered)
 #define BLE_ON_TIMEOUT_RE        1000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define BLE_ON_TIMEOUT_SE         500  //milliseconds - 5 mim in Saving Energy Mode
-#define BLE_PERIOD           10000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
+#define BLE_PERIOD           20000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
 #define BLE_PERIOD_RE        60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define BLE_PERIOD_SE        300000  //milliseconds - 5 mim in Saving Energy Mode
 #define BLE_PERIOD_EXTENSION 10000  //120000  //milliseconds - 2 mim extension due to webServer activity
+#define BLE_PRE_PERIOD       150  //milliseconds - Guard slot to inform the webServer module the BLE is about to be loaded
+#define BLE_MAX_LOAD_ERRORS   12  //How many consecutive errors to load the BLE module
+#define BLE_MAX_HEAP_UNLOAD_ERRORS  6  //How many consecutive BLE unloads due to low heap memory
 #define TIME_LONG_PRESS_BUTTON1_HIBERNATE  5000 // 
 #define TIME_LONG_PRESS_BUTTON2_TOGGLE_BACKLIGHT  5000 // 
 #define TIME_TO_SLEEP_FULL_ENERGY 5*uS_TO_S_FACTOR 
@@ -394,7 +402,8 @@
 //BLE stuff
 #define BLE_ENABLED  false
 #define BLE_MIN_HEAP_SIZE  95000  //Based on tests
-#define ABSULUTE_MIN_HEAP_THRESHOLD  25000  //Bellow this threshold garbage collection is needed
+#define ABSULUTE_MIN_HEAP_THRESHOLD  15000  //Bellow this threshold, heap overflow risk. SoftReset is needed. 
+#define MIN_HEAP_SEEN_THRESHOLD        700  //Bellow this threshold, heap overflow risk. SoftReset is needed. 
 #define BEACON_UUID           "F7826DA6-4FA2-4E98-8024-BC5B71E0893E"  //Kontakt proximity
 #define BEACON_UUID_REV       "3E89E071-5BBC-2480-984E-A24FA66D82F7" //Kontakt proximity reverse
 #define BEACON_MANUFACTURER   0x4c00

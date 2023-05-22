@@ -59,6 +59,8 @@ extern RTC_DATA_ATTR char co2SensorVersion[5];
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 extern RTC_DATA_ATTR uint32_t error_setup;
 extern RTC_DATA_ATTR uint64_t lastTimeBLECheck,loopStartTime;
+extern RTC_DATA_ATTR uint8_t BLEnoLoadedCount,BLEunloadsCount;
+extern RTC_DATA_ATTR int webServerFailsCounter,softResetCounter,BLEnoLoadedCounter,BLEunloadsCounter,minHeapSeenCounter;
 #ifdef __MHZ19B__
   extern MHZ19 co2Sensor;  //64 B
 #endif
@@ -88,11 +90,16 @@ extern String fileUpdateName;
 extern char activeCookie[],currentSetCookie[];
 extern JSONVar samples;
 extern String mqttTopicName;
-extern bool webServerResponding,isBeaconAdvertising;
+extern bool webServerResponding,isBeaconAdvertising,BLEtoBeLoaded;
 
 extern void stopBLE(uint8_t caller);
 
-String processor(const String& var);
+String processorInfo(const String& var);
+String processorBasic(const String& var);
+String processorCloud(const String& var);
+String processorBluetooth(const String& var);
+String processorMaintenance(const String& var);
+String processorContainer(const String& var);
 String processorAP(const String& var);
 uint32_t initWebServer();
 uint32_t initAPWebServer();

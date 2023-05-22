@@ -8,9 +8,23 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
-- 1.3.3 17/May/2023   - Added *Send* icons for MQTT, NTP and Upload Readings. Display refreshed when they're active
+- 1.4.0 21/May/2023   - Reduced ABSULUTE_MIN_HEAP_THRESHOLD to 15000 B
+                      - Robustness and resiliancy
+                        + Split processor callback in webServer class to reduce memory requirements and CPU processor time
+                        + Set a guard time slot just right before loading the BLE module to inform the webServer about it
+                        + softReset for memory cleanup if:
+                          * webServer fails to sever web page (check every WEBSERVER_CHECK_PERIOD)
+                          * BLE fails to be loaded more than BLE_MAX_LOAD_ERRORS consecutive tries
+                          * BLE unload due to lack of hep more than BLE_MAX_HEAP_UNLOAD_ERRORS consecutive tries
+                          * Min heap seen below MIN_HEAP_SEEN_THRESHOLD
                       - Bug fixing:
-                        + Memory leak: corrected the wrong usage of pointer and HTTP Requests creation in webServer.cpp
+                        + BLE notify new readings
+                        + Wrong BLE disconnection at BLE_PERIOD
+                        + Wrong Icon refresh in the Menu screens
+                        + Crash when Reset from web
+                      - Webserver
+                        + Added new error stats on the maintenance.html page
+- 1.3.3 17/May/2023   - Added *Send* icons for MQTT, NTP and Upload Readings. Display refreshed when they're active
 - 1.3.2 16/May/2023   - Bug fixing: BLE icons didn't refreshed properly 
 - 1.3.1 16/May/2023   - BLE modificactions
                         + In function stopBLE, turn WDT back to automatic only if !webServerResponding

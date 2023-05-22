@@ -183,6 +183,11 @@
               <p>SPIFFS Errors:&nbsp; ~SPIFFSERRORS~</p>
               <p>Boots since last upgrade:&nbsp; ~BOOTCOUNT~</p>
               <p>Uncontrolled resets since last upgrade:&nbsp; ~RESETCOUNT~</p>
+              <p>Total number of sanity resets since last boot:&nbsp; ~SOFTRESETCOUNTER~</p>
+              <p>&nbsp;&nbsp;&nbsp;&nbsp;- Web server failed to response:&nbsp; ~WEBSERVERFAILCOUNTER~</p>
+              <p>&nbsp;&nbsp;&nbsp;&nbsp;- Failures to load the BLE module:&nbsp; ~BLENOLOADCOUNTER~</p>
+              <p>&nbsp;&nbsp;&nbsp;&nbsp;- BLE unloads because lack of heap:&nbsp; ~BLEUNLOADCOUNTER~</p>
+              <p>&nbsp;&nbsp;&nbsp;&nbsp;- Min heap seen since last boot too low:&nbsp; ~MINHEAPSEENCOUNTER~</p>
               <p>Current heap size:&nbsp; ~CURRENTHEAPSIZE~ (Bytes)</p>
               <p>Minimum heap size since last boot:&nbsp; ~MINHEAPSIZE~ (Bytes)</p>
             </fieldset>
