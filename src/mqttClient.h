@@ -4,11 +4,18 @@
 #include <AsyncMqttClient.h>
 #include <TFT_eSPI.h>
 #include "misc.h"
+#include "soc/rtc_wdt.h"
+
+#ifndef _BUTTONSFRAMEWORK_
+    enum callingAction {mainloop,askAPloop,ntpcheck,wificheck,webcheck,mqttcheck};
+    #define _BUTTONSFRAMEWORK_
+#endif
 
 extern RTC_DATA_ATTR AsyncMqttClient mqttClient;
 extern RTC_DATA_ATTR enum MqttSyncStatus MqttSyncCurrentStatus;
 extern RTC_DATA_ATTR boolean debugModeOn,wifiEnabled,mqttServerEnabled;
 extern RTC_DATA_ATTR uint32_t error_setup;
+extern bool isBeaconAdvertising;
 extern String mqttServer;
 extern TFT_eSprite stext1;
 extern uint8_t pixelsPerLine,
@@ -28,3 +35,5 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
 void onMqttUnsubscribe(uint16_t packetId);
 void onMqttPublish(uint16_t packetId);
 uint32_t mqttClientInit(bool fromSetup, bool debugModeOn, bool TFTDisplayLogs);
+
+extern uint8_t checkButtonsActions(enum callingAction fromAction);

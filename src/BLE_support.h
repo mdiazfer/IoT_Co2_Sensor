@@ -46,10 +46,9 @@ extern BLEAdvertisementData* pAdvertisementData;
 
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
-      //pServer->getServiceByUUID(BLEUUID(BLE_SERVICE_UUID))->getCharacteristic(BLEUUID(BLE_CHARACT_CO2_UUID))->setValue(valueCO2);
-      pCharacteristicCO2->setValue(valueCO2);  //pCharacteristicCO2 is global pointer
-      pCharacteristicT->setValue(valueT);  //pCharacteristicT is global pointer
-      pCharacteristicHum->setValue(valueHum);  //pCharacteristicHum is global pointer
+      pCharacteristicCO2->setValue(String(valueCO2).c_str());  //pCharacteristicCO2 is global pointer
+      pCharacteristicT->setValue(String(valueT).c_str());  //pCharacteristicT is global pointer
+      pCharacteristicHum->setValue(String(valueHum).c_str());  //pCharacteristicHum is global pointer
 
       deviceConnected = true;
       BLECurrentStatus=BLEConnectedStatus;
@@ -86,13 +85,22 @@ class MyCallbacks: public BLECharacteristicCallbacks {
     }
 
     void onRead(BLECharacteristic *pCharacteristic) {
-      BLEUUID Co2BLEUUID;
+      
+      BLEUUID characteristicBLEUUID;
 
-      Co2BLEUUID=pCharacteristic->getUUID();
+      characteristicBLEUUID=pCharacteristic->getUUID();
 
-      if (Co2BLEUUID.equals(BLEUUID(BLE_CHARACT_CO2_UUID))) {
-          pCharacteristic->setValue(valueCO2);
-          if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onRead] - Sent CO2 value");
+      if (characteristicBLEUUID.equals(BLEUUID(BLE_CHARACT_CO2_UUID))) { //v1.4.1
+        pCharacteristic->setValue(valueCO2);
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onRead] - Sent CO2 value "+String(valueCO2));
+      } 
+      else if (characteristicBLEUUID.equals(BLEUUID(BLE_CHARACT_TEM_UUID))) {
+        pCharacteristic->setValue(valueT);
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onRead] - Sent Temperature value "+String(valueT));
+      }
+      else if (characteristicBLEUUID.equals(BLEUUID(BLE_CHARACT_HUM_UUID))) {
+        pCharacteristic->setValue(valueHum);
+        if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onRead] - Sent Humidity value "+String(valueHum));
       }
 
       if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [onRead] - Ends");

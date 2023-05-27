@@ -255,9 +255,9 @@ uint32_t wifiConnect(boolean debugModeOn=true, boolean msgTFT=true, boolean chec
   return(NO_ERROR); //WiFi Connection OK
 }
 
-uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,uint64_t* whileLoopTimeLeft=nullptr) {
-  //If function called fron firstSetup(), then logs are displayed
-  // and buttons are checked during NTP Sync handshake
+uint32_t setupNTPConfig(boolean debugModeOn,boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,uint64_t* whileLoopTimeLeft=nullptr) {
+  //If function is called from firstSetup(), then logs are displayed
+  // Buttons are checked during NTP Sync handshake
   // Parameters:
   // - fromSetup: where the function was called from. Diferent prints out are done base on its value
   //      Value false: from main loop
@@ -307,10 +307,8 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
     for (uint8_t loopCounter=*auxLoopCounter; loopCounter<(uint8_t)sizeof(ntpServers)/sizeof(String); loopCounter++) {
       if (ntpServers[loopCounter].charAt(0)=='\0') loopCounter++;
       else {
-        if ((debugModeOn && fromSetup) || debugModeOn) {Serial.println("[setup - NTP] Connecting to NTP Server: "+ntpServers[loopCounter]);}
-        if (!NTPResuming) { //Only calling configXTime() for new checks
-          configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
-        }
+        if (debugModeOn) {Serial.println("[setup - NTP] Configuring configTzTime("+String(TZEnvVariable.c_str())+","+String(ntpServers[loopCounter].c_str())+") to connecting to NTP Server: "+ntpServers[loopCounter]);}
+        configTzTime(TZEnvVariable.c_str(), ntpServers[loopCounter].c_str());
 
         *auxLoopCounter=loopCounter;
         uint64_t whileStartTime=loopStartTime+millis(),auxTime=whileStartTime;
@@ -323,6 +321,19 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
           *whileLoopTimeLeft=*whileLoopTimeLeft-(loopStartTime+millis()-auxTime);
           auxTime=loopStartTime+millis();
           delay(50);
+
+          //Check if BLE is ON
+          if (isBeaconAdvertising) { //Stop synch if BLE is ON - v1.4.1
+            if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - BLE ON - Returning with ERROR_ABORT_NTP_SETUP");}
+            if (sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED) { //Actions required as the process is aborted
+              forceNTPCheck=true; //Let's grant NTP check again in the next loop interaction
+              CloudClockCurrentStatus=CloudClockSendStatus;
+              loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String); //Ends the for loop
+              auxForLoop=loopCounter;
+              return(ERROR_ABORT_NTP_SETUP);
+            }
+          }
+
           //Check if buttons are pressed during NTP sync handshake (if not in the first Setup)
           if (!fromSetup) {
             switch (checkButtonsActions(ntpcheck)) {
@@ -333,10 +344,8 @@ uint32_t setupNTPConfig(boolean fromSetup=false,uint8_t* auxLoopCounter=nullptr,
                 if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - checkButtonsActions() returns 1, 2 or 3 - Returning with ERROR_ABORT_NTP_SETUP");}
                 if (sntp_get_sync_status()!=SNTP_SYNC_STATUS_COMPLETED) { //Actions required as the process is aborted
                   forceNTPCheck=true; //Let's grant NTP check again in the next loop interaction
-                  //CloudClockCurrentStatus=previousCloudClockCurrentStatus; //Restore Cloud Clock status
                   CloudClockCurrentStatus=CloudClockSendStatus;
                   loopCounter=(uint8_t)sizeof(ntpServers)/sizeof(String); //Ends the for loop
-                  //whileFlagOn=false; //Breaks the while loop and continue to the regular loop() flow
                   auxForLoop=loopCounter;
                   return(ERROR_ABORT_NTP_SETUP);
                 }

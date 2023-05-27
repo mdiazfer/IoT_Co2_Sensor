@@ -60,12 +60,27 @@ uint32_t mqttClientInit(bool fromSetup, bool debugModeOn, bool TFTDisplayLogs) {
 
   if ((error_setup & ERROR_WIFI_SETUP)==0 && wifiEnabled && mqttServerEnabled) { 
     //Connect to MQTT broker
-    mqttClient.connect();    
+    mqttClient.connect();
     
     //Wait for the MQTT client to get connected or timeout (5sg), whatever happens first
-    if (fromSetup) {
-      ulong now=millis();
-      while (!mqttClient.connected() && (millis()<=now+5000));
+    ulong now=millis();
+    bool buttonPressed=false;
+    while (!mqttClient.connected() && (millis()<=now+5000) && !buttonPressed && !isBeaconAdvertising) {
+      if (!fromSetup) { //v1.4.1 - Abort if buttons are pressed. This avoids config menu gets frozen
+        switch (checkButtonsActions(mqttcheck)) { 
+          case 1:
+          case 2:
+          case 3:
+            //Button1 or Button2 pressed or released. MQTT Connect process aborted
+            if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - checkButtonsActions() returns 1, 2 or 3 - Stop MQTT connection");}
+            buttonPressed=true;
+          break;
+          case 0:
+          default:
+            //Regular exit. Do nothing else
+          break;
+        }
+      }
     }
     if (mqttClient.connected()) MqttSyncCurrentStatus=MqttSyncOnStatus;
 
@@ -79,7 +94,8 @@ uint32_t mqttClientInit(bool fromSetup, bool debugModeOn, bool TFTDisplayLogs) {
         stext1.setTextColor(TFT_DARKGREY_4_BITS_PALETTE,TFT_BLACK);
       }
     }
-    else {
+    else
+    {
       if (debugModeOn && fromSetup) {Serial.println("[KO]");}
       if (TFTDisplayLogs) {
         stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[");
@@ -98,7 +114,8 @@ uint32_t mqttClientInit(bool fromSetup, bool debugModeOn, bool TFTDisplayLogs) {
 
     if (TFTDisplayLogs) {stext1.print(mqttServer);if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine); }
   }
-  else {
+  else 
+  {
     if ((error_setup & ERROR_WIFI_SETUP)!=0 || !wifiEnabled) {
       if (debugModeOn && fromSetup) {Serial.println("No WiFi");}
       if (TFTDisplayLogs) {

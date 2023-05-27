@@ -96,6 +96,8 @@ String processorInfo(const String& var){
     if (mqttServerEnabled) return String("Enabled"); else return String("Disabled");
   } else if (var == "Secure_MQTTSERVICESSTATUS") {
     if (secureMqttEnabled) return String("Enabled"); else return String("Disabled");
+  } else if (var == "MQTTSERVER") {
+    return mqttServer;
   } else if (var == "MQTTTOPICNAME") {
     return mqttTopicName;
   } else if (var == "CLOUDSERVICESURL") {
@@ -147,7 +149,7 @@ String processorInfo(const String& var){
     return String();
   }
   log_v("<< processorInfo. Exit");
-}
+} //processorInfo
   
 String processorBasic(const String& var){
   log_v(">> processorBasic");  
@@ -264,7 +266,7 @@ String processorBasic(const String& var){
     return String();
   }
   log_v("<< processorBasic. Exit");
-}
+} //processorBasic
   
 String processorCloud(const String& var){
   log_v(">> processorCloud");  
@@ -328,7 +330,7 @@ String processorCloud(const String& var){
     return String();
   }
   log_v("<< processorCloud. Exit");
-}
+} //processorCloud
 
 String processorBluetooth(const String& var){
   log_v(">> processorBluetooth");  
@@ -342,7 +344,7 @@ String processorBluetooth(const String& var){
     return String();
   }
   log_v("<< processorBluetooth. Exit");
-}
+} //processorBluetooth
 
 String processorContainer(const String& var){
   log_v(">> processorContainer");  
@@ -381,7 +383,7 @@ String processorContainer(const String& var){
     return String();
   }
   log_v("<< processorContainer. Exit");
-}
+} //processorContainer
   
 String processorMaintenance(const String& var){
   log_v(">> processorMaintenance");  
@@ -411,6 +413,8 @@ String processorMaintenance(const String& var){
     return String(bootCount);
   } else if (var == "RESETCOUNT") {
     return String(resetCount);
+  } else if (var == "LASTRESETREASON") {
+    return String(softResetReason,HEX);
   } else if (var == "WEBSERVERFAILCOUNTER") {
     return String(webServerFailsCounter);
   } else if (var == "BLENOLOADCOUNTER") {
@@ -435,7 +439,7 @@ String processorMaintenance(const String& var){
     return String();
   }
   log_v("<< processorMaintenance. Exit");
-}
+} //processorMaintenance
 
 uint32_t initWebServer() {
   
@@ -1237,7 +1241,8 @@ uint32_t initWebServer() {
       //Connect to the MQTT broker
       if (WiFi.status()==WL_CONNECTED && !mqttClient.connected() && mqttServerEnabled) { //Connect to MQTT broker again
         if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  [webServer cloud] - about to init Mqtt client");
-        mqttClientInit(false,true,false);
+        //mqttClientInit(false,false,false);
+        forceMQTTConnect=true; //v1.4.1 Connect from the loop cycle to avoid the error "task_wdt: Task watchdog got triggered"
       }
       if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  [webServer cloud] - about to exit");
     }

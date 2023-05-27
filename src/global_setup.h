@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "1.4.0"
+#define VERSION "1.4.1"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -208,16 +208,18 @@
 #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE
   #define NTP_SERVER  "10.88.50.5"
   //#define NTP_SERVER  "time.google.com"
-  #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
-  #define NTP_SERVER3  "time4.google.com"  //216.239.35.12
+  #define NTP_SERVER2  "time.google.com"
+  #define NTP_SERVER3  "pool.ntp.org"
   #define NTP_SERVER4  "time.apple.com"
+  //#define NTP_SERVER4  "time.windows.com"
 #endif
 #if BUILD_ENV_NAME==BUILD_TYPE_DEVELOPMENT
   #define NTP_SERVER  "10.88.50.5"
   //#define NTP_SERVER  "time.google.com"
-  #define NTP_SERVER2  "time2.google.com"  //216.239.35.4
-  #define NTP_SERVER3  "time4.google.com"  //216.239.35.12
+  #define NTP_SERVER2  "time.google.com"
+  #define NTP_SERVER3  "pool.ntp.org"
   #define NTP_SERVER4  "time.apple.com"
+  //#define NTP_SERVER4  "time.windows.com"
 #endif
 #ifndef NTP_SERVER
   #define NTP_SERVER  "time.google.com"
@@ -320,13 +322,13 @@
 #define DISPLAY_MODE_REFRESH_PERIOD 5000 //milliseconds
 #define DISPLAY_REFRESH_PERIOD      5000 //milliseconds
 #define FULL_CHARGE_TIME 9000000 //Milliseconds for 100% charge 9000000=2h30m
-#define HTTP_ANSWER_TIMEOUT 20000 //7000  //Millisenconds
+#define HTTP_ANSWER_TIMEOUT 7000  //Millisenconds
 #define ICON_STATUS_REFRESH_PERIOD  DISPLAY_REFRESH_PERIOD  //milliseconds
 #define ICON_ON_TIMEOUT       750 //Time the icons shows activity (MQTT, Upload readings, NTP sync)   
 #define NTP_KO_CHECK_PERIOD  60000 //Milliseconds. 1 minute
 #define NTP_CHECK_TIMEOUT     5000  //Millisecons. Should have NTP anser within 2 sc.
 #define POWER_ENABLE_DELAY 50 //250 //Milliseconds
-#define SAMPLE_PERIOD          10000 //20000  //milliseconds - Full Energy Mode (USB powered)
+#define SAMPLE_PERIOD          20000  //milliseconds - Full Energy Mode (USB powered)
 #define SAMPLE_PERIOD_RE       60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define SAMPLE_PERIOD_SE      300000  //milliseconds - 5 mim in Saving Energy Mode
 #define SAMPLE_T_LAST_HOUR     20 //Seconds - Period of last hour samples to be recorded
@@ -339,7 +341,7 @@
 #define BLE_PERIOD           20000 //20000  //milliseconds - 20 sg in Full Energy Mode (USB powered)
 #define BLE_PERIOD_RE        60000  //milliseconds - 1 min in Reduce Energy Mode (BAT powered)
 #define BLE_PERIOD_SE        300000  //milliseconds - 5 mim in Saving Energy Mode
-#define BLE_PERIOD_EXTENSION 10000  //120000  //milliseconds - 2 mim extension due to webServer activity
+#define BLE_PERIOD_EXTENSION 30000  //milliseconds - 30 sec extension due to webServer activity
 #define BLE_PRE_PERIOD       150  //milliseconds - Guard slot to inform the webServer module the BLE is about to be loaded
 #define BLE_MAX_LOAD_ERRORS   12  //How many consecutive errors to load the BLE module
 #define BLE_MAX_HEAP_UNLOAD_ERRORS  6  //How many consecutive BLE unloads due to low heap memory
@@ -355,7 +357,9 @@
 #define VOLTAGE_CHECK_PERIOD 5000 //Milliseconds - 5 s
 #define VOLTAGE_CHECK_PERIOD_RE 300000 //Milliseconds - 5 min in Reduced Energy Mode
 #define VOLTAGE_CHECK_PERIOD_SE 300000 //Milliseconds - 5 min in Save Energy Mode
-#define WIFI_RECONNECT_PERIOD  300000 //milliseconds - 5 min
+#define WIFI_RECONNECT_PERIOD  120000 //milliseconds - 2 min - less than UPLOAD_SAMPLES_PERIOD for quicker icon refresh
+#define WIFI_RECONNECT_PERIOD_RE  UPLOAD_SAMPLES_PERIOD  //millisenconds - 5 min in Reduce Energy Mode
+#define WIFI_RECONNECT_PERIOD_SE  UPLOAD_SAMPLES_PERIOD  //millisenconds - 5 min in Reduce Energy Mode
 #define WD_TIMEOUT             20000 //milliseconds - 20 s
 
 //Binary header stuff
@@ -363,7 +367,7 @@
 #define BINARY_HD_MAGIC_NUMBER       0xE9 //Magic number as per https://docs.espressif.com/projects/esptool/en/latest/esp32/advanced-topics/firmware-image-format.html
 #define BINARY_HD_MAGIC_NUMBER_ADDR  0x00 //Address
 #define BINARY_HD_MAGIC_WORD         0xABCD5432 //Magic word as per //https://github.com/espressif/esp-idf/blob/8fbb63c2a701c22ccf4ce249f43aded73e134a34/components/bootloader_support/include/esp_image_format.h#L58
-#define BINARY_HD_MAGIC_WORD_ADDR  0x20 //Address - 32 = 0x20
+#define BINARY_HD_MAGIC_WORD_ADDR    0x20 //Address - 32 = 0x20
 
 //SPIFFS stuff
 #define SPIFFS_CFG_LOG_BLOCK_SZ  4096 //Bytes - Size of Logical SPIFFS Blocks
@@ -473,7 +477,7 @@
   #endif
 
   #ifndef _BUTTONSFRAMEWORK_
-    enum callingAction {mainloop,askAPloop,ntpcheck,wificheck,webcheck};
+    enum callingAction {mainloop,askAPloop,ntpcheck,wificheck,webcheck,mqttcheck};
     #define _BUTTONSFRAMEWORK_
   #endif
 

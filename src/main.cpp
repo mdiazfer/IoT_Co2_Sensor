@@ -43,10 +43,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   1507 B
+// RTC memory variables:                   1512 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     4587 B
-// RTC memory left:     8000 B - 4587 B = 3413 B 
+// RTC memorty TOTAL:                     4592 B
+// RTC memory left:     8000 B - 4592 B = 3410 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -105,7 +105,7 @@ RTC_DATA_ATTR uint64_t nowTimeGlobal=0,timeUSBPowerGlobal=0,loopStartTime=0,loop
                         lastTimeHourSampleCheck=0,lastTimeDaySampleCheck=0,lastTimeUploadSampleCheck=0,lastTimeIconStatusRefreshCheck=0,
                         lastTimeTurnOffBacklightCheck=0,lastTimeWifiReconnectionCheck=0,
                         lastMQTTChangeCheck=0,lastCloudChangeCheck=0,lastCloudClockChangeCheck=0,lastTimeWebServerCheck=0; //20*8=160 B
-RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,BLEPeriod,BLEOnTimeout; //4*4=16B
+RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,BLEPeriod,BLEOnTimeout,wifiReconnectPeriod; //5*4=20B
 RTC_DATA_ATTR uint64_t sleepTimer=0; //8 B
 RTC_DATA_ATTR enum displayModes displayMode=bootup,lastDisplayMode=bootup; //2*4=8 B
 RTC_DATA_ATTR enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState; //3*4=12 B
@@ -138,7 +138,7 @@ RTC_DATA_ATTR char TZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH]="\0"; //57 B Should be e
 RTC_DATA_ATTR struct tm startTimeInfo; //36 B
 RTC_DATA_ATTR boolean firstWifiCheck=true,forceWifiReconnect=false,forceGetSample=false,forceGetVolt=false,
         forceDisplayRefresh=false,forceDisplayModeRefresh=false,forceNTPCheck=false,buttonWakeUp=false,
-        forceWEBCheck=false,forceWEBTestCheck=false,forceWebServerInit=false,softResetOn=false; // 13*1=13 Bº
+        forceWEBCheck=false,forceWEBTestCheck=false,forceWebServerInit=false,softResetOn=false,forceMQTTConnect=false; // 14*1=14 B
 RTC_DATA_ATTR int uploadServerIPAddressOctectArray[4]; // 4*4B = 16B - To store upload server's @IP
 RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
@@ -249,7 +249,7 @@ void initVariable() {
                               TFT_BLUE,TEMP_BAR_TH2,TFT_RED,TFT_DARKGREY,TFT_BLACK);
   firstWifiCheck=true;forceWifiReconnect=false;forceGetSample=false;forceGetVolt=false;
   forceDisplayRefresh=false;forceDisplayModeRefresh=false;forceNTPCheck=false;buttonWakeUp=false;
-  forceWEBCheck=false;forceWEBTestCheck=false;forceWebServerInit=false;softResetOn=false;
+  forceWEBCheck=false;forceWEBTestCheck=false;forceWebServerInit=false;softResetOn=false;forceMQTTConnect=false;
   valueCO2=0;valueT=0;valueHum=0;lastValueCO2=-1;tempMeasure=0;
   errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;webServerError1=0;webServerError2=0;webServerError3=0;
   SPIFFSErrors=0;webServerFailsCounter=0;softResetCounter=0;
@@ -1116,7 +1116,7 @@ void firstSetup() {
   CloudClockCurrentStatus=CloudClockOffStatus;
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - NTP: [");
   if (wifiCurrentStatus!=wifiOffStatus && wifiEnabled) { 
-    error_setup|=setupNTPConfig(true,&auxLoopCounter2,&whileLoopTimeLeft); //Control variables were init in initVariables()
+    error_setup|=setupNTPConfig(true,true,&auxLoopCounter2,&whileLoopTimeLeft); //Control variables were init in initVariables()
     lastTimeNTPCheck=loopStartTime+millis();  //loopStartTime=0 just right after bootup
     if ((error_setup & ERROR_NTP_SERVER)!=0) {
       stext1.setTextColor(TFT_RED_4_BITS_PALETTE,TFT_BLACK); stext1.print("KO");
@@ -1307,6 +1307,7 @@ void firstSetup() {
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+      wifiReconnectPeriod=WIFI_RECONNECT_PERIOD;
       BLEPeriod=BLE_PERIOD;
       BLEOnTimeout=BLE_ON_TIMEOUT;
       if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
@@ -1318,6 +1319,7 @@ void firstSetup() {
       else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
+      wifiReconnectPeriod=WIFI_RECONNECT_PERIOD_RE;
       BLEPeriod=BLE_PERIOD_RE;
       BLEOnTimeout=BLE_ON_TIMEOUT_RE;
       if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
@@ -1329,6 +1331,7 @@ void firstSetup() {
       else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
+      wifiReconnectPeriod=WIFI_RECONNECT_PERIOD_SE;
       BLEPeriod=BLE_PERIOD_SE;
       BLEOnTimeout=BLE_ON_TIMEOUT_SE;
       if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
@@ -1430,11 +1433,13 @@ boolean warmingUp() {
     circularGauge.setValue((int)(co2PreheatingTime-millis())/1000);
     circularGauge.drawTextGauge("warmup",TEXT_SIZE,true,TEXT_SIZE_UNITS_CO2,TEXT_FONT,TEXT_FONT_UNITS_CO2,TFT_GREENYELLOW);
 
+    CloudSyncLastStatus=CloudSyncCurrentStatus;CloudClockLastStatus=CloudClockCurrentStatus;MqttSyncLastStatus=MqttSyncCurrentStatus; //To update rest of icons -v1.4.1
     //Update icons every 5 seconds
     if (5==auxCounter) {
       //Update WiFi icon
       if (WiFi.status()!=WL_CONNECTED) {
         //WiFi is not connected. Update wifiCurrentStatus properly
+        CloudClockCurrentStatus=CloudClockOffStatus;CloudSyncCurrentStatus=CloudSyncOffStatus;MqttSyncCurrentStatus=MqttSyncOffStatus; //To update rest of icons -v1.4.1
         wifiCurrentStatus=wifiOffStatus;
       }
       else {
@@ -1778,9 +1783,10 @@ void loop() {
   if ( ((MqttSyncLastStatus!=MqttSyncCurrentStatus) || (CloudSyncLastStatus!=CloudSyncCurrentStatus) || (CloudClockLastStatus!=CloudClockCurrentStatus) ||
         (((nowTimeGlobal-lastMQTTChangeCheck)  >= ICON_ON_TIMEOUT) && (MqttSyncCurrentStatus==MqttSyncSendStatus)) || 
         (((nowTimeGlobal-lastCloudChangeCheck) >= ICON_ON_TIMEOUT) && (CloudSyncCurrentStatus==CloudSyncSendStatus)) ||
-        (((nowTimeGlobal-lastCloudClockChangeCheck) >= ICON_ON_TIMEOUT) && (CloudClockCurrentStatus==CloudClockSendStatus)) ) && !firstBoot ) {
+        (((nowTimeGlobal-lastCloudClockChangeCheck) >= ICON_ON_TIMEOUT) && (CloudClockCurrentStatus==CloudClockSendStatus)) ) 
+        && !firstBoot && (digitalRead(PIN_TFT_BACKLIGHT)!=LOW)) {
 
-    Serial.println(String(nowTimeGlobal)+"  - DISPLAY_ICONS_CHECK_PERIOD");
+    if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  - DISPLAY_ICONS_CHECK_PERIOD");
     /*Serial.println(String(nowTimeGlobal)+"      + Reasons");
     if (!firstBoot) Serial.printf("        * !firstBoot=%d\n",!firstBoot);
     if (MqttSyncLastStatus!=MqttSyncCurrentStatus) Serial.printf("        * MqttSyncLastStatus(%d)!=MqttSyncCurrentStatus(%d)\n",MqttSyncLastStatus,MqttSyncCurrentStatus);
@@ -1833,7 +1839,7 @@ void loop() {
       else if (currentState==displayingSampleFixed) showIcons(); //Refresh only Icons now
     }
 
-    Serial.println(String(nowTimeGlobal)+"  - DISPLAY_ICONS_CHECK_PERIOD - Exit");
+    if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  - DISPLAY_ICONS_CHECK_PERIOD - Exit");
     /*Serial.printf("        * MqttSyncLastStatus(%d), MqttSyncCurrentStatus(%d), CloudSyncLastStatus(%d), CloudSyncCurrentStatus(%d), CloudClockLastStatus(%d), CloudClockCurrentStatus(%d)\n",
       MqttSyncLastStatus,MqttSyncCurrentStatus,CloudSyncLastStatus,CloudSyncCurrentStatus,CloudClockLastStatus,CloudClockCurrentStatus);  
     Serial.printf("        * forceDisplayRefresh(%d), forceDisplayModeRefresh(%d), currentState(%d), digitalRead(PIN_TFT_BACKLIGHT)(%d), CloudClockLastStatus(%d), CloudClockCurrentStatus(%d)\n",
@@ -1920,17 +1926,22 @@ void loop() {
     if (wifiEnabled && mqttServerEnabled && WiFi.status()==WL_CONNECTED) {
       if (mqttClient.connected()) {
         //MQTT Client connected
-        if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new MQTT messages published:\n    "+mqttTopicName+"/temperature "+String(valueT)+", packetId="+String(mqttClient.publish(String(mqttTopicName+"/temperature").c_str(), 0, true, String(valueT).c_str()))+
-                      "\n    "+mqttTopicName+"/humidity "+String(valueHum)+", packetID="+String(mqttClient.publish(String(mqttTopicName+"/humidity").c_str(), 0, true, String(valueHum).c_str()))+
-                      "\n    "+mqttTopicName+"/co2 "+String(valueCO2)+", packetId="+String(mqttClient.publish(String(mqttTopicName+"/co2").c_str(), 0, true, String(valueCO2).c_str())));
+
+        String packetIdCO2=String(mqttClient.publish(String(mqttTopicName+"/co2").c_str(), 0, true, String(valueCO2).c_str()));
+        String packetIdT=String(mqttClient.publish(String(mqttTopicName+"/temperature").c_str(), 0, true, String(valueT).c_str()));
+        String packetIdHum=String(mqttClient.publish(String(mqttTopicName+"/humidity").c_str(), 0, true, String(valueHum).c_str()));
+
+        if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new MQTT messages published:\n    "+mqttTopicName+"/temperature "+String(valueT)+", packetIdT="+packetIdT+
+                      "\n    "+mqttTopicName+"/humidity "+String(valueHum)+", packetIdHum="+packetIdHum+
+                      "\n    "+mqttTopicName+"/co2 "+String(valueCO2)+", packetIdCO2="+packetIdCO2);
         if (MqttSyncCurrentStatus==MqttSyncOnStatus) MqttSyncCurrentStatus=MqttSyncSendStatus;
       }
       else {
         //MQTT Client disconnected
         //Connect to MQTT broker
-        if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new MQTT messages can't be published as MQTT broker is disconnected. Trying to get connected again...\nMqttSyncLastStatus("+String(MqttSyncLastStatus)+")!=MqttSyncCurrentStatus("+String(MqttSyncCurrentStatus)+")");
-        mqttClientInit(true,true,false);
-        if (MqttSyncCurrentStatus!=MqttSyncOffStatus) MqttSyncCurrentStatus=MqttSyncOnStatus;
+        if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new MQTT messages can't be published as MQTT broker is disconnected. Trying to get connected again...\n             MqttSyncLastStatus("+String(MqttSyncLastStatus)+")!=MqttSyncCurrentStatus("+String(MqttSyncCurrentStatus)+")");
+        mqttClientInit(false,debugModeOn,false);
+        if (MqttSyncCurrentStatus==MqttSyncOffStatus) {MqttSyncLastStatus=MqttSyncOffStatus;MqttSyncCurrentStatus=MqttSyncSendStatus;} //Update icon
       }
     }
 
@@ -2109,6 +2120,10 @@ void loop() {
     if (WiFi.status()!=WL_CONNECTED) {
       //WiFi is not connected. Update wifiCurrentStatus properly
       if (wifiCurrentStatus!=wifiOffStatus) {
+        if (CloudSyncLastStatus!=CloudSyncOffStatus) CloudSyncLastStatus=CloudSyncCurrentStatus;      //To update icon -v1.4.1
+        if (CloudClockLastStatus!=CloudClockOffStatus) CloudClockLastStatus=CloudClockCurrentStatus;  //To update icon -v1.4.1
+        if (MqttSyncLastStatus!=MqttSyncOffStatus) MqttSyncLastStatus=MqttSyncCurrentStatus;          //To update icon -v1.4.1
+        CloudClockCurrentStatus=CloudClockOffStatus;CloudSyncCurrentStatus=CloudSyncOffStatus;MqttSyncCurrentStatus=MqttSyncOffStatus; //To update rest of icons -v1.4.1
         wifiCurrentStatus=wifiOffStatus;
         forceWifiReconnect=true; //Don't wait next WIFI_RECONNECT_PERIOD interaction. Reconnect in this loop() interaction
       }
@@ -2253,16 +2268,16 @@ void loop() {
   //forceWifiReconnect==true if:
   // 1) after ICON_STATUS_REFRESH_PERIOD
   // 2) after configuring WiFi = ON in the Config Menu
-  // 3) or wake up from sleep (either by pressing buttons or timer)
+  // 3) or wake up from sleep (only by pressing buttons, no by timer)
   // 4) or previous WiFi re-connection try was ABORTED (button pressed) or BREAK (need to refresh display)
   // 5) after heap size was below ABSULUTE_MIN_HEAP_THRESHOLD
   // 6) after detection the webServer is down
   nowTimeGlobal=loopStartTime+millis();
-  if ((((nowTimeGlobal-lastTimeWifiReconnectionCheck) >= WIFI_RECONNECT_PERIOD) || forceWifiReconnect ) && 
+  if ((((nowTimeGlobal-lastTimeWifiReconnectionCheck) >= wifiReconnectPeriod) || forceWifiReconnect ) && 
       wifiEnabled && !firstBoot && (wifiCurrentStatus==wifiOffStatus || WiFi.status()!=WL_CONNECTED) ) {
      
     if (debugModeOn) {
-      Serial.println(String(nowTimeGlobal)+"  - nowTimeGlobal-lastTimeWifiReconnectionCheck >= WIFI_RECONNECT_PERIOD ("+String(nowTimeGlobal-lastTimeWifiReconnectionCheck)+" >= "+String(WIFI_RECONNECT_PERIOD/1000)+" s)");
+      Serial.println(String(nowTimeGlobal)+"  - nowTimeGlobal-lastTimeWifiReconnectionCheck >= wifiReconnectPeriod ("+String(nowTimeGlobal-lastTimeWifiReconnectionCheck)+" >= "+String(wifiReconnectPeriod/1000)+" s)");
       Serial.println("    - lastTimeWifiReconnectionCheck="+String(lastTimeWifiReconnectionCheck));
       Serial.println("    - forceWifiReconnect="+String(forceWifiReconnect));
       Serial.println("    - forceWebServerInit="+String(forceWebServerInit));
@@ -2275,10 +2290,14 @@ void loop() {
     if (!wifiResuming) lastTimeWifiReconnectionCheck=nowTimeGlobal; //Only if the WiFi reconnection didn't ABORT or BREAK in the previous interaction
     
     wifiStatus previousWifiCurrentStatus=wifiCurrentStatus;
-    if(forceWifiReconnect) {
+    if (CloudSyncLastStatus!=CloudSyncOffStatus) CloudSyncLastStatus=CloudSyncCurrentStatus;      //To update icon -v1.4.1
+    if (CloudClockLastStatus!=CloudClockOffStatus) CloudClockLastStatus=CloudClockCurrentStatus;  //To update icon -v1.4.1
+    if (MqttSyncLastStatus!=MqttSyncOffStatus) MqttSyncLastStatus=MqttSyncCurrentStatus;          //To update icon -v1.4.1
+
+    /*if(forceWifiReconnect) {
       forceWifiReconnect=false;
       forceNTPCheck=true; //v0.9.9 - Force NTP sync after WiFi Connection
-    }
+    }*/  //Deleted in v1.4.1 - forceNTPCheck moved to 'case: NO_ERROR and default:' below.
     
     //If WiFi disconnected (wifiOffStatus), then re-connect
     //Conditions for wifiCurrentStatus==wifiOffStatus
@@ -2304,6 +2323,7 @@ void loop() {
         if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with ERROR_BREAK_WIFI_SETUP. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWifiReconnect="+String(forceWifiReconnect));}
       break;
       case ERROR_WIFI_SETUP:
+        CloudClockCurrentStatus=CloudClockOffStatus;CloudSyncCurrentStatus=CloudSyncOffStatus;MqttSyncCurrentStatus=MqttSyncOffStatus; //To update rest of icons -v1.4.1
         wifiCurrentStatus=wifiOffStatus;
         forceWifiReconnect=false;
         wifiResuming=false;
@@ -2322,16 +2342,17 @@ void loop() {
         //Send HttpRequest to check the server status
         // The request updates CloudSyncCurrentStatus
         forceWEBTestCheck=true; //Will check CLOUD server in the next loop() interaction
+        forceNTPCheck=true; //v1.4.1 - Force NTP sync after WiFi Connection
         if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - wifiConnect() finish with NO_ERROR. wifiCurrentStatus="+String(wifiCurrentStatus)+", forceWEBTestCheck="+String(forceWEBTestCheck));}
       break;
     } 
 
     if (WiFi.status()==WL_CONNECTED && !mqttClient.connected() && mqttServerEnabled) { //Connect to MQTT broker again
       //mqttClient.connect();
-      mqttClientInit(true,true,false);
+      mqttClientInit(false,debugModeOn,false);
     }
 
-    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - WIFI_RECONNECT_PERIOD - exit, lastTimeWifiReconnectionCheck="+String(lastTimeWifiReconnectionCheck));}
+    if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"  - wifiReconnectPeriod - exit, lastTimeWifiReconnectionCheck="+String(lastTimeWifiReconnectionCheck));}
   }
 
   //After getting WiFi connection re-init the web server if needed
@@ -2341,7 +2362,7 @@ void loop() {
   // 3) after heap size was below ABSULUTE_MIN_HEAP_THRESHOLD
   // 4) Webserver detected down.
   if (wifiEnabled && webServerEnabled && WiFi.status()==WL_CONNECTED && forceWebServerInit) { //v0.9.9 - Re-init the built-in WebServer after waking up from sleep
-    if (debugModeOn) Serial.println("    - After leaving WIFI_RECONNECT_PERIOD entering to re-init the Web Server");    
+    if (debugModeOn) Serial.println("    - After leaving wifiReconnectPeriod entering to re-init the Web Server");    
     if(SPIFFS.begin(true)) {
       if (debugModeOn) Serial.println("    - wifiConnect()  - SPIFFS.begin() OK, SPIFFSErrors="+String(SPIFFSErrors));
       initWebServer();
@@ -2376,7 +2397,7 @@ void loop() {
     //   + Every 6 hours in avarage per day (probability ~ 17% ==> prob= random(1,7)<2) 
     // - If in either Reduce or Save Energy Mode, everytime there's WiFi connecton to minimize the
     //     time drift due to Deep Sleep (0,337 s per Deep Sleep min).
-    //   + In average, every WIFI_RECONNECT_PERIOD=300000 (5 min)
+    //   + In average, every wifiReconnectPeriod=300000 (5 min)
     // - If the previous NTP check was aborted due to Button action (forceNTPCheck=true)
     
     long auxRandom=random(1,7);
@@ -2395,7 +2416,7 @@ void loop() {
       }
       forceNTPCheck=false;
       if (CloudClockCurrentStatus!=CloudClockSendStatus) CloudClockLastStatus=CloudClockCurrentStatus; //To enter in DISPLAY_ICONS_REFRESH_TIMEOUT in the next loop cycle
-      switch(setupNTPConfig(false,&auxLoopCounter2,&whileLoopTimeLeft)) { //NTP Sync and CloudClockCurrentStatus update
+      switch(setupNTPConfig(false,false,&auxLoopCounter2,&whileLoopTimeLeft)) { //NTP Sync and CloudClockCurrentStatus update
         case ERROR_ABORT_NTP_SETUP: //Button pressed. NTP reconnection aborted. Exit now but force reconnection next loop interaction 
           forceNTPCheck=true; //Force NTP reconnection in the next loop interaction
           NTPResuming=true;
@@ -2515,14 +2536,15 @@ void loop() {
   }
 
   //Regular actions every WEBSERVER_CHECK_PERIOD seconds
-  //Check webServer responsiveness and reset it if needed
+  //Check webServer responsiveness and reset it if needed, only if
   nowTimeGlobal=loopStartTime+millis();
   if ( ((nowTimeGlobal-lastTimeWebServerCheck) >= WEBSERVER_CHECK_PERIOD) && WiFi.status()==WL_CONNECTED && 
-          wifiEnabled && webServerEnabled && !firstBoot) {
-    //Get http://WiFi.localIP/samples
+          wifiEnabled && webServerEnabled && !firstBoot && 
+          !(powerState==onlyBattery && digitalRead(PIN_TFT_BACKLIGHT)!=LOW)) { //v1.4.1 - Only if USB powered or Battery with display ON
+    //Get http://WiFi.localIP/samples if not waked up from deep sleep mode
     
     if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - WEBSERVER_CHECK_PERIOD webServerFailsCounter="+String(webServerFailsCounter)+", heap="+String(esp_get_free_heap_size())+" B, xPortGetFreeHeapSize()="+String(xPortGetFreeHeapSize())+" B, minHeap="+String(minHeapSeen)+" B - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
-    switch (checkURL(false,false,0,WiFi.localIP(),80,String("GET ")+String(WEBSERVER_SAMPLES_PAGE)))
+    switch (checkURL(debugModeOn,false,0,WiFi.localIP(),80,String("GET ")+String(WEBSERVER_SAMPLES_PAGE)))
     {
       case ERROR_WEB_SERVER:
         //Reinit WiFi and network services
@@ -2546,6 +2568,16 @@ void loop() {
 
     if (debugModeOn) {Serial.print(String(loopStartTime+millis())+"  - WEBSERVER_CHECK_PERIOD webServerFailsCounter="+String(webServerFailsCounter)+", heap="+String(esp_get_free_heap_size())+" B, xPortGetFreeHeapSize()="+String(xPortGetFreeHeapSize())+" B, minHeap="+String(minHeapSeen)+" B - Exit - Time: ");
         getLocalTime(&nowTimeInfo);Serial.print(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println(", lastTimeWebServerCheck="+String(lastTimeUploadSampleCheck));}
+  }
+
+
+  //Connect to MQTT broker as it was enabled from the webserver
+  //forceMQTTConnect is set from webServer (maintenance.html)
+  if (WiFi.status()==WL_CONNECTED && !mqttClient.connected() && mqttServerEnabled && forceMQTTConnect) {
+    if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - forceMQTTConnect - Connecting to the MQTT broker is disconnected.\n        MqttSyncLastStatus("+String(MqttSyncLastStatus)+")!=MqttSyncCurrentStatus("+String(MqttSyncCurrentStatus)+")");
+    mqttClientInit(false,debugModeOn,false);
+    if (MqttSyncCurrentStatus==MqttSyncOffStatus) {MqttSyncLastStatus=MqttSyncOffStatus;MqttSyncCurrentStatus=MqttSyncSendStatus;} //Update icon
+    forceMQTTConnect=false;
   }
 
   if (firstBoot) firstBoot=false;

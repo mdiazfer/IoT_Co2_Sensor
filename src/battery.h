@@ -29,8 +29,8 @@ There are 4 different Saving Energy modes:
  Update Screen                        |     DISPLAY_REFRESH_PERIOD     |  NOT DONE if Display is off  |   NOT DONE if Display is off   |
  (DISPLAY_REFRESH_PERIOD)             |               5 s              |                              |                                |
 +-------------------------------------+--------------------------------+------------------------------+--------------------------------+
- Checking WiFi Connection             |     WIFI_RECONNECT_PERIOD      |            same              |            same                |
- (WIFI_RECONNECT_PERIOD)              |              5 min             |                              |                                |
+ Checking WiFi Connection             |     WIFI_RECONNECT_PERIOD      |     With Sample Uploads      |       With Sample Uploads      |
+ (WIFI_RECONNECT_PERIOD)              |              2 min             |            5 min             |             5 min              |
 +-------------------------------------+--------------------------------+------------------------------+--------------------------------+
  Checking NTP Connection              |     NTP_KO_CHECK_PERIOD        |            same              |            same                |
  (NTP_KO_CHECK_PERIOD)                |           60 s (random)        |     5 min as needs WiFi      |      5 min as needs WiFi       |
@@ -84,7 +84,7 @@ extern RTC_DATA_ATTR boolean autoBackLightOff,forceDisplayModeRefresh,forceDispl
 extern RTC_DATA_ATTR enum availableStates stateSelected,currentState;
 extern RTC_DATA_ATTR uint64_t nowTimeGlobal,previousLastTimeSampleCheck,lastTimeTurnOffBacklightCheck;
 extern RTC_DATA_ATTR enum displayModes displayMode,lastDisplayMode;
-extern RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod; //3*4=12B
+extern RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,wifiReconnectPeriod;
 extern RTC_DATA_ATTR  enum CloudClockStatus CloudClockCurrentStatus;
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 extern IPAddress serverToUploadSamplesIPAddress;

@@ -17,7 +17,7 @@ void softReset() {
   //The function disconect services and goes to deep sleep for just a few millisenconds
   //The init process is done after waking up
 
-  CloudSyncLastStatus=CloudSyncCurrentStatus;CloudClockLastStatus=CloudClockLastStatus;MqttSyncLastStatus=MqttSyncCurrentStatus;
+  CloudSyncLastStatus=CloudSyncCurrentStatus;CloudClockLastStatus=CloudClockCurrentStatus;MqttSyncLastStatus=MqttSyncCurrentStatus;
   CloudClockCurrentStatus=CloudClockOffStatus;CloudSyncCurrentStatus=CloudSyncOffStatus;MqttSyncCurrentStatus=MqttSyncOffStatus;
   wifiCurrentStatus=wifiOffStatus;
   softResetOn=true;  //Force complete variable init after wake-up
@@ -86,6 +86,7 @@ void go_to_sleep() {
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+      wifiReconnectPeriod=WIFI_RECONNECT_PERIOD;
       BLEPeriod=BLE_PERIOD;
       BLEOnTimeout=BLE_ON_TIMEOUT;
       if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
@@ -95,6 +96,7 @@ void go_to_sleep() {
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_RE; //It's supposed display is off, so no checks on display
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
+      wifiReconnectPeriod=WIFI_RECONNECT_PERIOD_RE;
       BLEPeriod=BLE_PERIOD_RE;
       BLEOnTimeout=BLE_ON_TIMEOUT_RE;
       if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;
@@ -104,6 +106,7 @@ void go_to_sleep() {
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD_SE; //It's supposed display is off, so no checks on display
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
+      wifiReconnectPeriod=WIFI_RECONNECT_PERIOD_SE;
       BLEPeriod=BLE_PERIOD_SE;
       BLEOnTimeout=BLE_ON_TIMEOUT_SE;
       if (BLEPeriod<=BLEOnTimeout) BLEPeriod=BLEOnTimeout+500;

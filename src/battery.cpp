@@ -29,8 +29,8 @@ There are 4 different Saving Energy modes:
  Update Screen                        |     DISPLAY_REFRESH_PERIOD     |  NOT DONE if Display is off  |   NOT DONE if Display is off   |
  (DISPLAY_REFRESH_PERIOD)             |               5 s              |                              |                                |
 +-------------------------------------+--------------------------------+------------------------------+--------------------------------+
- Checking WiFi Connection             |     WIFI_RECONNECT_PERIOD      |            same              |            same                |
- (WIFI_RECONNECT_PERIOD)              |              5 min             |                              |                                |
+ Checking WiFi Connection             |     WIFI_RECONNECT_PERIOD      |     With Sample Uploads      |       With Sample Uploads      |
+ (WIFI_RECONNECT_PERIOD)              |              2 min             |            5 min             |             5 min              |
 +-------------------------------------+--------------------------------+------------------------------+--------------------------------+
  Checking NTP Connection              |     NTP_KO_CHECK_PERIOD        |            same              |            same                |
  (NTP_KO_CHECK_PERIOD)                |           60 s (random)        |     5 min as needs WiFi      |      5 min as needs WiFi       |
@@ -171,6 +171,7 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
       voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD;
+      wifiReconnectPeriod=WIFI_RECONNECT_PERIOD;
       autoBackLightOff=false; //update autoBackLightOff if USB power
       forceDisplayRefresh=true; //force Icon update (if display is ON)
 
@@ -237,6 +238,7 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
       else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD; 
       samplePeriod=SAMPLE_PERIOD_RE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_RE;
+      wifiReconnectPeriod=WIFI_RECONNECT_PERIOD_RE;
     }
     else {
       energyCurrentMode=lowestEnergy;    
@@ -246,6 +248,7 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
       else voltageCheckPeriod=VOLTAGE_CHECK_PERIOD;
       samplePeriod=SAMPLE_PERIOD_SE;
       uploadSamplesPeriod=UPLOAD_SAMPLES_PERIOD_SE;
+      wifiReconnectPeriod=WIFI_RECONNECT_PERIOD_SE;
     }
   }
 }

@@ -2,10 +2,11 @@ To do list
 -----------
 - Web server
   + Web form to setup iBeacon Proximity, Major and Minor
-  + Extend lastTimeBLECheck even more when upgrading firmware/SPIFFS files
   + Add graphs
   + Enrich the provided info in the REST API /samples
+  + Reduce size of logo image
 - BLE sutff
+  + Add BLE characteristics for: firmware version, powerMode (BAT, USB or USB charging), Batery level
   + General
     * clean-up of Serial.prints
   + Scanning to find TAG frames
@@ -14,22 +15,15 @@ To do list
   + Scanning to find other devices
     * iPhone, Android, airtags, etc.
 - Tests/Checks
-  + Button and menu whith BLE enabled
-  + MQTT enabled and buttons/BLE impact
-  + Check NTP icons if WiFi is disabled/OFF
-  + Analize/check improvements in the sleep/hibernate modes
+  + Analize/check impact of improvements in the sleep/hibernate modes
     * BLE On
     * Error counters (softResetCounter++, webServerFailsCounter, minHeapSeenCounter, BLEnoLoadedCounter, BLEnoLoadedCount, BLEunloadsCounter, BLEunloadsCount)
     * heap and minHeapSeen
 - Troubleshoot
   + BLE
     * Analize why sometimes BLE_PERIOD is triggered if it is not the right time
-  + MQTT
-    * Ping packets sent, but no readings packets
   + Some times SPIFFS doesn't get mounted and no error detected. Find out how to check if mounted to detect error
-  + If MQTT server is down, menu/buttons are frozen
   + No http connection if SSID changes or maybe wokeup from sleep (investigate)
-  + No NTP sync if 2nd or 3rd SSID is connected 
 - Icon for the bootup screen
 - Candidate features
   + Triger alarms
@@ -42,8 +36,19 @@ To do list
   + Reduce size of BLE stack/code
 
 
+
 Done
 -------
+- Test on WiFi (v1.4.1)
+  + AP ON -> AP OFF -> AP ON: Result
+    * WiFi icon updated (off) but NTP, MQTT and Upload are still ON
+    * WiFi icon updated (on) when WiFi is recovered, but it tooks WIFI_RECONNECT_PERIOD (2 min)
+  + NTP
+    * Successfull sync in all the scenarios:
+      - WiFi ON->OFF->ON: NTP gets synced with either the previous NTP server or other one from the list:
+        time.google.com, 216.239.35.12 (time4.google.com), 10.88.50.5
+    * Connected to madnetot and change NTP conf from web to: pool.ntp.org, time.google.com, 216.239.35.12, 10.88.50.5
+      - Result: OK. NTP does syn.
 - Tests on BLE
   + iBeacon send and heap checks => Result: OK
   + iBeacon ON/OFF based on BLE ON/OFF config in web => Result: OK

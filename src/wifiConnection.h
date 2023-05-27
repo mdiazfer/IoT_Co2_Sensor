@@ -51,10 +51,11 @@ extern RTC_DATA_ATTR char TZEnvVar[TZ_ENV_VARIABLE_MAX_LENGTH];
 extern RTC_DATA_ATTR uint64_t lastTimeNTPCheck;
 extern struct tm nowTimeInfo;
 extern boolean startTimeConfigure;
+extern bool isBeaconAdvertising;
 
 void printNetData();
 wifiNetworkInfo * printCurrentWiFi(boolean debugModeOn, int16_t *numberWiFiNetworks);
 uint32_t wifiConnect(boolean debugModeOn,boolean msgTFT,boolean checkButtons,uint8_t* auxLoopCounter,uint8_t* auxCounter);
-uint32_t setupNTPConfig(boolean fromSetup,uint8_t* auxLoopCounter,uint64_t* whileLoopTimeLeft);
+uint32_t setupNTPConfig(boolean debugModeOn,boolean fromSetup,uint8_t* auxLoopCounter,uint64_t* whileLoopTimeLeft);
 bool runAPMode();
 

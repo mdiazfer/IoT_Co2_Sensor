@@ -59,7 +59,7 @@ extern RTC_DATA_ATTR char co2SensorVersion[5];
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 extern RTC_DATA_ATTR uint32_t error_setup;
 extern RTC_DATA_ATTR uint64_t lastTimeBLECheck,loopStartTime;
-extern RTC_DATA_ATTR uint8_t BLEnoLoadedCount,BLEunloadsCount;
+extern RTC_DATA_ATTR uint8_t BLEnoLoadedCount,BLEunloadsCount,softResetReason;
 extern RTC_DATA_ATTR int webServerFailsCounter,softResetCounter,BLEnoLoadedCounter,BLEunloadsCounter,minHeapSeenCounter;
 #ifdef __MHZ19B__
   extern MHZ19 co2Sensor;  //64 B
@@ -67,7 +67,7 @@ extern RTC_DATA_ATTR int webServerFailsCounter,softResetCounter,BLEnoLoadedCount
 extern RTC_DATA_ATTR boolean debugModeOn,wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,autoBackLightOff,
                               forceDisplayRefresh,forceDisplayModeRefresh,forceWifiReconnect,forceNTPCheck,
                               forceWEBTestCheck,reconnectWifiAndRestartWebServer,resyncNTPServer,
-                              deviceReset,factoryReset;
+                              deviceReset,factoryReset,forceMQTTConnect;
 extern String ntpServers[4];
 extern uint8_t ntpServerIndex;
 extern RTC_DATA_ATTR enum CloudClockStatus CloudClockCurrentStatus;

@@ -16,7 +16,7 @@
   #endif
 
   #ifndef _BUTTONSFRAMEWORK_
-    enum callingAction {mainloop,askAPloop,ntpcheck,wificheck,webcheck};
+    enum callingAction {mainloop,askAPloop,ntpcheck,wificheck,webcheck,mqttcheck};
     #define _BUTTONSFRAMEWORK_
   #endif
 

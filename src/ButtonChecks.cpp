@@ -339,6 +339,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
       break;
       case ntpcheck:
       case wificheck:
+      case mqttcheck:
         return(1);
       break;
       case askAPloop:
@@ -393,6 +394,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
       break;
       case ntpcheck:
       case wificheck:
+      case mqttcheck:
         return(2);
       break;
       case askAPloop:
@@ -413,6 +415,7 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
       break;
       case ntpcheck:
       case wificheck:
+      case mqttcheck:
         return(3);
       break;
     }
