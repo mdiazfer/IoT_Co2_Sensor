@@ -43,10 +43,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   1512 B
+// RTC memory variables:                   1553 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     4592 B
-// RTC memory left:     8000 B - 4592 B = 3410 B 
+// RTC memorty TOTAL:                     4643 B
+// RTC memory left:     8000 B - 4643 B = 3357 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -89,6 +89,9 @@
 //Address 315-3DD: MQTT Topic name char []* (200 B+null=201 B)
 //Address 3DE: bootCount - Number of restarts since last upgrade
 //Address 3DF: resetCount - Number of non controlled resets since last upgrade
+//Address 3E0-416: iBeacon Proximity char []* (36 B+null=37 B)
+//Address 417-418: iBeacon Major uint16_t 2 B
+//Address 419-41A: iBeacon Minor uint16_t  2 B
 
 
 RTC_DATA_ATTR float_t lastHourCo2Samples[3600/SAMPLE_T_LAST_HOUR];   //4*(3600/60)=240 B - Buffer to record last-hour C02 values
@@ -153,6 +156,8 @@ RTC_DATA_ATTR AsyncEventSource webEvents(WEBSERVER_SAMPLES_EVENT); //1*104=104B
 RTC_DATA_ATTR uint32_t error_setup=NO_ERROR,minHeapSeen=0xFFFFFFFF; //1*4=4B
 RTC_DATA_ATTR AsyncMqttClient mqttClient;
 RTC_DATA_ATTR boolean OTAUpgradeBinAllowed=false,SPIFFSUpgradeBinAllowed=false; //2*1=2B - v1.2.0 To block SPIFFS upgrade if there is something wrong with SPIFFS partition
+RTC_DATA_ATTR char BLEProximityUUID[BLE_BEACON_UUID_LENGH]; //BLE_BEACON_UUID_LENGH=37 B
+RTC_DATA_ATTR uint16_t BLEMajor=0,BLEMinor=0; //2*2=4B
 
 //Global variable definitions stored in regular RAM. 520 KB Max
 TFT_eSPI tft = TFT_eSPI();  // 292 B - Invoke library to manage the display
@@ -220,6 +225,7 @@ BLECharacteristic* pCharacteristicCO2=nullptr;
 BLECharacteristic* pCharacteristicT=nullptr;
 BLECharacteristic* pCharacteristicHum=nullptr;
 enum CloudClockStatus previousCloudClockCurrentStatus;
+String lastURI;  //Needed to going back to the right page from CONTAINER if the authentication fails
 
 //Code
 
@@ -325,6 +331,9 @@ void initVariable() {
   //Address 315-3DD: MQTT Topic name char []* (200 B+null=201 B)
   //Address 3DE: bootCount - Number of restarts since last upgrade
   //Address 3DF: resetCount - Number of non controlled resets since last upgrade
+  //Address 3E0-416: iBeacon Proximity char []* (36 B+null=37 B)
+  //Address 417-418: iBeacon Major uint16_t 2 B
+  //Address 419-41A: iBeacon Minor uint16_t  2 B
 
   //Adding the 3 latest mac bytes to the device name (in Hex format)
   WiFi.macAddress(mac);
@@ -1483,18 +1492,25 @@ void setup() {
   if (debugModeOn) {Serial.println("\n"+String(nowTimeGlobal)+" [SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}
   randomSeed(analogRead(GPIO_NUM_32));
 
-  //Init BLE pointers before using TFT Sprite due to memory size constraints
-  //BLE Memory is released after setupBLE is finished
-  BLECurrentStatus=BLEOffStatus;
-  if (EEPROM.read(0x08) & 0x08) { //bluetoothEnabled
-    //error_setup=0;
-    error_setup=setupBLE();
+  //Init BLE pointers first before using TFT Sprite due to memory size constraints
+  // - even if not enabled in EEPROM => Due to memory size constraints, this allows to start 
+  //                                    adverstising without reset when BLE is enabled in webServer or menu config
+  //After setupBLE is finished, the BLE stack is de-initiated to release memory
+  initBLEVariables();  //Read BLE variables from EEPPROM even if BLE is not enabled (to show info in web)
+  if (EEPROM.read(0x08) & 0x08) {BLECurrentStatus=BLEStandbyStatus; bluetoothEnabled=true;}
+  else {BLECurrentStatus=BLEOffStatus; bluetoothEnabled=false;}
+
+  //Init BLE stack
+  error_setup=setupBLE();
+  if (bluetoothEnabled) {
     if (error_setup==0) {
       BLECurrentStatus=BLEStandbyStatus;
       if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SETUP] - BLE init OK");}
     }
-    else
+    else {
+      BLECurrentStatus=BLEOffStatus; bluetoothEnabled=false; //Disable BLE
       if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SETUP] - BLE init KO");}
+    }
   }
   else
     if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SETUP] - BLE N/E");}

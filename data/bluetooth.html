@@ -19,7 +19,7 @@
         </p>
         <p>&nbsp;</p>
         <p style="text-align: right; font-size: smaller;">
-          <font>Sensor CO2 by The IoT Factory (C).</font>
+          <font>Sensor CO2 by The IoT Factory ©</font>
           <font style="color:#3f9bd5;""><label id='currentDate'"></label></font>
         </p>
         <script>
@@ -64,7 +64,23 @@
           <!-- start of content column: insert your content here -->
           <h1>Bluetooth Configuration</h1>
           <p></p>
-            <form action="bluetooth" method="post">
+          <form action="bluetooth" method="post">
+            <label for="BLEIBEACON">iBeacon Configuration</label><p></p>
+            <label for="BLEPROXIMITY">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Proximity UUID:&nbsp;&nbsp;</label>
+            <input id="BLEPROXIMITY1_id" name="BLEPROXIMITY1" pattern="^[A-Fa-f0-9]+$" minlength="8" maxlength="8" size="8" placeholder=~BLEPROXIMITY1~ type="text" required title="8 HEX characters required" required value="~BLEPROXIMITY1~">
+            <input id="BLEPROXIMITY2_id" name="BLEPROXIMITY2" pattern="^[A-Fa-f0-9]+$" minlength="4" maxlength="4" size="4" placeholder=~BLEPROXIMITY2~ type="text" required title="4 HEX characters required" required value="~BLEPROXIMITY2~">
+            <input id="BLEPROXIMITY3_id" name="BLEPROXIMITY3" pattern="^[A-Fa-f0-9]+$" minlength="4" maxlength="4" size="4" placeholder=~BLEPROXIMITY3~ type="text" required title="4 HEX characters required"  required value="~BLEPROXIMITY3~">
+            <input id="BLEPROXIMITY4_id" name="BLEPROXIMITY4" pattern="^[A-Fa-f0-9]+$" minlength="4" maxlength="4" size="4" placeholder=~BLEPROXIMITY4~ type="text" required title="4 HEX characters required"  required value="~BLEPROXIMITY4~">
+            <input id="BLEPROXIMITY5_id" name="BLEPROXIMITY5" pattern="^[A-Fa-f0-9]+$" minlength="12" maxlength="12" size="12" placeholder=~BLEPROXIMITY5~ type="text" required title="12 HEX characters required"  required value="~BLEPROXIMITY5~">
+            <br>
+            <label for="BLEMAJOR">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Major:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <input id="BLEMAJOR_id" name="BLEMAJOR" pattern="^[0-9]+$" maxlength="5" size="5" min=0 max=65535 placeholder=~BLEMAJOR~ type="number" required value="~BLEMAJOR~">
+            <label for="BLEMAJORHEX" id="BLEMAJORHEX_id">&nbsp;0x~BLEMAJORHEX~</label>
+            <br>
+            <label for="BLEMINOR">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Minor:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</label>
+            <input id="BLEMINOR_id" name="BLEMINOR" pattern="^[0-9]+$" maxlength="5" size="5" min=0 max=65535 placeholder=~BLEMINOR~ type="number" required value="~BLEMINOR~">
+            <label for="BLEMINORHEX" id="BLEMINORHEX_id" >&nbsp;0x~BLEMINORHEX~</label>
+            <p></p><br><br>
             Enable Bluetooth:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
             <label for="Bluetooth_on_id">On</label>	
             <input name="Bluetooth_enabled" id="Bluetooth_on_id" value="on" required="required" ~BLUETOOTH_ON_CHECKED~  type="radio">
@@ -74,8 +90,64 @@
             <br><br>
             <p></p>
             <button type="reset" name="Button_Reset" id="Button_Reset_id">Reset</button>&nbsp;&nbsp;&nbsp;&nbsp;
-            <button type="submit" name="Button_Send" id="Button_Send_id"><strong>Submit</strong></button>
+            <button type="submit" name="Button_Send" id="Button_Send_id" onClick="return checkChanges()"><strong>Submit</strong></button>
           </form>
+
+          <script>
+            var iBeaconChanged=false;
+            var auxProximity1=document.getElementById("BLEPROXIMITY1_id").value; //String
+            var auxProximity2=document.getElementById("BLEPROXIMITY2_id").value; //String
+            var auxProximity3=document.getElementById("BLEPROXIMITY3_id").value; //String
+            var auxProximity4=document.getElementById("BLEPROXIMITY4_id").value; //String
+            var auxProximity5=document.getElementById("BLEPROXIMITY5_id").value; //String
+            var auxMajor=parseInt(document.getElementById("BLEMAJOR_id").value); //Number
+            var auxMinor=parseInt(document.getElementById("BLEMINOR_id").value); //Number
+            document.getElementById("BLEPROXIMITY1_id").addEventListener("input", updateValue);
+            document.getElementById("BLEPROXIMITY2_id").addEventListener("input", updateValue);
+            document.getElementById("BLEPROXIMITY3_id").addEventListener("input", updateValue);
+            document.getElementById("BLEPROXIMITY4_id").addEventListener("input", updateValue);
+            document.getElementById("BLEPROXIMITY5_id").addEventListener("input", updateValue);
+            document.getElementById("BLEMAJOR_id").addEventListener("input", updateValue);
+            document.getElementById("BLEMINOR_id").addEventListener("input", updateValue);
+
+            function checkChanges() {
+              if (auxProximity1!=document.getElementById("BLEPROXIMITY1_id").value) iBeaconChanged=true;
+              if (auxProximity2!=document.getElementById("BLEPROXIMITY2_id").value) iBeaconChanged=true;
+              if (auxProximity3!=document.getElementById("BLEPROXIMITY3_id").value) iBeaconChanged=true;
+              if (auxProximity4!=document.getElementById("BLEPROXIMITY4_id").value) iBeaconChanged=true;
+              if (auxProximity5!=document.getElementById("BLEPROXIMITY5_id").value) iBeaconChanged=true;
+              if (auxMajor!=document.getElementById("BLEMAJOR_id").value) iBeaconChanged=true;
+              if (auxMinor!=document.getElementById("BLEMINOR_id").value) iBeaconChanged=true;
+
+
+              if (iBeaconChanged===true) {
+                return confirm("The device will be reset. Do you want to continue?")
+              }
+              else return;
+            }
+            
+            function updateValue(detectedEvent) { //Modify values for better reading
+              //Convert to upper case for better reading
+              if ( (detectedEvent.target.id==='BLEPROXIMITY1_id') || (detectedEvent.target.id==='BLEPROXIMITY2_id') || (detectedEvent.target.id==='BLEPROXIMITY3_id') ||
+                   (detectedEvent.target.id==='BLEPROXIMITY4_id') || (detectedEvent.target.id==='BLEPROXIMITY5_id') ) {
+                    var inputValue=detectedEvent.target.value;
+                    detectedEvent.target.value=inputValue.toUpperCase();
+                    //iBeaconChanged=true;
+              }
+              //Convert the Decimal value into HEX
+              else if (detectedEvent.target.id==='BLEMAJOR_id') {
+                var decimalValue=parseInt(detectedEvent.target.value);
+                document.getElementById("BLEMAJORHEX_id").innerHTML="0x"+decimalValue.toString(16).toUpperCase();
+                //iBeaconChanged=true;
+              }
+              //Convert the Decimal value into HEX
+              else if (detectedEvent.target.id==='BLEMINOR_id') {
+                var decimalValue=parseInt(detectedEvent.target.value);
+                document.getElementById("BLEMINORHEX_id").innerHTML="0x"+decimalValue.toString(16).toUpperCase();
+                //iBeaconChanged=true;
+              }
+            }
+          </script>
           <!-- end of content column: put your content above this line --> </div>
       </div>
       <div style="clear: both;"></div>

@@ -89,6 +89,34 @@
 
    ****************************************************************************************************************** */
 
+void initBLEVariables() {
+  //Set iBeacon Proximity
+  //char auxBLEProximityUUID[BLE_BEACON_UUID_LENGH];
+  memset(BLEProximityUUID,'\0',BLE_BEACON_UUID_LENGH);EEPROM.get(0x3E0,BLEProximityUUID);
+  if (String(BLEProximityUUID).compareTo("")==0) {
+    #ifdef BLE_BEACON_UUID
+      String _BLEProximityUUID=String(BLE_BEACON_UUID);
+      //Check if BLEProximityUUID server must be updated in EEPROM
+      if (_BLEProximityUUID.compareTo(String(BLEProximityUUID))!=0) {
+        uint8_t auxLength=_BLEProximityUUID.length()+1;
+        if (auxLength>BLE_BEACON_UUID_LENGH-1) { //Substring if greater that max length
+          auxLength=BLE_BEACON_UUID_LENGH-1;
+          _BLEProximityUUID=_BLEProximityUUID.substring(0,auxLength);
+        }
+        memset(BLEProximityUUID,'\0',BLE_BEACON_UUID_LENGH);
+        memcpy(BLEProximityUUID,_BLEProximityUUID.c_str(),auxLength);
+        EEPROM.put(0x3E0,BLEProximityUUID);
+        EEPROM.commit();
+      }
+    #endif
+  }
+
+  //Set iBeacon Major and Minor
+  BLEMajor=EEPROM.readUShort(0x417);
+  BLEMinor=EEPROM.readUShort(0x419);
+
+  if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [initBLEVariables] - BLEProximityUUID='"+String(BLEProximityUUID)+"', Major=0x"+String(BLEMajor,HEX)+", Minor=0x"+String(BLEMinor,HEX));}
+}
 
 uint32_t setupBLE() {
   //BLEDevice::init() needed to create Server, Advertising, etc.
@@ -154,15 +182,23 @@ uint32_t setupBLE() {
   if (debugModeOn) Serial.println(String(nowTimeGlobal)+"  [setupBLE] - Service started");
 
   //Add Beacon to the Advertising - Every time due to BLEBeacon & BLEAdvertisementData object memory is realeasd
-  pBeacon->setManufacturerId(BEACON_MANUFACTURER);
+  pBeacon->setManufacturerId(BLE_BEACON_MANUFACTURER);
   //iBeacon Data
-  byte mac[6];WiFi.macAddress(mac);
+  /*byte mac[6];WiFi.macAddress(mac);
   uint16_t aux=(mac[2]<<8)|mac[3];
   pBeacon->setMajor(aux);
   aux=(mac[4]<<8)|mac[5];
   pBeacon->setMinor(aux);
-  pBeacon->setSignalPower(BEACON_RSSI);
-  pBeacon->setProximityUUID(BLEUUID(BEACON_UUID_REV));
+  pBeacon->setProximityUUID(BLEUUID(BLE_BEACON_UUID_REV));*/
+  pBeacon->setSignalPower(BLE_BEACON_RSSI);
+  //pBeacon->setMajor(BLEMajor<<8 | BLEMajor>>8);pBeacon->setMinor(BLEMinor<<8 | BLEMinor>>8);
+  pBeacon->setMajor(BLEMajor);pBeacon->setMinor(BLEMinor);
+  pBeacon->setProximityUUID(BLEUUID(reverseStringUUID(String(BLEProximityUUID)).c_str()));
+
+  if (debugModeOn) {
+    Serial.print(String(nowTimeGlobal)+"  [setupBLE] - setProximityUUID=");
+    Serial.printf("%s, Major=0x%x, Minor=0x%x\n",pBeacon->getProximityUUID().toString(),pBeacon->getMajor(),pBeacon->getMinor());
+  }
 
   //Set Flags and Add Beacon to the Advertising
   pAdvertisementData->setFlags(0x1A);

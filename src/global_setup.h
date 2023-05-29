@@ -34,7 +34,7 @@
 #ifndef DEBUG_MODE_ON
   #define DEBUG_MODE_ON true
 #endif
-#define EEPROM_SIZE 0x400
+#define EEPROM_SIZE 0x450
 
 //Co2 Sensor stuff
 #ifdef __MHZ19B__   //Sensor model dependant parameters
@@ -408,11 +408,12 @@
 #define BLE_MIN_HEAP_SIZE  95000  //Based on tests
 #define ABSULUTE_MIN_HEAP_THRESHOLD  15000  //Bellow this threshold, heap overflow risk. SoftReset is needed. 
 #define MIN_HEAP_SEEN_THRESHOLD        700  //Bellow this threshold, heap overflow risk. SoftReset is needed. 
-#define BEACON_UUID           "F7826DA6-4FA2-4E98-8024-BC5B71E0893E"  //Kontakt proximity
-#define BEACON_UUID_REV       "3E89E071-5BBC-2480-984E-A24FA66D82F7" //Kontakt proximity reverse
-#define BEACON_MANUFACTURER   0x4c00
-#define BEACON_RSSI           0xC5
-#define BEACON_FLAGS          0x06 //0x06 - Simulating Kontak TAG - 0x1A Real
+#define BLE_BEACON_UUID           "F7826DA6-4FA2-4E98-8024-BC5B71E0893E"  //Kontakt proximity
+#define BLE_BEACON_UUID_REV       "3E89E071-5BBC-2480-984E-A24FA66D82F7" //Kontakt proximity reverse
+#define BLE_BEACON_UUID_LENGH     37  //36+null=33 B - Including '-'
+#define BLE_BEACON_MANUFACTURER   0x4c00
+#define BLE_BEACON_RSSI           0xC5
+#define BLE_BEACON_FLAGS          0x06 //0x06 - Simulating Kontak TAG - 0x1A Real
 #define BLE_SERVICE_UUID      "9504ECB3-997C-4367-95FA-DA48461648CA"
 #define BLE_CHARACT_CO2_UUID      "055232CF-43A3-4373-92B8-090B630EA136"
 #define BLE_CHARACT_TEM_UUID      "D914B4BB-D7E7-4C81-9017-C9486FDEC3FA"

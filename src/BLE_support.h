@@ -8,6 +8,7 @@
 #include "global_setup.h"
 #include "misc.h"
 #include "soc/rtc_wdt.h"
+#include <EEPROM.h>
 
 #ifndef _DISPLAYSUPPORTINFO_
   enum BLEStatus {BLEOnStatus,BLEConnectedStatus,BLEStandbyStatus,BLEOffStatus};
@@ -20,6 +21,8 @@ extern RTC_DATA_ATTR float_t valueCO2, valueT, valueHum;
 extern RTC_DATA_ATTR uint64_t lastTimeBLEOnCheck;
 extern RTC_DATA_ATTR uint32_t minHeapSeen;
 extern RTC_DATA_ATTR enum displayModes displayMode;
+extern RTC_DATA_ATTR char BLEProximityUUID[BLE_BEACON_UUID_LENGH];
+extern RTC_DATA_ATTR uint16_t BLEMajor,BLEMinor;
 
 extern uint32_t heapSizeNow;
 extern TFT_eSprite stext1;
@@ -113,6 +116,7 @@ extern BLE2902* pBLE2902CO2;
 extern BLE2902* pBLE2902T;
 extern BLE2902* pBLE2902Hum;
 
+void initBLEVariables();
 uint32_t setupBLE();
 uint32_t startBLEAdvertising();
 void stopBLE(uint8_t caller=0);

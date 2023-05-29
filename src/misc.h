@@ -74,3 +74,5 @@ String getFileExt(const String& s);
 size_t getAppOTAPartitionSize(uint8_t type, uint8_t subtype);
 void logRamStats (const char text[]);
 void detachNetwork(void);
+String reverseString(String inputString);
+String reverseStringUUID(String inputString);

@@ -1,10 +1,8 @@
 To do list
 -----------
 - Web server
-  + Web form to setup iBeacon Proximity, Major and Minor
   + Add graphs
   + Enrich the provided info in the REST API /samples
-  + Reduce size of logo image
 - BLE sutff
   + Add BLE characteristics for: firmware version, powerMode (BAT, USB or USB charging), Batery level
   + General

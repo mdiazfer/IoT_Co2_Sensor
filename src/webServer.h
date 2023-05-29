@@ -81,6 +81,8 @@ extern RTC_DATA_ATTR uint64_t nowTimeGlobal,lastTimeUploadSampleCheck,lastTimeBL
 extern RTC_DATA_ATTR ulong uploadSamplesPeriod,BLEOnTimeout;
 extern RTC_DATA_ATTR int errorsWiFiCnt,errorsSampleUpts,errorsNTPCnt,SPIFFSErrors;
 extern RTC_DATA_ATTR boolean OTAUpgradeBinAllowed,SPIFFSUpgradeBinAllowed;
+extern RTC_DATA_ATTR char BLEProximityUUID[BLE_BEACON_UUID_LENGH];
+extern RTC_DATA_ATTR uint16_t BLEMajor,BLEMinor;
 extern wifiCredentials wifiCred;
 extern uint8_t fileUpdateError,errorOnActiveCookie,errorOnWrongCookie,bootCount,resetCount;
 extern size_t fileUpdateSize,OTAAvailableSize,SPIFFSAvailableSize;
@@ -89,7 +91,7 @@ extern uint32_t flashSize,programSize,fileSystemSize,fileSystemUsed,minHeapSeen;
 extern String fileUpdateName;
 extern char activeCookie[],currentSetCookie[];
 extern JSONVar samples;
-extern String mqttTopicName;
+extern String mqttTopicName,lastURI;
 extern bool webServerResponding,isBeaconAdvertising,BLEtoBeLoaded;
 
 extern void stopBLE(uint8_t caller);

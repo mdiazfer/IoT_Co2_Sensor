@@ -402,6 +402,27 @@ void factoryConfReset() {
 
   if (debugModeOn) {Serial.println(" [initVariable] - Wrote mqttServer='"+String(auxMQTT)+"', mqttTopicPrefix='"+String(auxMqttTopicPrefix)+"', mqttUserName='"+String(auxUserName)+"', mqttUserPssw='"+String(auxUserPssw)+"'");}
 
+  //Set iBeacon Proximity
+  char auxBLEProximityUUID[BLE_BEACON_UUID_LENGH];
+  memset(auxBLEProximityUUID,'\0',BLE_BEACON_UUID_LENGH);
+  #ifdef BLE_BEACON_UUID
+    String(BLE_BEACON_UUID).toCharArray(auxBLEProximityUUID,String(BLE_BEACON_UUID).length()+1);
+  #endif
+  //Write varialbes in EEPROM to be available the next boots up
+  EEPROM.put(0x3E0,auxBLEProximityUUID);
+
+  if (debugModeOn) {Serial.println(" [initVariable] - Wrote BLEProximityUUID='"+String(auxBLEProximityUUID)+"'");}
+
+  //Set iBeacon Major and Minor
+  byte mac[6];WiFi.macAddress(mac);
+  uint16_t aux=(mac[2]<<8)|mac[3];
+  EEPROM.writeUShort(0x417,aux);
+  if (debugModeOn) {Serial.print(" [initVariable] - Wrote Major=0x"+String(aux,HEX));}
+  aux=(mac[4]<<8)|mac[5];
+  EEPROM.writeUShort(0x419,aux);
+
+  if (debugModeOn) {Serial.println(" and Minor=0x"+String(aux,HEX));}
+
   //Initialize bootCount variable
   bootCount=0;
   EEPROM.write(0x3DE,bootCount); 
@@ -630,4 +651,52 @@ void detachNetwork(void) {
   //CloudSyncCurrentStatus (External HTTP server) and  CloudClockCurrentStatus (NTP Server) will be init by their own
   
   if (debugModeOn) Serial.println(String(nowTimeGlobal)+"   [detachNetwork] - WiFi related modules stoped. They will be initiated in the next loop cycle");
+}
+
+String reverseString(String inputString) {
+  //Reverse the string.
+  char buff[inputString.length()+1];
+  memset(buff,'\0',sizeof(buff));
+  const char* ptr=inputString.c_str();
+
+  ptr+=inputString.length()-1;
+  for (int i=0; i<=inputString.length()-1; i++) {
+    buff[i]=(byte) *ptr;
+    ptr--;
+  }
+  
+  return String(buff);
+}
+
+
+String reverseStringUUID(String inputString) {
+  //Reverse the string. Useful for BLE iBeacon Proximity
+  //  inputString must be in the format:  F7826DA6-4FA2-4E98-8024-BC5B71E0893E  - No checks are done
+  //  output will be in the format:       3E89E071-5BBC-2480-984E-A24FA66D82F7
+
+  const char* ptr=inputString.c_str();  //F7826DA6-4FA2-4E98-8024-BC5B71E0893E
+  char buff[inputString.length()+1];
+  memset(buff,'\0',sizeof(buff));
+  memcpy(buff,ptr,inputString.length());
+
+  //Clean all the hyphens
+  char buff2[sizeof(buff)];
+  memset(buff2,'\0',sizeof(buff2));
+  int buff2Index=0;
+  for (int i=0; i<sizeof(buff2);i++) if (buff[i]!='-') {buff2[buff2Index]=buff[i];buff2Index++;
+  }  //buff2=F7826DA64FA24E988024BC5B71E0893E
+
+  memset(buff,'\0',sizeof(buff));
+  uint8_t auxLength2=String(buff2).length();
+  ptr=buff2+auxLength2-2;
+  for (int i=0; i<=auxLength2-1; i=i+2) {memcpy(&buff[i],ptr,2);ptr=ptr-2;} //buff=3E89E0715BBC2480984EA24FA66D82F7
+
+  memset(buff2,'\0',sizeof(buff2));
+  memcpy(&buff2[0],&buff[0],8);buff2[8]='-';       //3E89E071-
+  memcpy(&buff2[9],&buff[8],4);buff2[13]='-';      //3E89E071-5BBC-
+  memcpy(&buff2[14],&buff[12],4);buff2[18]='-';    //3E89E071-5BBC-2480-
+  memcpy(&buff2[19],&buff[16],4);buff2[23]='-';    //3E89E071-5BBC-2480-984E-
+  memcpy(&buff2[24],&buff[20],12);                //3E89E071-5BBC-2480-984E-A24FA66D82F7
+  
+  return String(buff2);
 }
