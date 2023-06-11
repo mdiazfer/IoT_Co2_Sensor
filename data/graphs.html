@@ -2,14 +2,14 @@
 <html lang="en">
   <head>
     <meta http-equiv="content-type" content="text/html; charset=UTF-8">
-    <title>Basic Configuration</title>
+    <title>Global Info</title>
+    <meta name="generator" content="thesitewizard.com's Layout Wizard 3.0.1">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" media="all" href="styles.css">
     <link type="text/css" rel="stylesheet" href="tswnavbar.css" title="Side Menu CSS">
-    <script src="gauge.min.js"></script>
   </head>
   <body onload="getTime()" style="background-color: #1d2324; color: white;">
-    <div id="tswcontainerindex">
+    <div id="tswcontainerinfo">
       <div id="tswheader">
         <!-- start of header section: insert your logo, etc, here -->
         <p style="text-align: center; font-size: 1%; vertical-align: 210px;">
@@ -32,17 +32,19 @@
         </script>
         <p style="text-align: center; font-size: smaller;"><br></p>
       </div> <!--tswheader-->
-      <div id="tswsidecolindex"> <!--*-->
+
+      <div id="tswsidecolgraphs">
         <div id="tswsideproper">
           <!-- start of side column: insert your navigation menu, etc, here -->
           <!-- start of hamburger menu button -->
           <script type="text/javascript">
-            function tsw_expand_navmenu( ) {
+            function tsw_expand_navmenu( )
+            {
               document.getElementById ( 'tswhamburger' ).style.display = 'none' ;
               document.getElementById( 'tswcssbuttons' ).style.display = 'block' ;
             }
           </script>
-          <button type="button" id="tswhamburger" title="Click to expand menu"onclick="tsw_expand_navmenu();">
+          <button type="button" id="tswhamburger" title="Click to expand menu" onclick="tsw_expand_navmenu();">
             ≡
           </button>
           <!-- end of hamburger menu button -->
@@ -56,55 +58,31 @@
               <li><a href="bluetooth.html">Bluetooth configuration</a></li>
               <li><a href="maintenance.html">Maint. & Troubleshoot</a></li>
             </ul>
-          </div>
+          </div> <!--tswcssbuttons-->
           <!-- end of side column: put your navigation menu, etc, above this line -->
         </div> <!--tswsideproper-->
-      </div> <!--tswsidecolindex--> <!--*-->
-      <div id="tswcontent">
+      </div> <!--tswsidecolgraphs-->
+
+      <div id="tswcontentgraphs">
         <div id="tswcontproper">
           <!-- start of content column: insert your content here -->
-          <div id="tswmeasurementstitle">
-            <font size="6">Measurements</font>
-          </div>
-          <div id="tswupdateheader">
-            <font size="2"; style="font-family:verdana; color:#b69249;"><label>Latest update:</label></font>
-          </div>
-          <div id="tswupdate">
-            <font size="2"; style="font-family:verdana; color:#FFAB00;"><label id='latestUpdate'></label></font>
-          </div>
-          <p>&nbsp;</p>
-          <div id="tswmeasurements">
-            <div class="card-content">
-              <div class="card-grid" id="id-card-grid">
-                <div class="card" id="id-card-CO2">
-                  <p class="card-title" id="id-card-title-CO2" style="text-align: center;">CO2</p>
-                  <div id="id-canvas-CO2" style="text-align: center;"> <canvas id="gauge-CO2"></canvas> </div>
-                </div>
-                <div class="card" id="id-card-temperature">
-                  <p class="card-title" id="id-card-title-temperature" style="text-align: center;">Temperat.</p>
-                  <div id="id-canvas-temperature" style="text-align: center;"> <canvas id="gauge-temperature"></canvas> </div>
-                </div>
-                <div class="card" id="id-card-humidity">
-                  <p class="card-title" id="id-card-title-humidity" style="text-align: center;">Humidity</p>
-                  <div id="id-canvas-humidity" style="text-align: center;"> <canvas id="gauge-humidity"></canvas> </div>
-                </div>
-              </div>
-            </div>
-            <script src="result_script.js"></script>
-          </div> <!--tswmeasurements--> <!--*-->
-          <p></p>
-          <!-- end of content column: put your content above this line --> </div>
+          <h1>Graphs - 24 h Evolution</h1>
+          ~GRAPHSBODY~
+          <!-- end of content column: put your content above this line -->
         </div> <!--tswcontproper-->
-        <div style="clear: both;"></div>
-        <div id="tswfooter">
-          <!-- start of footer section: insert your copyright notice, etc, here -->
-          <p style="font-size: 80%; text-align: center;">The IoT Factory ©</p>
-          <p style="font-size: 55%; text-align: center;">
-            <a href="http://the-iotfactory.com" title="The IoT Factory" target="_blank">http://the-iotfactory.com</a>
-          </p>
-          <!-- end of footer section: insert your copyright notice, etc, above this line -->
-        </div> <!--tswfooter-->
-      </div>  <!--tswcontent-->
+      </div> <!--tswcontentgraphs-->
+
+      
+
+      <div style="clear: both;"></div>      
+      <div id="tswfooter">
+        <!-- start of footer section: insert your copyright notice, etc, here -->
+        <p style="font-size: 80%; text-align: center;">The IoT Factory ©</p>
+        <p style="font-size: 55%; text-align: center;">
+          <a href="http://the-iotfactory.com" title="The IoT Factory" target="_blank">http://the-iotfactory.com</a>
+        </p>
+        <!-- end of footer section: insert your copyright notice, etc, above this line -->
+      </div> <!--tswfooter-->
     </div> <!--tswcontainer-->
   </body>
 </html>

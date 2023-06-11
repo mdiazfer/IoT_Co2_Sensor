@@ -1,9 +1,9 @@
 <!DOCTYPE html>
+<!--Version 2.0 with no jquery.min.js support-->
 <html lang="en">
   <head>
     <meta http-equiv="content-type" content="text/html; charset=UTF-8">
     <title>Basic Configuration</title>
-    <script src='/jquery.min.js'></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" media="all" href="styles.css">
     <link type="text/css" rel="stylesheet" href="tswnavbar.css" title="Side Menu CSS">
@@ -48,6 +48,7 @@
           <div id="tswcssbuttons">
             <ul>
               <li><a href="index.html">Measurements</a></li>
+              <li><a href="graphs.html">Graphs</a></li>
               <li><a href="info.html">Global Info</a></li>
               <li><a href="basic.html">Basic configuration</a></li>
               <li><a href="cloud.html">Cloud configuration</a></li>
@@ -114,52 +115,42 @@
               }
             }
 
-            /* this function will call when page loaded successfully */
-            $(document).ready(function(){                     
-              /* this function will call when onchange event fired */
+            document.getElementById("select_file_id").addEventListener("change", function(){
+              var files=document.getElementById("select_file_id").files[0];
+              var filename = files.name;
 
-              $("#select_file_id").on("change",function(){
-                /* current this object refer to input element */
-                
-                var $input = $(this);
-                
-                /* collect list of files choosen */
-                var files = $input[0].files;
-                var filename = files[0].name;
+              /* getting file extenstion eg- .jpg,.png, etc */
+              var extension = filename.substr(filename.lastIndexOf("."));
+              /* define allowed file types */
+              //var allowedExtensionsRegx = /(\.bin|\.bin.gz)$/i;
+              var allowedExtensionsRegx = /(\.bin)$/i;
+              /* testing extension with regular expression */
+              var isAllowed = allowedExtensionsRegx.test(extension);
+              if(isAllowed){
+                  /* file upload logic goes here... */
+                  document.getElementById("prg").innerHTML = filename+" ("+files.size+" B)";
+                  const binAvailableSpace=~MAINTENLEFTBINMEM~;
+                  const spiffsAvailableSpace=~MAINTENLEFTSPIFFSMEM~;
 
-                /* getting file extenstion eg- .jpg,.png, etc */
-                var extension = filename.substr(filename.lastIndexOf("."));
-                /* define allowed file types */
-                //var allowedExtensionsRegx = /(\.bin|\.bin.gz)$/i;
-                var allowedExtensionsRegx = /(\.bin)$/i;
-                /* testing extension with regular expression */
-                var isAllowed = allowedExtensionsRegx.test(extension);
-                if(isAllowed){
-                    /* file upload logic goes here... */
-                    document.getElementById("prg").innerHTML = filename+" ("+files[0].size+" B)";
-                    const binAvailableSpace=~MAINTENLEFTBINMEM~;
-                    const spiffsAvailableSpace=~MAINTENLEFTSPIFFSMEM~;
-
-                    //Binary firmware file
-                    if (document.getElementById('OTA_firmware_id').checked) {
-                      if ((binAvailableSpace-files[0].size)<0) {
-                        alert("Binary File greater than available space ("+binAvailableSpace+" B)");
-                        return false;  
-                      }
+                  //Binary firmware file
+                  if (document.getElementById('OTA_firmware_id').checked) {
+                    if ((binAvailableSpace-files.size)<0) {
+                      alert("Binary File greater than available space ("+binAvailableSpace+" B)");
+                      return false;  
                     }
-                    //SPIFFS system file
-                    else {
-                      if ((spiffsAvailableSpace-files[0].size)<0) {
-                        alert("System File greater than available space ("+spiffsAvailableSpace+" B)");
-                        return false;  
-                      }
+                  }
+                  //SPIFFS system file
+                  else {
+                    if ((spiffsAvailableSpace-files.size)<0) {
+                      alert("System File greater than available space ("+spiffsAvailableSpace+" B)");
+                      return false;  
                     }
-                    showHideCheck();
-                }else{
-                    alert("Only file extension .bin is allowed to be uploaded for either Binary or File Systems.");
-                    return false;
-                }
-              });
+                  }
+                  showHideCheck();
+              }else{
+                  alert("Only file extension .bin is allowed to be uploaded for either Binary or File Systems.");
+                  return false;
+              }
             });
 
             var fileForm=document.getElementById("upload_form");
@@ -184,6 +175,7 @@
               <p>Boots since last upgrade:&nbsp; ~BOOTCOUNT~</p>
               <p>Uncontrolled resets since last upgrade:&nbsp; ~RESETCOUNT~</p>
               <p>Total number of sanity resets since last boot:&nbsp; ~SOFTRESETCOUNTER~,&nbsp;&nbsp;last one reason:&nbsp;0x~LASTRESETREASON~</p>
+              <p>&nbsp;&nbsp;&nbsp;&nbsp;- Connectivity failures:&nbsp; ~CONNECTIVITYFAILCOUNTER~</p>
               <p>&nbsp;&nbsp;&nbsp;&nbsp;- Web server failed to response:&nbsp; ~WEBSERVERFAILCOUNTER~</p>
               <p>&nbsp;&nbsp;&nbsp;&nbsp;- Failures to load the BLE module:&nbsp; ~BLENOLOADCOUNTER~</p>
               <p>&nbsp;&nbsp;&nbsp;&nbsp;- BLE unloads because lack of heap:&nbsp; ~BLEUNLOADCOUNTER~</p>
@@ -207,3 +199,4 @@
     </div>
   </body>
 </html>
+                    

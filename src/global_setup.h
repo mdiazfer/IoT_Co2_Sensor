@@ -9,7 +9,7 @@
 
 #include "user_setup.h"
 
-#define VERSION "1.4.1"
+#define VERSION "1.5.1"
 #define VERSION_CHAR_LENGTH 5 //
 #define _STRINGIFY_(PARAMETER) #PARAMETER
 #define _CONCATENATE_(PARAMETER) MH_Z19B ## PARAMETER                    //This two-level macro concatenates 2 labels. Useful to make some
@@ -130,7 +130,8 @@
 #define ERROR_WEBSERVER_NO_RESPOND          0X20
 #define ERROR_BLE_NO_LOAD                   0X21
 #define ERROR_BLE_UNLOAD                    0x22
-#define ERROR_MIN_HEAP                      0X23
+#define ERROR_MIN_HEAP                      0x23
+#define ERROR_NO_CONNECTIVITY               0x24
 
 //Display stuff - Values customized for TTGO T-Display board
 #define TFT_MAX_X 240
@@ -224,6 +225,8 @@
 #ifndef NTP_SERVER
   #define NTP_SERVER  "time.google.com"
 #endif
+#define FQDN_TO_CHECK "google.com"
+#define SERVER_TO_CHECK "connectivity.office.com"
 
 #define NTP_TZ_ENV_VARIABLE "CET-1CEST,M3.5.0,M10.5.0/3"  //POSIX.1 format for Europe/Madrid TZ env variable
 #define TZ_ENV_VARIABLE_MAX_LENGTH 57 //Including end null
@@ -274,6 +277,7 @@
 #define WEBSERVER_CSSNAVBAR_PAGE "/tswnavbar.css"
 #define WEBSERVER_LOGO_ICON "/The_IoT_Factory.png"
 #define WEBSERVER_INDEX_PAGE "/index.html"
+#define WEBSERVER_GRAPHS_PAGE "/graphs.html"
 #define WEBSERVER_INFO_PAGE "/info.html"
 #define WEBSERVER_BASICCONFIG_PAGE "/basic.html"
 #define WEBSERVER_CLOUDCONFIG_PAGE "/cloud.html"
@@ -293,6 +297,11 @@
 #define WEBSERVER_GAUGESCRIPT_PAGE "/gauge.min.js"
 #define WEBSERVER_RESULTSCRIPT_PAGE "/result_script.js"
 #define COOKIE_SIZE 54 //32 Chars + null
+#define CLOUD_SERVICES_URL  "http://the-iotfactory.com/lar-co2/"
+#define CO2_GRAPH_IMAGE "co2.png"
+#define TEMP_HUM_GRAPH_IMAGE "temp_hum.png"
+#define VOLTAGE_GRAPH_IMAGE "voltage.png"
+#define CHARGE_GRAPH_IMAGE "charge.png"
 
 //Battery stuff
 #define SAVING_BATTERY_MODE  reducedEnergy //Other values: reducedEnergy lowestEnergy
@@ -354,6 +363,7 @@
 #define UPLOAD_SAMPLES_PERIOD 300000  //millisenconds - 5 min
 #define UPLOAD_SAMPLES_PERIOD_RE UPLOAD_SAMPLES_PERIOD  //millisenconds - 5 min in Reduce Energy Mode
 #define UPLOAD_SAMPLES_PERIOD_SE UPLOAD_SAMPLES_PERIOD  //millisenconds - 5 min in Save Energy Mode
+#define CONNECTIVITY_CHECK_PERIOD UPLOAD_SAMPLES_PERIOD  //milliseconds - Check connectivity just right after UPLOAD_SAMPLES
 #define VOLTAGE_CHECK_PERIOD 5000 //Milliseconds - 5 s
 #define VOLTAGE_CHECK_PERIOD_RE 300000 //Milliseconds - 5 min in Reduced Energy Mode
 #define VOLTAGE_CHECK_PERIOD_SE 300000 //Milliseconds - 5 min in Save Energy Mode

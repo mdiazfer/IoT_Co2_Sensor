@@ -2,7 +2,7 @@
 #include <WiFi.h>
 #include "ButtonChecks.h"
 
-extern boolean debugModeOn,webResuming,forceWEBCheck,forceWEBTestCheck;
+extern boolean debugModeOn,webResuming,forceWEBCheck,forceWEBTestCheck,errorCloudServer;
 extern RTC_DATA_ATTR CloudSyncStatus CloudSyncCurrentStatus; //Struct to store WiFi parameters
 extern RTC_DATA_ATTR int errorsSampleUpts,webServerError1,webServerError2,webServerError3;
 extern struct tm nowTimeInfo;

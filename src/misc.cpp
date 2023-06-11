@@ -30,6 +30,9 @@ void softReset() {
     BLEDevice::stopAdvertising();BLEDevice::deinit(false); delay(750); //Stop Advertisings, release memory and give time to execute everything
   }
 
+  //Reset the counter
+  minHeapSeen=0xFFFFFFFF; //v1.5.1
+  
   //Close Network services and WiFi connection
   SPIFFS.end();
   webServer.end();

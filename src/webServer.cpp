@@ -13,6 +13,33 @@
 
 #include "webServer.h"
 
+String processorGraphs(const String& var){
+  log_v(">> processorGraphs");
+  if(var == "GRAPHSBODY") {
+    if (uploadSamplesEnabled) {
+      /*String prefixURL=String(CLOUD_SERVICES_URL)+device;
+      String co2GraphPath=prefixURL+"-"+String(CO2_GRAPH_IMAGE);
+      String tempHumGraphPath=prefixURL+"-"+String(TEMP_HUM_GRAPH_IMAGE);
+      String voltageGraphPath=prefixURL+"-"+String(VOLTAGE_GRAPH_IMAGE);
+      String chargeGraphPath=prefixURL+"-"+String(CHARGE_GRAPH_IMAGE);
+
+      return String("<img src="+co2GraphPath+" alt=\"CO2 graph\" title=\"CO2 Samples Evolution\" id=\"CO2SamplesEvolution\" style=\"width: 550px; height: 325px;\">\n"+
+                    "<img src="+tempHumGraphPath+" alt=\"Temp and Hum graph\" title=\"Temp & Hum Samples Evolution\" id=\"TempHumSamplesEvolution\" style=\"width: 550px; height: 325px;\">\n"+
+                    "<img src="+voltageGraphPath+" alt=\"Voltage graph\" title=\"Voltage Samples Evolution\" id=\"VoltageSamplesEvolution\" style=\"width: 550px; height: 325px;\">\n"+
+                    "<img src="+chargeGraphPath+" alt=\"Charge graph\" title=\"Charge Samples Evolution\" id=\"ChargeSamplesEvolution\" style=\"width: 550px; height: 325px;\">");
+      */
+      String URL=String(CLOUD_SERVICES_URL)+"?dev="+device;
+      return String("<iframe src=\""+URL+"\" frameBorder=\"0\" width=\"550\" height=\"1400\"></iframe>");
+    }
+    else {
+      return String("<p><br>Enable the <a href=\"cloud.html\"> Cloud Services</a> first to see the evolution graphs</p>");
+    }
+  } else {
+    return String();
+  }
+  log_v("<< processorGraphs. Exit");
+} //processorGraphs
+
 String processorInfo(const String& var){
   log_v(">> processorInfo");
   if(var == "CO2") {
@@ -88,12 +115,44 @@ String processorInfo(const String& var){
     if (wifiEnabled && CloudClockCurrentStatus==CloudClockOnStatus) return String("Synced"); else return String("Not Available");
   } else if (var == "WIFISTATUS") {
     if (wifiEnabled) return String("Enabled"); else return String("Disabled");
+  } else if (var == "WIFICURRENTSTATUS") {
+    switch (wifiCurrentStatus) {
+      case wifiOffStatus:return String("Off");break;
+      case wifi0Status:return String("On, 0%");break;
+      case wifi25Status:return String("On, 25%");break;
+      case wifi50Status:return String("On, 50%");break;
+      case wifi75Status:return String("On, 75%");break;
+      case wifi100Status:return String("On, 100%");break;
+      default: return String();break;
+    }; 
   } else if (var == "BLUETOOTHSTATUS") {
     if (bluetoothEnabled) return String("Enabled"); else return String("Disabled");
+  } else if (var == "BLUETOOTHCURRENTSTATUS") {
+    switch (BLECurrentStatus) {
+      case BLEOffStatus:return String("Off");break;
+      case BLEOnStatus:return String("Advertising");break;
+      case BLEConnectedStatus:return String("Connected");break;
+      case BLEStandbyStatus:return String("On");break;
+      default: return String();break;
+    }; 
   } else if (var == "CLOUDSERVICESSTATUS") {
     if (uploadSamplesEnabled) return String("Enabled"); else return String("Disabled");
+  } else if (var == "CLOUDSERVICESCURRENTSTATUS") {
+    switch (CloudSyncCurrentStatus) {
+      case CloudSyncOffStatus:return String("Down");break;
+      case CloudSyncSendStatus:return String("Updating");break;
+      case CloudSyncOnStatus:return String("Up");break;
+      default: return String();break;
+    }; 
   } else if (var == "MQTTSERVICESSTATUS") {
     if (mqttServerEnabled) return String("Enabled"); else return String("Disabled");
+  } else if (var == "MQTTSERVICESCURRENTSTATUS") {
+    switch (MqttSyncCurrentStatus) {
+      case MqttSyncOffStatus:return String("Down");break;
+      case MqttSyncSendStatus:return String("Updating");break;
+      case MqttSyncOnStatus:return String("Up");break;
+      default: return String();break;
+    }; 
   } else if (var == "Secure_MQTTSERVICESSTATUS") {
     if (secureMqttEnabled) return String("Enabled"); else return String("Disabled");
   } else if (var == "MQTTSERVER") {
@@ -450,6 +509,8 @@ String processorMaintenance(const String& var){
     return String(resetCount);
   } else if (var == "LASTRESETREASON") {
     return String(softResetReason,HEX);
+  } else if (var == "CONNECTIVITYFAILCOUNTER") {
+    return String(connectivityFailsCounter);
   } else if (var == "WEBSERVERFAILCOUNTER") {
     return String(webServerFailsCounter);
   } else if (var == "BLENOLOADCOUNTER") {
@@ -564,6 +625,15 @@ uint32_t initWebServer() {
   });
   //webServer.serveStatic(WEBSERVER_LOGO_ICON,SPIFFS,WEBSERVER_LOGO_ICON);
 
+  webServer.on(WEBSERVER_GRAPHS_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
+    lastTimeBLECheck=loopStartTime+millis()+BLE_PERIOD_EXTENSION; //Avoid BLE Advertising during BLE_PERIOD_EXTENSION from now
+    webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
+    if (isBeaconAdvertising || BLEtoBeLoaded) {delay(WEBSERVER_SEND_DELAY);} //Wait for iBeacon to stop to prevent heap overflow
+    request->send(SPIFFS, WEBSERVER_GRAPHS_PAGE, String(), false, processorGraphs);
+    webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
+  });
+  
+  
   webServer.on(WEBSERVER_INFO_PAGE, HTTP_GET, [](AsyncWebServerRequest *request){
     lastTimeBLECheck=loopStartTime+millis()+BLE_PERIOD_EXTENSION; //Avoid BLE Advertising during BLE_PERIOD_EXTENSION from now
     webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
@@ -1024,30 +1094,38 @@ uint32_t initWebServer() {
       if(p->isPost()){
         // HTTP POST Display ON/OFF value
         if (p->name().compareTo("Display_enabled")==0) {
-          if (p->value().compareTo("off")==0) {
-            autoBackLightOff=false;
-            //Turn off back light
-            digitalWrite(PIN_TFT_BACKLIGHT,LOW);
+          if ( ((p->value().compareTo("off")==0) && digitalRead(PIN_TFT_BACKLIGHT)==HIGH) || 
+               ((p->value().compareTo("on")==0)  && digitalRead(PIN_TFT_BACKLIGHT)==LOW) ) {
+            //Process only if the Display_enabled parameter has been changed
+            if (p->value().compareTo("off")==0) {
+              //autoBackLightOff=false;
+              //Turn off back light
+              digitalWrite(PIN_TFT_BACKLIGHT,LOW);
+            }
+            if (p->value().compareTo("on")==0) {
+              //autoBackLightOff=true;
+              tft.fillScreen(MENU_BACK_COLOR); //clean the screen before turning the display on
+              digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+            }
             lastTimeTurnOffBacklightCheck=loopStartTime+millis();
-          }
-          if (p->value().compareTo("on")==0) {
-            autoBackLightOff=true;
-            tft.fillScreen(MENU_BACK_COLOR); //clean the screen before turning the display on
-            digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
           }
         }
         // HTTP POST DisplaySw_enabled value
         if (p->name().compareTo("DisplaySw_enabled")==0) {
-          if ((p->value().compareTo("on")==0) && !autoBackLightOff) {
-            autoBackLightOff=true;
-            //Turn off back light
-            digitalWrite(PIN_TFT_BACKLIGHT,LOW);
-            lastTimeTurnOffBacklightCheck=loopStartTime+millis();
-          }
-          if ((p->value().compareTo("off")==0) && autoBackLightOff) {
-            autoBackLightOff=false;
-            tft.fillScreen(MENU_BACK_COLOR); //clean the screen before turning the display on
-            digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+          if (((p->value().compareTo("on")==0) && !autoBackLightOff) || 
+              ((p->value().compareTo("off")==0) && autoBackLightOff) ) {
+            //Process only if the DisplaySw_enabled parameter has been changed
+            if ((p->value().compareTo("on")==0) && !autoBackLightOff) {
+              autoBackLightOff=true;
+              //Turn off back light
+              //digitalWrite(PIN_TFT_BACKLIGHT,LOW); //v1.5.0 - Display should switch off after TIME_TURN_OFF_BACKLIGHT seconds
+            }
+            if ((p->value().compareTo("off")==0) && autoBackLightOff) {
+              autoBackLightOff=false;
+              tft.fillScreen(MENU_BACK_COLOR); //clean the screen before turning the display on
+              digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+            }
+            lastTimeTurnOffBacklightCheck=loopStartTime+millis(); //Wait TIME_TURN_OFF_BACKLIGHT to switch off the display
           }
         }
         // HTTP POST BatteryMode value

@@ -23,6 +23,9 @@ There are 4 different Saving Energy modes:
  Checking WiFi signal strength        |   ICON_STATUS_REFRESH_PERIOD   |  NOT DONE if Display is off  |   NOT DONE if Display is off   |
  (ICON_STATUS_REFRESH_PERIOD)         |               5 s              |                              |                                |
 +-------------------------------------+--------------------------------+------------------------------+--------------------------------+
+ BLE Adversitising iBeacon & Services |            BLE_PERIOD          |         BLE_PERIOD_RE        |          BLE_PERIOD_RE         |
+ (BLE_PERIOD)                         |              20 s              |            60 s              |             5 min              |
++-------------------------------------+--------------------------------+------------------------------+--------------------------------+
  Select the screen (only Seq. Mode)   |   DISPLAY_MODE_REFRESH_PERIOD  |  NOT DONE if Display is off  |   NOT DONE if Display is off   |
  (DISPLAY_MODE_REFRESH_PERIOD)        |               5 s              |                              |                                |
 +-------------------------------------+--------------------------------+------------------------------+--------------------------------+

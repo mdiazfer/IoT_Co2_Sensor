@@ -752,6 +752,25 @@ void printNetInfo() {
 
 void loadBootImage() {
   //-->>Load the logo image when booting up
+
+  // Create a sprite for text and initialize sprite parameters
+  TFT_eSprite logoSprite=TFT_eSprite(&tft);
+  uint16_t spriteYSize=TFT_Y_HEIGH+49;
+  logoSprite.setColorDepth(16);
+  logoSprite.createSprite(TFT_X_WIDTH, spriteYSize);
+  logoSprite.fillSprite(TFT_BLACK); // Note: Sprite is filled with black when created
+  
+  //Display immage
+  uint32_t y=spriteYSize;
+  uint8_t scrollPixel=1;
+  while (y>0) {
+    logoSprite.pushImage(5,y,230,49,bootLogo);
+    logoSprite.scroll(0,-scrollPixel);
+    logoSprite.pushSprite(0,-49);
+    y=y-scrollPixel>spriteYSize?0:y-scrollPixel;
+    if (y==90) delay (2000);
+    delay(5);
+  }
   
   return;
 }

@@ -60,7 +60,7 @@ extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 extern RTC_DATA_ATTR uint32_t error_setup;
 extern RTC_DATA_ATTR uint64_t lastTimeBLECheck,loopStartTime;
 extern RTC_DATA_ATTR uint8_t BLEnoLoadedCount,BLEunloadsCount,softResetReason;
-extern RTC_DATA_ATTR int webServerFailsCounter,softResetCounter,BLEnoLoadedCounter,BLEunloadsCounter,minHeapSeenCounter;
+extern RTC_DATA_ATTR int connectivityFailsCounter,webServerFailsCounter,softResetCounter,BLEnoLoadedCounter,BLEunloadsCounter,minHeapSeenCounter;
 #ifdef __MHZ19B__
   extern MHZ19 co2Sensor;  //64 B
 #endif

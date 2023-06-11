@@ -33,6 +33,7 @@
 #include "webServer.h"
 #include "mqttClient.h"
 #include "BLE_support.h"
+#include <ESP32Ping.h>
 
 #ifdef __MHZ19B__
   const ulong co2PreheatingTime=MH_Z19B_CO2_WARMING_TIME;
@@ -43,10 +44,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   1553 B
+// RTC memory variables:                   1577 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     4643 B
-// RTC memory left:     8000 B - 4643 B = 3357 B 
+// RTC memorty TOTAL:                     4667 B
+// RTC memory left:     8000 B - 4667 B = 3333 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -106,9 +107,9 @@ RTC_DATA_ATTR uint64_t nowTimeGlobal=0,timeUSBPowerGlobal=0,loopStartTime=0,loop
                         lastTimeBLECheck=0,previousLastTimeBLECheck=0,lastTimeBLEOnCheck=0,
                         lastTimeDisplayCheck=0,lastTimeDisplayModeCheck=0,lastTimeNTPCheck=0,lastTimeVOLTCheck=0,
                         lastTimeHourSampleCheck=0,lastTimeDaySampleCheck=0,lastTimeUploadSampleCheck=0,lastTimeIconStatusRefreshCheck=0,
-                        lastTimeTurnOffBacklightCheck=0,lastTimeWifiReconnectionCheck=0,
-                        lastMQTTChangeCheck=0,lastCloudChangeCheck=0,lastCloudClockChangeCheck=0,lastTimeWebServerCheck=0; //20*8=160 B
-RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,BLEPeriod,BLEOnTimeout,wifiReconnectPeriod; //5*4=20B
+                        lastTimeTurnOffBacklightCheck=0,lastTimeWifiReconnectionCheck=0,lastTimeMQTTSampleCheck=0,
+                        lastMQTTChangeCheck=0,lastCloudChangeCheck=0,lastCloudClockChangeCheck=0,lastTimeWebServerCheck=0,lastTimeConnectiviyCheck=0; //22*8=176 B
+RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,BLEPeriod,BLEOnTimeout,wifiReconnectPeriod,displayModeRefreshPeriod=DISPLAY_MODE_REFRESH_PERIOD; //6*4=24B
 RTC_DATA_ATTR uint64_t sleepTimer=0; //8 B
 RTC_DATA_ATTR enum displayModes displayMode=bootup,lastDisplayMode=bootup; //2*4=8 B
 RTC_DATA_ATTR enum availableStates stateSelected=displayingSampleFixed,currentState=bootupScreen,lastState=currentState; //3*4=12 B
@@ -147,7 +148,7 @@ RTC_DATA_ATTR byte mac[6]; //6*1=6B - To store WiFi MAC address
 RTC_DATA_ATTR float_t valueCO2,valueT,valueHum=0,lastValueCO2=-1,tempMeasure; //5*4=20B
 RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0,webServerError1=0,
                   webServerError2=0,webServerError3=0,SPIFFSErrors=0,softResetCounter=0,
-                  BLEnoLoadedCounter=0,BLEunloadsCounter=0,minHeapSeenCounter=0,webServerFailsCounter=0; //12*4=48B - Error stats
+                  BLEnoLoadedCounter=0,BLEunloadsCounter=0,minHeapSeenCounter=0,webServerFailsCounter=0,connectivityFailsCounter=0; //13*4=52B - Error stats
 RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled,mqttServerEnabled,secureMqttEnabled;//5*1=5B
 RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON,startTimeConfigure=false; //2*1=1B
 RTC_DATA_ATTR enum BLEStatus BLECurrentStatus=BLEOffStatus; //1*4=4B
@@ -176,7 +177,7 @@ ulong previousTime=0,timePressButton1,timeReleaseButton1,timePressButton2,timeRe
       remainingBootupTime=BOOTUP_TIMEOUT*1000;
 String valueString,TZEnvVariable,TZName;
 String serverToUploadSamplesString(SERVER_UPLOAD_SAMPLES);
-IPAddress serverToUploadSamplesIPAddress; //8 B
+IPAddress serverToUploadSamplesIPAddress,auxServer; //8*2=16
 String device(DEVICE_NAME_PREFIX); //16 B
 static const char hex_digits[] = "0123456789ABCDEF";
 boolean waitingMessage=true,runningMessage=true,wifiResuming=false,NTPResuming=false,webResuming=false,startAPMode=false;
@@ -209,7 +210,7 @@ char currentSetCookie[COOKIE_SIZE];
 JSONVar samples;
 String userName,userPssw,mqttUserName,mqttUserPssw,mqttTopicPrefix,mqttTopicName;
 uint32_t heapSizeNow=0;//,heapSizeLast=0;
-bool webServerResponding=false,isBeaconAdvertising=false;
+bool errorCloudServer=false,webServerResponding=false,isBeaconAdvertising=false,errorConnectivity=false;
 bool deviceConnected=false,BLEtoBeLoaded=false;
 BLEServer* pServer=nullptr;
 BLEAdvertising* pAdvertising=nullptr;
@@ -237,8 +238,8 @@ void initVariable() {
   lastTimeBLECheck=0;previousLastTimeBLECheck=0;lastTimeBLEOnCheck=0;
   lastTimeNTPCheck=0;lastTimeVOLTCheck=0;lastTimeHourSampleCheck=0;lastTimeDaySampleCheck=0;
   lastTimeUploadSampleCheck=0;lastTimeIconStatusRefreshCheck=0;lastTimeTurnOffBacklightCheck=0;
-  lastMQTTChangeCheck=0,lastCloudChangeCheck=0,lastCloudClockChangeCheck=0;
-  lastTimeWifiReconnectionCheck=0;lastTimeWebServerCheck=0;
+  lastMQTTChangeCheck=0,lastCloudChangeCheck=0,lastCloudClockChangeCheck=0;lastTimeMQTTSampleCheck=0;
+  lastTimeWifiReconnectionCheck=0;lastTimeWebServerCheck=0;lastTimeConnectiviyCheck=0;
   sleepTimer=0;
   displayMode=bootup;lastDisplayMode=bootup;
   stateSelected=displayingSampleFixed;currentState=bootupScreen;lastState=currentState;
@@ -258,7 +259,7 @@ void initVariable() {
   forceWEBCheck=false;forceWEBTestCheck=false;forceWebServerInit=false;softResetOn=false;forceMQTTConnect=false;
   valueCO2=0;valueT=0;valueHum=0;lastValueCO2=-1;tempMeasure=0;
   errorsWiFiCnt=0;errorsSampleUpts=0;errorsNTPCnt=0;webServerError1=0;webServerError2=0;webServerError3=0;
-  SPIFFSErrors=0;webServerFailsCounter=0;softResetCounter=0;
+  SPIFFSErrors=0;webServerFailsCounter=0;softResetCounter=0;connectivityFailsCounter=0;
   BLEnoLoadedCounter=0;BLEunloadsCounter=0;minHeapSeenCounter=0;
   error_setup=NO_ERROR;remainingBootupSeconds=0;
   previousTime=0;remainingBootupTime=BOOTUP_TIMEOUT*1000;
@@ -268,7 +269,6 @@ void initVariable() {
   whileLoopTimeLeft=NTP_CHECK_TIMEOUT;whileWebLoopTimeLeft=HTTP_ANSWER_TIMEOUT;
   wifiResuming=false;NTPResuming=false;webResuming=false;
   debugModeOn=DEBUG_MODE_ON;
-  BLECurrentStatus=BLEOffStatus;
   reconnectWifiAndRestartWebServer=false;
   resyncNTPServer=false;
   deviceReset=false;
@@ -286,8 +286,9 @@ void initVariable() {
   memset(activeCookie,'\0',COOKIE_SIZE); //init variable
   memset(currentSetCookie,'\0',COOKIE_SIZE); //init variable
   //BLE variables and pointers
-  webServerResponding=false;isBeaconAdvertising=false;
+  errorCloudServer=false;webServerResponding=false;isBeaconAdvertising=false;errorConnectivity=false;
   deviceConnected=false;BLEtoBeLoaded=false;
+  displayModeRefreshPeriod=DISPLAY_MODE_REFRESH_PERIOD;
   
   //Read from EEPROM the values to be stored in the Config Variables
   //
@@ -856,6 +857,9 @@ void firstSetup() {
     tft.fillScreen(TFT_BLACK);
   }
 
+  //Load boot image
+  loadBootImage();
+
   //Start AP Mode to configure WiFi SSIDs
   if (startAPMode) {
     if (debugModeOn) Serial.println(" [setup] - No WiFi configuration. Asking the user what to do.");
@@ -911,11 +915,6 @@ void firstSetup() {
   pFL=scFL;                             //Pointer First Line
   pLL=pFL;                              //pointer Last Line written
 
-  //-->loadAllIcons();
-  //-->loadAllWiFiIcons();
-
-  loadBootImage();
-  delay(500);
   //Display messages
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_WHITE,TFT_BLACK);stext1.print("CO2 bootup v");stext1.print(VERSION);stext1.println(" ..........");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
   stext1.setCursor(0,(pLL-1)*pixelsPerLine);stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[setup] - Display: [");stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK); stext1.println("]");if (pLL-1<scLL) pLL++; else {stext1.scroll(0,-pixelsPerLine);if (pFL>spFL) pFL--;}stext1.pushSprite(0, (scL-spL)/2*pixelsPerLine);
@@ -1076,7 +1075,7 @@ void firstSetup() {
     // The request updates CloudSyncCurrentStatus
     error_setup|=sendAsyncHttpRequest(true,true,error_setup,serverToUploadSamplesIPAddress,SERVER_UPLOAD_PORT,String(GET_REQUEST_TO_UPLOAD_SAMPLES)+"test HTTP/1.1",&whileWebLoopTimeLeft);
 
-    if (CloudSyncCurrentStatus==CloudSyncOnStatus) {
+    if (CloudSyncCurrentStatus!=CloudSyncOffStatus) {
       if (debugModeOn) {Serial.println("[OK]");}
       stext1.setTextColor(TFT_YELLOW_4_BITS_PALETTE,TFT_BLACK);stext1.print("[");
       stext1.setTextColor(TFT_GREEN_4_BITS_PALETTE,TFT_BLACK); stext1.print("OK");
@@ -1516,7 +1515,28 @@ void setup() {
     if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SETUP] - BLE N/E");}
     
   wakeup_reason = esp_sleep_get_wakeup_cause();
-  if (softResetOn && (wakeup_reason==ESP_SLEEP_WAKEUP_TIMER)) wakeup_reason=ESP_SLEEP_WAKEUP_EXT0; //Force variables init -v1.3.4
+  //If coming from softReset, then follow the routing of ESP_SLEEP_WAKEUP_EXT0 for init variables
+  if (softResetOn) {  //v1.5.1
+    Serial.println(String(nowTimeGlobal)+" [SETUP] - Wakeup reason="+String(wakeup_reason)+String(" . Looks like a softReset() was done"));
+    switch(wakeup_reason) {
+      case ESP_SLEEP_WAKEUP_UNDEFINED:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_UNDEFINED");break;
+      case ESP_SLEEP_WAKEUP_ALL:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_ALL");break;
+      case ESP_SLEEP_WAKEUP_EXT0:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_EXT0");break;
+      case ESP_SLEEP_WAKEUP_EXT1:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_EXT1");break;
+      case ESP_SLEEP_WAKEUP_TIMER:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_TIMER");break;
+      case ESP_SLEEP_WAKEUP_TOUCHPAD:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_TOUCHPAD");break;
+      case ESP_SLEEP_WAKEUP_ULP:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_ULP");break;
+      case ESP_SLEEP_WAKEUP_GPIO:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_GPIO");break;
+      case ESP_SLEEP_WAKEUP_UART:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_UART");break;
+      case ESP_SLEEP_WAKEUP_WIFI:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_WIFI");break;
+      case ESP_SLEEP_WAKEUP_COCPU:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_COCPU");break;
+      case ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_COCPU_TRAP_TRIG");break;
+      case ESP_SLEEP_WAKEUP_BT:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_BT");break;
+      default:Serial.println(" [SETUP] - Wakeup reason=default");break;
+    }
+    wakeup_reason=ESP_SLEEP_WAKEUP_EXT0; //Force variables init -v1.3.4
+    Serial.println(" [SETUP] - Reset reason="+String(esp_reset_reason())); //v1.5.1
+  }
   switch(wakeup_reason)
   {
     case ESP_SLEEP_WAKEUP_EXT1: //Wake up from Hibernate Mode by long pressing Button1
@@ -1602,22 +1622,32 @@ void setup() {
       //Check if resetCount needs to be updated
       switch (esp_reset_reason()) { //v1.2.0 - https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/misc_system_api.html#_CPPv418esp_reset_reason_t
         case ESP_RST_UNKNOWN: //Reset reason can not be determined
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_UNKNOWN");break;
         case ESP_RST_PANIC: //Software reset due to exception/panic
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_PANIC");break;
         case ESP_RST_INT_WDT: //Reset (software or hardware) due to interrupt watchdog.
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_INT_WDT");break;
         case ESP_RST_TASK_WDT: //Reset due to task watchdog
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_TASK_WDT");break;
         case ESP_RST_WDT: //Reset due to other watchdogs
           //In all these cases, there was a wrong code that triggered the reset. Count it
           resetCount++;
           EEPROM.write(0x3DF,resetCount);
-        break;
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_WDT");break;
         case ESP_RST_POWERON: //Power-on event
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_POWERON");break;
         case ESP_RST_EXT: //External pin (not applicable for ESP32)
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_EXT");break;
         case ESP_RST_SW: //Software reset via esp_restart()
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_SW");break;
         case ESP_RST_DEEPSLEEP: //Reset after exiting deep sleep mode
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_DEEPSLEEP");break;
         case ESP_RST_BROWNOUT: //Brownout reset (software or hardware) - Supply voltage goes below safe level
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_BROWNOUT");break;
         case ESP_RST_SDIO: //Reset over SDIO
+          Serial.println(" [SETUP] - Reset reason=ESP_RST_SDIO");break;
         default:
-        break;
+          Serial.println(" [SETUP] - Reset reason=default");break;
       }
       EEPROM.commit(); //Update bootCount and resetCount values
       firstSetup(); //Hard bootup - Run global setup during the first boot (HW reset or power ON)
@@ -1732,7 +1762,10 @@ void loop() {
   //After firstSetup, the CO2 sensor must warmup before starting to take samples
   // Bootup messages review and WarmUp screen is displayied before the CO2 sensor is 
   // ready to work
-  if (firstBoot) if(warmingUp()) return;
+  if (firstBoot) {
+    lastTimeBLECheck=nowTimeGlobal-5000;//Wait 5 sg for the frist BLE Adversising to avoid WebServer to crash
+    if(warmingUp()) return;
+  }
 
   //********************************************************************
   //                     MAIN LOOP START HERE
@@ -1744,7 +1777,7 @@ void loop() {
   nowTimeGlobal=loopStartTime+millis();
   if (((nowTimeGlobal-lastTimeTurnOffBacklightCheck) >= TIME_TURN_OFF_BACKLIGHT) && !firstBoot && 
        digitalRead(PIN_TFT_BACKLIGHT)!=LOW && autoBackLightOff==true) {
-    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - TIME_TURN_OFF_BACKLIGHT");}
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - TIME_TURN_OFF_BACKLIGHT, lastTimeTurnOffBacklightCheck="+String(lastTimeTurnOffBacklightCheck));}
     
     if (currentState==displayingSampleFixed || currentState==displayingCo2LastHourGraphFixed ||
         currentState==displayingCo2LastDayGraphFixed || currentState==displayingSequential) {
@@ -1831,7 +1864,8 @@ void loop() {
     }
     else { 
       if ((nowTimeGlobal-lastCloudChangeCheck) >= ICON_ON_TIMEOUT) {
-        if (uploadSamplesEnabled) CloudSyncCurrentStatus=CloudSyncOnStatus;
+        //if (uploadSamplesEnabled) CloudSyncCurrentStatus=CloudSyncOnStatus;
+        if (uploadSamplesEnabled && !errorCloudServer) CloudSyncCurrentStatus=CloudSyncOnStatus; //v1.5.0
         else CloudSyncCurrentStatus=CloudSyncOffStatus;
         CloudSyncLastStatus=CloudSyncCurrentStatus; //Avoid trigger the check next loop cycle
       }
@@ -1926,9 +1960,12 @@ void loop() {
 
     //Updating JSON object with samples - Used in web webEvents
     char s[100];getLocalTime(&nowTimeInfo);strftime(s,sizeof(s),"%d/%m/%Y - %H:%M:%S",&nowTimeInfo);
+    samples["version"] = String(VERSION);
     samples["CO2"] = String(valueCO2);
     samples["temperature"] = String(valueT);
     samples["humidity"] =  String(valueHum);
+    samples["voltage"] =  String(batADCVolt*2/1000);
+    samples["batCharge"] =  String(batCharge);
     samples["dateUpdate"] =  String(s);
     
     // If there's web client connected, send Events it with the new readings
@@ -1950,7 +1987,7 @@ void loop() {
         if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - SAMPLE_PERIOD - new MQTT messages published:\n    "+mqttTopicName+"/temperature "+String(valueT)+", packetIdT="+packetIdT+
                       "\n    "+mqttTopicName+"/humidity "+String(valueHum)+", packetIdHum="+packetIdHum+
                       "\n    "+mqttTopicName+"/co2 "+String(valueCO2)+", packetIdCO2="+packetIdCO2);
-        if (MqttSyncCurrentStatus==MqttSyncOnStatus) MqttSyncCurrentStatus=MqttSyncSendStatus;
+        MqttSyncCurrentStatus=MqttSyncSendStatus; //v1.4.2
       }
       else {
         //MQTT Client disconnected
@@ -1959,6 +1996,7 @@ void loop() {
         mqttClientInit(false,debugModeOn,false);
         if (MqttSyncCurrentStatus==MqttSyncOffStatus) {MqttSyncLastStatus=MqttSyncOffStatus;MqttSyncCurrentStatus=MqttSyncSendStatus;} //Update icon
       }
+      lastTimeMQTTSampleCheck=nowTimeGlobal; //Next MQTT update in uploadSamplesPeriod ms in case of going to Battery powered status
     }
 
     // Notify the new readings to the BLE client (if there's connections)
@@ -2160,9 +2198,10 @@ void loop() {
   
   //Regular actions every DISPLAY_MODE_REFRESH_PERIOD seconds. Selecting what's the screen to display (active screen)
   nowTimeGlobal=loopStartTime+millis();
-  if ((((nowTimeGlobal-lastTimeDisplayModeCheck) >= DISPLAY_MODE_REFRESH_PERIOD) || forceDisplayModeRefresh) && 
+  //if ((((nowTimeGlobal-lastTimeDisplayModeCheck) >= DISPLAY_MODE_REFRESH_PERIOD) || forceDisplayModeRefresh) && 
+  if ((((nowTimeGlobal-lastTimeDisplayModeCheck) >= displayModeRefreshPeriod) || forceDisplayModeRefresh) && 
        currentState==displayingSequential && digitalRead(PIN_TFT_BACKLIGHT)!=LOW) {
-    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - DISPLAY_MODE_REFRESH_PERIOD");}
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - DISPLAY_MODE_REFRESH_PERIOD currentState="+String(currentState));}
 
     lastTimeDisplayModeCheck=nowTimeGlobal; //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
 
@@ -2174,16 +2213,23 @@ void loop() {
       case sampleValue:
         //if forceDisplayModeRefresh, then the first screen is always the sampleValue
         if (lastDisplayMode!=bootup && !forceDisplayModeRefresh) displayMode=co2LastHourGraph; //Next display mode only if coming from bootup screen
+        displayModeRefreshPeriod=(uint64_t)(DISPLAY_MODE_REFRESH_PERIOD/2); //16,5% of the cycle is showing the hourly graph
+        forceDisplayRefresh=true;
       break;
       case co2LastHourGraph:
         displayMode=co2LastDayGraph; //Next display mode
+        displayModeRefreshPeriod=(uint64_t)(DISPLAY_MODE_REFRESH_PERIOD/2); //16,5% of the cycle is showing the dayly graph
+        forceDisplayRefresh=true;
       break;
       case co2LastDayGraph:
         displayMode=sampleValue; //Next display mode
+        displayModeRefreshPeriod=DISPLAY_MODE_REFRESH_PERIOD*2; //66% of the cycle is showing the readings
+        forceDisplayRefresh=true;
       break;
     }
   
     if (forceDisplayModeRefresh) forceDisplayModeRefresh=false;
+    if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - DISPLAY_MODE_REFRESH_PERIOD end - displayMode="+String(displayMode)+", lastTimeDisplayModeCheck="+String(lastTimeDisplayModeCheck));}
   }
 
   //Regular actions every DISPLAY_REFRESH_PERIOD seconds. Display the active screen, but only if the Display is ON (to save energy consume)
@@ -2471,6 +2517,45 @@ void loop() {
     }
   }
   
+  //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to MQTT server
+  // Publish MQTT message with the new samples if:
+  // - every 5 min (uploadSamplesPeriod) if Battery powered (sleep mode)
+  // For other cases, the MQTT server is uploaded in SAMPLE_PERIOD
+  // - if USB powered (powerState!=onlyBattery)
+  // - if display is ON
+  nowTimeGlobal=loopStartTime+millis();
+  if (wifiCurrentStatus!=wifiOffStatus && wifiEnabled && mqttServerEnabled && !firstBoot &&
+      (((nowTimeGlobal-lastTimeMQTTSampleCheck) >= uploadSamplesPeriod) && powerState==onlyBattery ) ) { //v1.5.1
+    //After WIFI_RECONNECT_PERIOD, the MQTT client should be connected. Check it out.
+    if (!mqttClient.connected()) {
+      //MQTT Client disconnected
+      //Comming from deep mode, so connect to MQTT broker first
+      if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - UPLOAD_SAMPLES_PERIOD - Coming from deep sleep mode, trying to get connected again...");
+      mqttClientInit(false,debugModeOn,false);
+    }
+
+    //After mqttClientInit, MQTT client should be connected, otherwise try once again
+    if (mqttClient.connected()) {
+      //MQTT Client connected
+
+      String packetIdCO2=String(mqttClient.publish(String(mqttTopicName+"/co2").c_str(), 0, true, String(valueCO2).c_str()));
+      String packetIdT=String(mqttClient.publish(String(mqttTopicName+"/temperature").c_str(), 0, true, String(valueT).c_str()));
+      String packetIdHum=String(mqttClient.publish(String(mqttTopicName+"/humidity").c_str(), 0, true, String(valueHum).c_str()));
+
+      if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - UPLOAD_SAMPLES_PERIOD - Connected to the MQTT server. New MQTT messages published:\n    "+mqttTopicName+"/temperature "+String(valueT)+", packetIdT="+packetIdT+
+                    "\n    "+mqttTopicName+"/humidity "+String(valueHum)+", packetIdHum="+packetIdHum+
+                    "\n    "+mqttTopicName+"/co2 "+String(valueCO2)+", packetIdCO2="+packetIdCO2);
+      MqttSyncCurrentStatus=MqttSyncSendStatus; //v1.4.2
+    }
+    else {
+      //MQTT Client disconnected
+      if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - UPLOAD_SAMPLES_PERIOD - No connection with the MQTT server ...\n             MqttSyncLastStatus("+String(MqttSyncLastStatus)+")!=MqttSyncCurrentStatus("+String(MqttSyncCurrentStatus)+")");
+      if (MqttSyncCurrentStatus==MqttSyncOffStatus) {MqttSyncLastStatus=MqttSyncOffStatus;MqttSyncCurrentStatus=MqttSyncSendStatus;} //Update icon
+    }
+    lastTimeMQTTSampleCheck=nowTimeGlobal;
+  }
+  
+  
   //Regular actions every UPLOAD_SAMPLES_PERIOD seconds - Upload samples to external server
   //wifiCred.SiteAllow[wifiCred.activeIndex] must be set, otherwise samples are not uploaded
   //forceWEBCheck is set when in the previous interaction the WEB connection was either:
@@ -2486,7 +2571,8 @@ void loop() {
       //(0==wifiCred.wifiSITEs[wifiCred.activeIndex].compareTo(UPLOAD_SAMPLES_FROM_SITE)) ) {
     
     //Update at begining to prevent accumulating delays in CHECK periods as this code might take long
-    if (!webResuming && !forceWEBTestCheck) lastTimeUploadSampleCheck=nowTimeGlobal; //Only if the HTTP connection didn't ABORT or BREAK in the previous interaction
+    if (!webResuming && !forceWEBTestCheck) {lastTimeUploadSampleCheck=nowTimeGlobal;} //Only if the HTTP connection didn't ABORT or BREAK in the previous interaction
+    if (!webResuming) {whileWebLoopTimeLeft=HTTP_ANSWER_TIMEOUT;} //v1.5.0
     
     if (forceWEBTestCheck && ((nowTimeGlobal-lastTimeUploadSampleCheck) >= uploadSamplesPeriod))
      {forceWEBTestCheck=false;} //Timer has priority over WEB test. httpRequest will be setup to send samples 
@@ -2518,12 +2604,13 @@ void loop() {
       "&energyCurrentMode="+energyCurrentMode+"&errorsWiFiCnt="+errorsWiFiCnt+
       "&errorsSampleUpts="+errorsSampleUpts+"&errorsNTPCnt="+errorsNTPCnt+"&webServerError1="+webServerError1+
       "&webServerError2="+webServerError2+"&webServerError3="+webServerError3+"&SPIFFSErrors="+SPIFFSErrors+
-      +"&webServerFailsCounter="+webServerFailsCounter+"&softResetCounter="+softResetCounter+"&heapSize="+String(esp_get_free_heap_size())+" HTTP/1.1";
+      "&webServerFailsCounter="+webServerFailsCounter+"&connectivityFailsCounter="+connectivityFailsCounter+
+      "&softResetCounter="+softResetCounter+"&heapSize="+String(esp_get_free_heap_size())+" HTTP/1.1";
 
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+"    - serverToUploadSamplesIPAddress="+IpAddress2String(serverToUploadSamplesIPAddress)+", SERVER_UPLOAD_PORT="+String(SERVER_UPLOAD_PORT)+
                    ", httpRequest="+String(httpRequest));}
 
-    forceWEBCheck=false;
+    forceWEBCheck=false;errorCloudServer=false;
     switch(sendAsyncHttpRequest(false,false,0,serverToUploadSamplesIPAddress,SERVER_UPLOAD_PORT,httpRequest,&whileWebLoopTimeLeft)) { //Sending http request and CloudSyncCurrentStatus update
       case ERROR_ABORT_WEB_SETUP: //Button pressed. NTP connection aborted. Exit now but force reconnection next loop interaction 
         forceWEBCheck=true; //Force WEB reconnection in the next loop interaction
@@ -2556,7 +2643,7 @@ void loop() {
   nowTimeGlobal=loopStartTime+millis();
   if ( ((nowTimeGlobal-lastTimeWebServerCheck) >= WEBSERVER_CHECK_PERIOD) && WiFi.status()==WL_CONNECTED && 
           wifiEnabled && webServerEnabled && !firstBoot && 
-          !(powerState==onlyBattery && digitalRead(PIN_TFT_BACKLIGHT)!=LOW)) { //v1.4.1 - Only if USB powered or Battery with display ON
+          !(powerState==onlyBattery && digitalRead(PIN_TFT_BACKLIGHT)==LOW)) { //v1.5.0 - Only if USB powered or Battery with display ON
     //Get http://WiFi.localIP/samples if not waked up from deep sleep mode
     
     if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - WEBSERVER_CHECK_PERIOD webServerFailsCounter="+String(webServerFailsCounter)+", heap="+String(esp_get_free_heap_size())+" B, xPortGetFreeHeapSize()="+String(xPortGetFreeHeapSize())+" B, minHeap="+String(minHeapSeen)+" B - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
@@ -2586,9 +2673,85 @@ void loop() {
         getLocalTime(&nowTimeInfo);Serial.print(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println(", lastTimeWebServerCheck="+String(lastTimeUploadSampleCheck));}
   }
 
+  //Regular actions every CONNECTIVITY_CHECK_PERIOD seconds
+  //It has been experienced that the WiFi stack cracked (even not ping answer) but is shows the WL_CONNECTED status
+  // and the WEBSERVER_CHECK is successfull. This function detects this situation and reset.
+  //Check connectivity and reset it if needed, only if:
+  // WiFi.status()==WL_CONNECTED && no FQDN resolved and error in sample_upload && mqttClient not connected and error in checkURL and no GW ping
+  // NTP status is not check as NTP checks take time (random period) and forcing NTP in here is avoided (as it may take several loop cycles = complexity)
+  nowTimeGlobal=loopStartTime+millis();
+  if ( ((nowTimeGlobal-lastTimeConnectiviyCheck) >= uploadSamplesPeriod) && WiFi.status()==WL_CONNECTED && 
+          wifiEnabled && !firstBoot ) { //v1.5.0 - Only if USB powered or Battery with display ON
+
+    if (debugModeOn) {Serial.print(String(nowTimeGlobal)+"  - CONNECTIVITY_CHECK_PERIOD  - Time: ");getLocalTime(&nowTimeInfo);Serial.println(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");}
+
+    errorConnectivity=false;
+    //First try ping to the gateway
+    if (Ping.ping(WiFi.gatewayIP(),1)) {
+      //Success, so connectivity is right
+      //Nothing to do - exit
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"    - CONNECTIVITY_CHECK_PERIOD - Default GW Ping received. Connectivity is OK");}
+    }
+    else if (WiFi.hostByName(FQDN_TO_CHECK, auxServer)) {
+      //Success, so connectivity is right
+      //Nothing to do - exit
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"    - CONNECTIVITY_CHECK_PERIOD - "+String(FQDN_TO_CHECK)+"="+auxServer.toString()+". FQDN resoled. Connectivity is OK");}
+    }
+    else if (mqttClient.connected() && mqttServerEnabled) {
+      //Success, so connectivity is right
+      //Nothing to do - exit
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"    - CONNECTIVITY_CHECK_PERIOD - Connection to the MQTT server is OK. Connectivity is OK");}
+    }
+    else if (!errorCloudServer && uploadSamplesEnabled) {
+      //Success, so connectivity is right
+      //Nothing to do - exit
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"    - CONNECTIVITY_CHECK_PERIOD - Connection to the Cloud server is OK. Connectivity is OK");}
+    }
+    else {
+      //Check external URL
+      if (WiFi.hostByName(SERVER_TO_CHECK, auxServer)) {
+        //FQDN resolution is OK
+        //auxServer is IPAddress of SERVER_TO_CHECK
+      }
+      else {
+        //Even if FQDN fails, we'll try the URL check to the server
+        IPAddress auxServer2=IPAddress(40,112,243,49); //It's IP address of SERVER_TO_CHECK - connectivity.office.com
+        auxServer=auxServer2;
+      }
+
+      //Now let's check the SERVER_TO_CHECK web site
+      switch (checkURL(debugModeOn,false,0,auxServer,80,String("GET /")))
+      {
+        case ERROR_WEB_SERVER:
+          //Reinit WiFi and network services
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - CONNECTIVITY_CHECK_PERIOD - All previous checks are KO and also "+String(SERVER_TO_CHECK)+" Server is KO. Reinit network services, heap="+String(esp_get_free_heap_size())+" B, minHeap="+String(minHeapSeen)+" B");}
+          softResetCounter++;  //Stats
+          connectivityFailsCounter++;
+          softResetReason=ERROR_NO_CONNECTIVITY;
+          errorConnectivity=true;
+          softReset();
+        break;
+        case ERROR_ABORT_WEB_SETUP:
+          //New check in the next loop cycle
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - CONNECTIVITY_CHECK_PERIOD - All previous checks ar KO but Button presed. Wait till next loop cycle");}
+        break;
+        case NO_ERROR:
+          //New check in the next CONNECTIVITY_CHECK_PERIOD
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - CONNECTIVITY_CHECK_PERIOD - All previous checks are KO but the "+String(SERVER_TO_CHECK)+" Server is OK. Strange....");}
+        default:
+        break;
+      }
+    }
+
+    lastTimeConnectiviyCheck=nowTimeGlobal;
+
+    if (debugModeOn) {Serial.print(String(loopStartTime+millis())+"  - CONNECTIVITY_CHECK_PERIOD  - Exit - Time: ");
+        getLocalTime(&nowTimeInfo);Serial.print(&nowTimeInfo, "%d/%m/%Y - %H:%M:%S");Serial.println(", lastTimeConnectiviyCheck="+String(lastTimeConnectiviyCheck));}
+  }
+
 
   //Connect to MQTT broker as it was enabled from the webserver
-  //forceMQTTConnect is set from webServer (maintenance.html)
+  //forceMQTTConnect is set from webServer (/cloud form)
   if (WiFi.status()==WL_CONNECTED && !mqttClient.connected() && mqttServerEnabled && forceMQTTConnect) {
     if (debugModeOn) Serial.println(String(loopStartTime+millis())+"  - forceMQTTConnect - Connecting to the MQTT broker is disconnected.\n        MqttSyncLastStatus("+String(MqttSyncLastStatus)+")!=MqttSyncCurrentStatus("+String(MqttSyncCurrentStatus)+")");
     mqttClientInit(false,debugModeOn,false);

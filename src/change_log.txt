@@ -9,6 +9,24 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 1.5.1 06/jun/2023   - Web server
+                        + Added status info on wifi, ble, cloud server and mqtt connection (info.html)
+                        + Add graphs
+                        + Enrich the provided info in the REST API /samples
+                      - MQTT stuff
+                        + Publish readings if in sleep mode (when uploading reading to the cloud server or every 5 min)
+- 1.5.0 05/jun/2023   - Robustness and resiliancy
+                        + Connectivity checks: ping, FQDN resolution, MQTT and external web server
+                      - General
+                        + Modified display mode timings: 66% readings, 16,5% hourly graph, 16,5% daily graph
+                        + Boot logo
+                      - Web server
+                        + Removed jquery.min.js in maintenance.html to reduce the size of the code to be loaded
+                        + Improved configuration of Display On/Off and AutoDisplaySwitch On/Off
+                      - Bug fixing:
+                        + Wrong sanity reset triggered cause webserver when in sleep mode - Fix the fix in v1.4.1
+                        + Wrong "Sample Update Errors" count (webServerError3 count)
+                        + Wrong CloudSyncCurrentStatus value showed KO status of uploadeSampleServer in init()
 - 1.4.2 29/May/2023   - Web server
                         + Web form to setup iBeacon Proximity, Major and Minor
                         + Logo image size reduced

@@ -1,8 +1,7 @@
 To do list
 -----------
 - Web server
-  + Add graphs
-  + Enrich the provided info in the REST API /samples
+- MQTT stuff
 - BLE sutff
   + Add BLE characteristics for: firmware version, powerMode (BAT, USB or USB charging), Batery level
   + General
@@ -18,11 +17,8 @@ To do list
     * Error counters (softResetCounter++, webServerFailsCounter, minHeapSeenCounter, BLEnoLoadedCounter, BLEnoLoadedCount, BLEunloadsCounter, BLEunloadsCount)
     * heap and minHeapSeen
 - Troubleshoot
-  + BLE
-    * Analize why sometimes BLE_PERIOD is triggered if it is not the right time
   + Some times SPIFFS doesn't get mounted and no error detected. Find out how to check if mounted to detect error
   + No http connection if SSID changes or maybe wokeup from sleep (investigate)
-- Icon for the bootup screen
 - Candidate features
   + Triger alarms
   + Save CO2 samples in cloud to not lose graph pictures when the battery runs out
@@ -32,7 +28,6 @@ To do list
   + Use Wifi.onEvent() to detect WiFi disconnection rather than monitoring periodically
     (https://randomnerdtutorials.com/esp32-useful-wi-fi-functions-arduino/)
   + Reduce size of BLE stack/code
-
 
 
 Done

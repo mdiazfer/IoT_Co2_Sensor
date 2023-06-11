@@ -121,6 +121,7 @@ uint32_t sendAsyncHttpRequest(boolean debugModeOn, boolean fromSetup, uint32_t e
       if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=HTTP_ANSWER_TIMEOUT;  //To avoid resuming connection the next loop interacion       
       forceWEBCheck=false;
       webResuming=false;
+      errorCloudServer=true;
       if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest] - Not connected, errorsSampleUpts="+String(errorsSampleUpts));}
       if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest]  - webServerError2="+String(webServerError2)+" - Returning with ERROR_CLOUD_SERVER");}
       return(ERROR_CLOUD_SERVER); //not WEB server connection
@@ -168,6 +169,7 @@ uint32_t sendAsyncHttpRequest(boolean debugModeOn, boolean fromSetup, uint32_t e
         ) {
         forceWEBCheck=true;
         webResuming=true;
+        CloudSyncCurrentStatus=previousCloudSyncCurrentStatus;//Restore Cloud Clock status - v1.5.0
         return (ERROR_BREAK_WEB_SETUP); //Returns to refresh the display
       }
     }
@@ -190,7 +192,8 @@ uint32_t sendAsyncHttpRequest(boolean debugModeOn, boolean fromSetup, uint32_t e
       char c = client.read();
       if (debugModeOn) {Serial.write(c);}
     }
-    CloudSyncCurrentStatus=CloudSyncOnStatus;
+    //CloudSyncCurrentStatus=CloudSyncOnStatus;
+    CloudSyncCurrentStatus=CloudSyncSendStatus; //v1.5.0
     if (debugModeOn) {Serial.println("\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");}
   }
 
@@ -211,6 +214,7 @@ uint32_t sendAsyncHttpRequest(boolean debugModeOn, boolean fromSetup, uint32_t e
     if (whileLoopTimeLeft!=nullptr) *whileLoopTimeLeft=HTTP_ANSWER_TIMEOUT;  //To avoid resuming connection the next loop interacion       
     forceWEBCheck=false;
     webResuming=false;
+    errorCloudServer=true;
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [sendAsyncHttpRequest]  - webServerError3="+String(webServerError3)+" - Returning with ERROR_CLOUD_SERVER");}
     return(ERROR_CLOUD_SERVER); //not WEB server connection
   }
@@ -251,7 +255,7 @@ uint32_t checkURL(boolean debugModeOn,boolean fromSetup,uint32_t error_setup,IPA
   
   if (debugModeOn) {Serial.print(String(loopStartTime+millis())+" [checkURL] - Trying connection to ");Serial.print(IpAddress2String(server));Serial.print(" to send httpRequest: '");Serial.print(httpRequest);Serial.println("'");}
 
-  if (client.connect(server, 80)) {
+  if (client.connect(server, port)) {
     if (debugModeOn) {Serial.println(String(loopStartTime+millis())+" [checkURL] - connected");}
     // Send a HTTP request:
     client.println(httpRequest);

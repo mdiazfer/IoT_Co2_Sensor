@@ -55,6 +55,7 @@ extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncLastStatus;
 extern RTC_DATA_ATTR enum MqttSyncStatus MqttSyncLastStatus;
 extern RTC_DATA_ATTR AsyncEventSource webEvents;
 extern RTC_DATA_ATTR ulong BLEPeriod,BLEOnTimeout;
+extern RTC_DATA_ATTR uint32_t minHeapSeen;
 
 extern wifiCredentials wifiCred;
 extern String TZEnvVariable,TZName;

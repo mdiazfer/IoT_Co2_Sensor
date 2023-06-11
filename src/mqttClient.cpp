@@ -65,7 +65,8 @@ uint32_t mqttClientInit(bool fromSetup, bool debugModeOn, bool TFTDisplayLogs) {
     //Wait for the MQTT client to get connected or timeout (5sg), whatever happens first
     ulong now=millis();
     bool buttonPressed=false;
-    while (!mqttClient.connected() && (millis()<=now+5000) && !buttonPressed && !isBeaconAdvertising) {
+    //while (!mqttClient.connected() && (millis()<=now+5000) && !buttonPressed && !isBeaconAdvertising) {
+    while (!mqttClient.connected() && (millis()<=now+5000) && !buttonPressed) { //v1.5.1 - No confict with BLE Advertising
       if (!fromSetup) { //v1.4.1 - Abort if buttons are pressed. This avoids config menu gets frozen
         switch (checkButtonsActions(mqttcheck)) { 
           case 1:
