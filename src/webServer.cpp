@@ -13,6 +13,26 @@
 
 #include "webServer.h"
 
+String processorIndex(const String& var){
+  log_v(">> processorIndex");
+  if(var == "INDEX_Text_Update_Color") {
+    #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+      if (calibrationNextState==usbOffDisplayOffStable || calibrationNextState==usbOffDisplayOnStable || 
+          calibrationNextState==usbOnDisplayOffStable || calibrationNextState==usbOnDisplayOnStable) {
+        return String("#b69249"); //Orange color
+      }
+      else {
+        return String("#e4f94a");  //Yellowish color
+      }
+    #else
+      return String("#b69249"); //Orange color
+    #endif
+  }
+  else {
+    return String();
+  }
+} //processorIndex
+
 String processorGraphs(const String& var){
   log_v(">> processorGraphs");
   if(var == "GRAPHSBODY") {
@@ -45,9 +65,28 @@ String processorInfo(const String& var){
   if(var == "CO2") {
     return roundFloattoString(valueCO2,0)+" ppm";
   } else if (var == "TEMPERATURE") {
-    return roundFloattoString(valueT,1)+" ºC";
+    #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+      return roundFloattoString(valueT,1)+" ºC - "+String(calibrationCurrentState)+", "+String(calibrationNextState);
+    #else
+      return roundFloattoString(valueT,1)+" ºC";
+    #endif
   } else if (var == "HUMIDITY") {
-    return roundFloattoString(valueHum,1)+" %";
+    #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+      char s[100];
+      strftime(s,sizeof(s),"%d/%m/%Y-%H:%M:%S",&lastCalibrationStateChangeTimeInfo);
+      if (calibrationNextState==usbOffDisplayOffStable || calibrationNextState==usbOffDisplayOnStable || 
+          calibrationNextState==usbOnDisplayOffStable || calibrationNextState==usbOnDisplayOnStable) {  
+            return roundFloattoString(valueHum,1)+" %"+"<p>St. Chg.: "+String(s)+", NT</p>";
+      }
+      else {
+        if (nowTimeGlobal>(lastCalibrationStateChange+transitionEndTime[calibrationNextState]))
+          return roundFloattoString(valueHum,1)+" %"+"<p>St. Chg.: "+String(s)+", "+String((float_t)(lastTimeSampleCheck+samplePeriod-nowTimeGlobal)/60000)+" m</p>";
+        else
+          return roundFloattoString(valueHum,1)+" %"+"<p>St. Chg.: "+String(s)+", "+String((float_t)(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal)/60000)+" m</p>";
+      }
+    #else
+      return roundFloattoString(valueHum,1)+" %";
+    #endif
   } else if (var == "DEVICENAME") {
     return device;
   } else if (var == "FIRMWAREVERSION") {
@@ -545,7 +584,8 @@ uint32_t initWebServer() {
     if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  [webServer.on] - lastTimeBLECheck="+String(lastTimeBLECheck));}
     if (isBeaconAdvertising || BLEtoBeLoaded) {delay(WEBSERVER_SEND_DELAY);} //Wait for iBeacon to stop to prevent heap overflow
     //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
-    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html",false,processorIndex);
     webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
@@ -555,7 +595,8 @@ uint32_t initWebServer() {
     webServerResponding=true;  //This prevents sending iBeacons to prevent heap overflow
     if (isBeaconAdvertising || BLEtoBeLoaded) {delay(WEBSERVER_SEND_DELAY);} //Wait for iBeacon to stop to prevent heap overflow
     //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
-    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html",false,processorIndex);
     webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
   
@@ -834,7 +875,8 @@ uint32_t initWebServer() {
       }
     }
     //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
-    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html",false,processorIndex);
     webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
@@ -884,7 +926,8 @@ uint32_t initWebServer() {
       }
       if (updateEEPROM) EEPROM.commit();
       //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
-      request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+      //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+      request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html",false,processorIndex);
     }
 
     webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
@@ -1077,7 +1120,8 @@ uint32_t initWebServer() {
     if (updateEEPROM) EEPROM.commit();
     //request->send(200,String("text/html"),String("<!DOCTYPE html><html lang=\"en\"><head><meta http-equiv=\"refresh\" content=\"0.5; URL=http://192.168.100.103\"/></head><body style=\"background-color:#34383b;\"></body></html>"));
     //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
-    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html",false,processorIndex);
 
     webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
@@ -1101,11 +1145,31 @@ uint32_t initWebServer() {
               //autoBackLightOff=false;
               //Turn off back light
               digitalWrite(PIN_TFT_BACKLIGHT,LOW);
+              #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+                digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+                float_t batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+                digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+                if (batADCVolt >= VOLTAGE_TH_STATE) calibrationNextState=usbOnDisplayOffTransition;
+                else calibrationNextState=usbOffDisplayOffTransition;
+                lastCalibrationStateChange=loopStartTime+millis();
+                getLocalTime(&lastCalibrationStateChangeTimeInfo);
+                if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [webServer.on(/basic3)] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", batADCVolt="+String(batADCVolt)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+              #endif
             }
             if (p->value().compareTo("on")==0) {
               //autoBackLightOff=true;
               tft.fillScreen(MENU_BACK_COLOR); //clean the screen before turning the display on
               digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+              #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+                digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+                float_t batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+                digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+                if (batADCVolt >= VOLTAGE_TH_STATE) calibrationNextState=usbOnDisplayOnTransition;
+                else calibrationNextState=usbOffDisplayOnTransition;
+                lastCalibrationStateChange=loopStartTime+millis();
+                getLocalTime(&lastCalibrationStateChangeTimeInfo);
+                if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [webServer.on(/basic3)] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", batADCVolt="+String(batADCVolt)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+              #endif
             }
             lastTimeTurnOffBacklightCheck=loopStartTime+millis();
           }
@@ -1124,6 +1188,16 @@ uint32_t initWebServer() {
               autoBackLightOff=false;
               tft.fillScreen(MENU_BACK_COLOR); //clean the screen before turning the display on
               digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+              #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+                digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+                float_t batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+                digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+                if (batADCVolt >= VOLTAGE_TH_STATE) calibrationNextState=usbOnDisplayOnTransition;
+                else calibrationNextState=usbOffDisplayOnTransition;
+                lastCalibrationStateChange=loopStartTime+millis();
+                getLocalTime(&lastCalibrationStateChangeTimeInfo);
+                if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [webServer.on(/basic3)] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", batADCVolt="+String(batADCVolt)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+              #endif
             }
             lastTimeTurnOffBacklightCheck=loopStartTime+millis(); //Wait TIME_TURN_OFF_BACKLIGHT to switch off the display
           }
@@ -1182,7 +1256,8 @@ uint32_t initWebServer() {
       }
     }
     //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
-    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html",false,processorIndex);
     webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   });
 
@@ -1369,7 +1444,8 @@ uint32_t initWebServer() {
     }
     if (updateEEPROM) EEPROM.commit();
     //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, String(), false, processor);
-    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html");
+    request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html",false,processorIndex);
 
     webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
   }); // /cloud HTTP_POST form
@@ -1474,7 +1550,9 @@ uint32_t initWebServer() {
       if (updateEEPROM) EEPROM.commit();
 
       if (deviceReset) request->send(auxResp); //Reset the device to start new BLE Advertisings
-      else request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html"); //Enable BLE
+      else 
+        //request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html"); //Enable BLE
+        request->send(SPIFFS, WEBSERVER_INDEX_PAGE, "text/html",false,processorIndex); //Enable BLE
     } //else
 
     webServerResponding=false;   //WebServer ends, heap is goint to be realeased, so BLE iBeacons are allowed agin
@@ -1518,6 +1596,16 @@ uint32_t initWebServer() {
             autoBackLightOff=false;
             tft.fillScreen(MENU_BACK_COLOR); //clean the screen before turning the display on
             digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+            #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+              digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+              float_t batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+              digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+              if (batADCVolt >= VOLTAGE_TH_STATE) calibrationNextState=usbOnDisplayOnTransition;
+              else calibrationNextState=usbOffDisplayOnTransition;
+              lastCalibrationStateChange=loopStartTime+millis();
+              getLocalTime(&lastCalibrationStateChangeTimeInfo);
+              if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [webServer.on(WEBSERVER_DEFAULTCONF_PAGE)] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+            #endif
             currentState=displayingSequential;
             lastDisplayMode=displayMode;
             displayMode=sampleValue;

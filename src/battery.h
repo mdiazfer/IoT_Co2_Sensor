@@ -71,6 +71,7 @@ There are 4 different Saving Energy modes:
     enum energyModes {fullEnergy, reducedEnergy, lowestEnergy};
     #define _BATTERYFRAMEWORK_ 
   #endif
+
 #endif
 
 
@@ -85,7 +86,7 @@ extern RTC_DATA_ATTR enum energyModes energyCurrentMode,configSavingEnergyMode;
 extern RTC_DATA_ATTR boolean autoBackLightOff,forceDisplayModeRefresh,forceDisplayRefresh,
                               forceGetSample,forceWifiReconnect,forceWebServerInit;
 extern RTC_DATA_ATTR enum availableStates stateSelected,currentState;
-extern RTC_DATA_ATTR uint64_t nowTimeGlobal,previousLastTimeSampleCheck,lastTimeTurnOffBacklightCheck;
+extern RTC_DATA_ATTR uint64_t nowTimeGlobal,previousLastTimeSampleCheck,lastTimeTurnOffBacklightCheck,loopStartTime;
 extern RTC_DATA_ATTR enum displayModes displayMode,lastDisplayMode;
 extern RTC_DATA_ATTR ulong voltageCheckPeriod,samplePeriod,uploadSamplesPeriod,wifiReconnectPeriod;
 extern RTC_DATA_ATTR  enum CloudClockStatus CloudClockCurrentStatus;
@@ -95,6 +96,12 @@ extern bool initTZVariables();
 extern IPAddress stringToIPAddress(String stringIPAddress);
 extern esp_sleep_wakeup_cause_t wakeup_reason;
 
+#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+  extern RTC_DATA_ATTR calibrationStates calibrationCurrentState;
+  extern RTC_DATA_ATTR calibrationStates calibrationNextState;
+  extern RTC_DATA_ATTR uint64_t elapsedTransitionTime,endTransitionTime,lastCalibrationStateChange;
+  extern RTC_DATA_ATTR struct tm lastCalibrationStateChangeTimeInfo;
+#endif
 
 //Function declarations
 enum batteryChargingStatus getBatteryStatus(float_t batADCVolt, ulong timeLast);

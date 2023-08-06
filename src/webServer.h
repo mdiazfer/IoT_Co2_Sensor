@@ -58,7 +58,7 @@ extern RTC_DATA_ATTR const String co2SensorType;
 extern RTC_DATA_ATTR char co2SensorVersion[5];
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
 extern RTC_DATA_ATTR uint32_t error_setup;
-extern RTC_DATA_ATTR uint64_t lastTimeBLECheck,loopStartTime;
+extern RTC_DATA_ATTR uint64_t lastTimeBLECheck,loopStartTime,lastTimeSampleCheck;
 extern RTC_DATA_ATTR uint8_t BLEnoLoadedCount,BLEunloadsCount,softResetReason;
 extern RTC_DATA_ATTR int connectivityFailsCounter,webServerFailsCounter,softResetCounter,BLEnoLoadedCounter,BLEunloadsCounter,minHeapSeenCounter;
 #ifdef __MHZ19B__
@@ -93,6 +93,11 @@ extern char activeCookie[],currentSetCookie[];
 extern JSONVar samples;
 extern String mqttTopicName,lastURI;
 extern bool webServerResponding,isBeaconAdvertising,BLEtoBeLoaded;
+#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+  extern RTC_DATA_ATTR calibrationStates calibrationCurrentState;
+  extern RTC_DATA_ATTR calibrationStates calibrationNextState;
+  extern RTC_DATA_ATTR uint64_t elapsedTransitionTime,endTransitionTime,lastCalibrationStateChange;    
+#endif
 
 extern void stopBLE(uint8_t caller);
 

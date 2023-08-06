@@ -44,10 +44,10 @@
 //           3* (4*3600/60 = 240 B)     =  720 B
 //           3* (4*24*3600/450 = 768 B) = 2304 B
 // RTC memory variables in global_setup:    56 B
-// RTC memory variables:                   1577 B
+// RTC memory variables:                   1637 B
 // ----------------------------------------------
-// RTC memorty TOTAL:                     4667 B
-// RTC memory left:     8000 B - 4667 B = 3333 B 
+// RTC memorty TOTAL:                     4727 B
+// RTC memory left:     8000 B - 4727 B = 3273 B 
 //
 //EEPROM MAP
 //Address 0-5: Stores the firmware version char []* (5B+null=6 B)
@@ -152,6 +152,12 @@ RTC_DATA_ATTR int errorsWiFiCnt=0,errorsSampleUpts=0,errorsNTPCnt=0,webServerErr
 RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled,mqttServerEnabled,secureMqttEnabled;//5*1=5B
 RTC_DATA_ATTR boolean debugModeOn=DEBUG_MODE_ON,startTimeConfigure=false; //2*1=1B
 RTC_DATA_ATTR enum BLEStatus BLECurrentStatus=BLEOffStatus; //1*4=4B
+#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+  RTC_DATA_ATTR enum calibrationStates calibrationCurrentState=bootUpState; //1*4=4B
+  RTC_DATA_ATTR enum calibrationStates calibrationNextState=usbOnDisplayOnTransition; //1*4=4B
+  RTC_DATA_ATTR uint64_t lastCalibrationStateChange=0,elapsedTransitionTime=0,endTransitionTime=transitionEndTime[calibrationCurrentState]; //2*8=16B
+  RTC_DATA_ATTR struct tm lastCalibrationStateChangeTimeInfo; //36 B
+#endif
 RTC_DATA_ATTR AsyncWebServer webServer(WEBSERVER_PORT); //1*84=84B
 RTC_DATA_ATTR AsyncEventSource webEvents(WEBSERVER_SAMPLES_EVENT); //1*104=104B
 RTC_DATA_ATTR uint32_t error_setup=NO_ERROR,minHeapSeen=0xFFFFFFFF; //1*4=4B
@@ -289,6 +295,12 @@ void initVariable() {
   errorCloudServer=false;webServerResponding=false;isBeaconAdvertising=false;errorConnectivity=false;
   deviceConnected=false;BLEtoBeLoaded=false;
   displayModeRefreshPeriod=DISPLAY_MODE_REFRESH_PERIOD;
+  #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+    calibrationCurrentState=bootUpState;
+    calibrationNextState=usbOnDisplayOnTransition;
+    lastCalibrationStateChange=0;elapsedTransitionTime=0;
+    endTransitionTime=transitionEndTime[calibrationCurrentState];
+  #endif
   
   //Read from EEPROM the values to be stored in the Config Variables
   //
@@ -1488,6 +1500,7 @@ void setup() {
   EEPROM.begin(EEPROM_SIZE);
   
   Serial.begin(115200);
+  if (debugModeOn) {Serial.println("\n"+String(nowTimeGlobal)+" [SETUP] - BUILD_ENV_NAME="+String(BUILD_ENV_NAME));}
   if (debugModeOn) {Serial.println("\n"+String(nowTimeGlobal)+" [SETUP] - bootCount="+String(bootCount)+", nowTime="+String(millis())+", nowTimeGlobal="+String(nowTimeGlobal));}
   randomSeed(analogRead(GPIO_NUM_32));
 
@@ -1516,7 +1529,7 @@ void setup() {
     
   wakeup_reason = esp_sleep_get_wakeup_cause();
   //If coming from softReset, then follow the routing of ESP_SLEEP_WAKEUP_EXT0 for init variables
-  if (softResetOn) {  //v1.5.1
+  if (softResetOn && wakeup_reason!=ESP_SLEEP_WAKEUP_EXT1) {  //v1.5.2. - v1.5.1
     Serial.println(String(nowTimeGlobal)+" [SETUP] - Wakeup reason="+String(wakeup_reason)+String(" . Looks like a softReset() was done"));
     switch(wakeup_reason) {
       case ESP_SLEEP_WAKEUP_UNDEFINED:Serial.println(" [SETUP] - Wakeup reason=ESP_SLEEP_WAKEUP_UNDEFINED");break;
@@ -1787,6 +1800,16 @@ void loop() {
       tft.fillScreen(TFT_BLACK);
       digitalWrite(PIN_TFT_BACKLIGHT,LOW);
       lastTimeTurnOffBacklightCheck=nowTimeGlobal;
+      #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+        digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+        float_t batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+        digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+        if (batADCVolt >= VOLTAGE_TH_STATE) calibrationNextState=usbOnDisplayOffTransition;
+        else calibrationNextState=usbOffDisplayOffTransition;
+        lastCalibrationStateChange=loopStartTime+millis();
+        getLocalTime(&lastCalibrationStateChangeTimeInfo);
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - TIME_TURN_OFF_BACKLIGHT - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+      #endif
     }
   }
   
@@ -1914,12 +1937,112 @@ void loop() {
     //tempMeasure=co2Sensor.getTemperature(true,true);
     tempHumSensor.read();
     //tempMeasure=tempHumSensor.getTemperature();
-    tempMeasure=0.9944*tempHumSensor.getTemperature()-0.8073; //Calibrated value
     //valueHum=0;
     valueHum=tempHumSensor.getHumidityCompensated();
-    
-    if (tempMeasure>-50.0) valueT=tempMeasure;  //Discarding potential wrong values
 
+    #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+      //Calibration based on estimation for case model 2
+      float_t transitionTimeElapsed,auxC,auxK,auxExp,auxTemM,auxTemB,auxHumM,auxHumB;
+      float_t tempSensor=tempHumSensor.getTemperature();
+      //tempMeasure=tempSensor-(tempSensor*0.0022124890310004+2.59617689397678)*POWER_DIS; //Calibrated value for case model 2
+
+      if (calibrationCurrentState == calibrationNextState) {
+        if (calibrationCurrentState==usbOffDisplayOffStable || calibrationCurrentState==usbOffDisplayOnStable || 
+          calibrationCurrentState==usbOnDisplayOffStable || calibrationCurrentState==usbOnDisplayOnStable) {  
+          //Stable state
+          //tempMeasure=tempSensor*calibrationTemM[calibrationCurrentState]+calibrationTemB[calibrationCurrentState];
+          //valueHum=valueHum*calibrationHumM[calibrationCurrentState]+calibrationHumB[calibrationCurrentState];
+          auxTemM=calibrationTemM[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)((calibrationCurrentState-1)/2)];
+          auxTemB=calibrationTemB[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)((calibrationCurrentState-1)/2)];
+          auxHumM=calibrationHumM[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)((calibrationCurrentState-1)/2)];
+          auxHumB=calibrationHumB[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)((calibrationCurrentState-1)/2)];
+          tempMeasure=tempSensor*auxTemM+auxTemB;
+          valueHum=valueHum*auxHumM+auxHumB;
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SAMPLE_CALC] - In stable state. calibrationCurrentState=calibrationNextState="+String(calibrationCurrentState)+", tempSensor="+String(tempSensor)+", auxTemM="+String(auxTemM)+", auxTemB="+String(auxTemB)+", auxHumM="+String(auxHumM)+", auxHumB="+String(auxHumB)+", tempMeasure="+String(tempMeasure)+", valueHum="+String(valueHum));}
+        }
+        else {
+          //This case shouldn't be possible
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SAMPLE_CALC] - This case shouldn't be possible");}
+        }
+      } 
+      else {
+        //Transition state
+        endTransitionTime=calibrationCurrentState==bootUpState?transitionEndTime[calibrationCurrentState]:transitionEndTime[calibrationNextState];
+        if ((nowTimeGlobal-lastCalibrationStateChange) >= endTransitionTime) {
+          //Transition time ended. Now it's stable state. Let's change to stable state
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+"  - Change of state. calibrationCurrentState from "+String(calibrationCurrentState)+" to "+String(calibrationNextState));}
+          switch (calibrationNextState) {
+            case usbOffDisplayOffTransition:
+              calibrationCurrentState=usbOffDisplayOffStable;
+            break;
+            case usbOffDisplayOnTransition:
+              calibrationCurrentState=usbOffDisplayOnStable;
+            break;
+            case usbOnDisplayOffTransition:
+              calibrationCurrentState=usbOnDisplayOffStable;
+            break;
+            case usbOnDisplayOnTransition:
+            default:
+              calibrationCurrentState=usbOnDisplayOnStable;
+            break;
+          }
+          calibrationNextState=calibrationCurrentState;
+          lastCalibrationStateChange=loopStartTime+millis();
+          getLocalTime(&lastCalibrationStateChangeTimeInfo);
+          //tempMeasure=tempSensor*calibrationTemM[calibrationCurrentState]+calibrationTemB[calibrationCurrentState];
+          //valueHum=valueHum*calibrationHumM[calibrationCurrentState]+calibrationHumB[calibrationCurrentState];
+          auxTemM=calibrationTemM[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)((calibrationCurrentState-1)/2)];
+          auxTemB=calibrationTemB[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)((calibrationCurrentState-1)/2)];
+          auxHumM=calibrationHumM[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)((calibrationCurrentState-1)/2)];
+          auxHumB=calibrationHumB[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)((calibrationCurrentState-1)/2)];
+          tempMeasure=tempSensor*auxTemM+auxTemB;
+          valueHum=valueHum*auxHumM+auxHumB;
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SAMPLE_CALC] - Change to stable state. Now calibrationCurrentState=calibrationNextState="+String(calibrationCurrentState)+", tempSensor="+String(tempSensor)+", auxTemM="+String(auxTemM)+", auxTemB="+String(auxTemB)+", auxHumM="+String(auxHumM)+", auxHumB="+String(auxHumB)+", tempMeasure="+String(tempMeasure)+", valueHum="+String(valueHum)+" lastCalibrationStateChange="+String(lastCalibrationStateChange));}
+        }
+        else {
+          //Transiiton state
+          if (calibrationCurrentState!=bootUpState) {
+            //tempMeasure=tempSensor*calibrationTemM[calibrationNextState]+calibrationTemB[calibrationNextState];
+            //tempMeasure=tempMeasure*calibrationTemM[calibrationCurrentState]+calibrationTemB[calibrationCurrentState];
+            //tempMeasure=tempSensor*M+B+(EXP(-K*t)*C)
+            transitionTimeElapsed=(loopStartTime+millis()-lastCalibrationStateChange)/1000; //seconds
+            auxC=calibrationTemC[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)(calibrationNextState/2)];
+            auxK=calibrationTemK[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)(calibrationNextState/2)];
+
+            auxExp=pow(eNum,-auxK*transitionTimeElapsed)*auxC;
+            auxTemM=calibrationTemM[(uint8_t)((calibrationNextState)/2)][(uint8_t)((calibrationNextState)/2)];
+            auxTemB=calibrationTemB[(uint8_t)((calibrationNextState)/2)][(uint8_t)((calibrationNextState)/2)];
+            tempMeasure=tempSensor*auxTemM+auxTemB+auxExp;
+            if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SAMPLE_CALC] - In transition state. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", tempSensor="+String(tempSensor)+", auxK="+String(auxK)+", auxC="+String(auxC)+", t="+String(transitionTimeElapsed)+", auxTemM="+String(auxTemM)+", auxTemB="+String(auxTemB)+", auxExp="+String(auxExp)+", tempMeasure="+String(tempMeasure));}
+            if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SAMPLE_CALC] - index: C[i,j]="+String((uint8_t)((calibrationCurrentState-1)/2))+","+String((uint8_t)(calibrationNextState/2)));}
+            if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SAMPLE_CALC] - index: M[i,j]="+String((uint8_t)((calibrationNextState)/2))+","+String((uint8_t)((calibrationNextState)/2)));}
+          }
+          else {
+            //tempMeasure=tempSensor*calibrationTemM[calibrationCurrentState]+calibrationTemB[calibrationCurrentState];
+            auxTemM=calibrationTemM[(uint8_t)((calibrationNextState)/2)][(uint8_t)((calibrationNextState)/2)];
+            auxTemB=calibrationTemB[(uint8_t)((calibrationNextState)/2)][(uint8_t)((calibrationNextState)/2)];
+            tempMeasure=tempSensor*auxTemM+auxTemB;
+            if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SAMPLE_CALC] - In transition from bootUpState. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", tempSensor="+String(tempSensor)+", auxTemM="+String(auxTemM)+", auxTemB="+String(auxTemB)+", tempMeasure="+String(tempMeasure));}
+          }
+          //valueHum=valueHum*calibrationHumM[calibrationNextState]+calibrationHumB[calibrationNextState];
+          auxHumM=calibrationHumM[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)((calibrationCurrentState-1)/2)];
+          auxHumB=calibrationHumB[(uint8_t)((calibrationCurrentState-1)/2)][(uint8_t)((calibrationCurrentState-1)/2)];
+          valueHum=valueHum*auxHumM+auxHumB;
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [SAMPLE_CALC] - In transition state. auxHumM="+String(auxHumM)+", auxHumB="+String(auxHumB)+", valueHum="+String(valueHum));}
+        }        
+      }
+      if (debugModeOn) {Serial.print("    - lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status=");}
+      if (nowTimeGlobal > transitionEndTime[calibrationNextState]+lastCalibrationStateChange) {
+        if (debugModeOn) {Serial.println(String(" no transition period"));}
+      }
+      else {
+        if (debugModeOn) {Serial.println(String(transitionEndTime[calibrationNextState]-(nowTimeGlobal-lastCalibrationStateChange)));}
+      }
+    #else
+      tempMeasure=0.9944*tempHumSensor.getTemperature()-0.8073; //Calibrated value for other case different than model 2
+    #endif
+
+    if (tempMeasure>-50.0) valueT=tempMeasure;  //Discarding potential wrong values
     if (debugModeOn) {Serial.println("    - valueT="+String(valueT)+", valueHum="+String(valueHum));}
 
     //Updating the last hour buffers
@@ -2291,6 +2414,13 @@ void loop() {
           valueString=roundFloattoString(valueT,1)+"C";
           tft.setTextSize(TEXT_SIZE);
           drawText(valueT, String(valueString),TEXT_SIZE,TEXT_FONT,TFT_GREEN,TFT_BLACK,TFT_X_WIDTH-tft.textWidth(String(valueString)),25,19.95,TFT_BLUE,27.05,TFT_RED);
+          #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+            //Different bar color in transition state
+            if (calibrationNextState==usbOffDisplayOffStable || calibrationNextState==usbOffDisplayOnStable || 
+                calibrationNextState==usbOnDisplayOffStable || calibrationNextState==usbOnDisplayOnStable) 
+                  horizontalBar.colorBar=TFT_DARKGREY;
+            else horizontalBar.colorBar=TFT_LIGHTGREY; //horizontalBar.colorBar=TFT_WHITE;
+          #endif
           horizontalBar.drawHorizontalBar(valueT);
 
           //Drawing Humidity
@@ -2299,7 +2429,6 @@ void loop() {
           drawText(valueHum,String(valueString),TEXT_SIZE,TEXT_FONT,TFT_MAGENTA,TFT_BLACK,TFT_X_WIDTH-tft.textWidth(String(valueString)),90,30,TFT_MAGENTA,55,TFT_MAGENTA);
           valueString=String(int(round(valueHum)))+"%";
           drawText(valueHum,String(valueString),TEXT_SIZE,TEXT_FONT,TFT_MAGENTA,TFT_BLACK,TFT_X_WIDTH-tft.textWidth(String(valueString)),90+tft.fontHeight(TEXT_FONT),30,TFT_BROWN,55,TFT_RED);
-        
         }
         lastDisplayMode=sampleValue;
       break;
@@ -2600,10 +2729,12 @@ void loop() {
       IpAddress2String(WiFi.localIP())+"&version="+String(VERSION)+
       "&co2="+valueCO2+"&temp_by_co2_sensor="+valueT+"&hum_by_co2_sensor="+valueHum+
       "&temp_co2_sensor="+co2Sensor.getTemperature(true,true)+"&powerState="+powerState+
-      "&batADCVolt="+batADCVolt+"&batCharge="+batCharge+"&batteryStatus="+batteryStatus+
-      "&energyCurrentMode="+energyCurrentMode+"&errorsWiFiCnt="+errorsWiFiCnt+
-      "&errorsSampleUpts="+errorsSampleUpts+"&errorsNTPCnt="+errorsNTPCnt+"&webServerError1="+webServerError1+
-      "&webServerError2="+webServerError2+"&webServerError3="+webServerError3+"&SPIFFSErrors="+SPIFFSErrors+
+      "&batADCVolt="+batADCVolt+"&batCharge="+batCharge+"&batteryStatus="+batteryStatus+"&energyCurrentMode="+energyCurrentMode+
+      #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+        "&calibrationCurrenttState="+calibrationCurrentState+"&calibrationNextState="+calibrationNextState+
+      #endif
+      "&errorsWiFiCnt="+errorsWiFiCnt+"&errorsSampleUpts="+errorsSampleUpts+"&errorsNTPCnt="+errorsNTPCnt+
+      "&webServerError1="+webServerError1+"&webServerError2="+webServerError2+"&webServerError3="+webServerError3+"&SPIFFSErrors="+SPIFFSErrors+
       "&webServerFailsCounter="+webServerFailsCounter+"&connectivityFailsCounter="+connectivityFailsCounter+
       "&softResetCounter="+softResetCounter+"&heapSize="+String(esp_get_free_heap_size())+" HTTP/1.1";
 

@@ -186,6 +186,12 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
         tft.init();
         tft.setRotation(1);
         digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
+        #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+          calibrationNextState=usbOnDisplayOnTransition;
+          lastCalibrationStateChange=loopStartTime+millis();
+          getLocalTime(&lastCalibrationStateChangeTimeInfo);
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [updateBatteryVoltageAndStatus] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", batADCVolt="+String(batADCVolt)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+        #endif
         tft.fillScreen(TFT_BLACK);
         lastTimeTurnOffBacklightCheck=nowTimeGlobal;
         forceDisplayRefresh=true;
@@ -207,6 +213,15 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
 
         if (debugModeOn) Serial.println("    [updateBatteryVoltageAndStatus] - forceWifiReconnect=true, forceWebServerInit=true, etc.");
       }
+      else {
+        //Display is already on, so configure next status accordingly
+        #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+          calibrationNextState=usbOnDisplayOnTransition;
+          lastCalibrationStateChange=loopStartTime+millis();
+          getLocalTime(&lastCalibrationStateChangeTimeInfo);
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [updateBatteryVoltageAndStatus] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", batADCVolt="+String(batADCVolt)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+        #endif
+      }
     }
     else { //USB power. Let's decide if chargingUSB or noChargingUSB based on USB power time
       if ((nowTimeGlobal - *timeUSBPower)>=FULL_CHARGE_TIME) powerState=noChargingUSB;
@@ -226,6 +241,13 @@ void updateBatteryVoltageAndStatus(uint64_t nowTimeGlobal, uint64_t *timeUSBPowe
       autoBackLightOff=true; //update autoBackLightOff if BAT power
       lastTimeTurnOffBacklightCheck=nowTimeGlobal; //force swiching the Display OFF next check 
       forceDisplayRefresh=true; //force Icon update (if display is ON)
+      #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+        if (digitalRead(PIN_TFT_BACKLIGHT)==HIGH) calibrationNextState=usbOffDisplayOnTransition;
+        else calibrationNextState=usbOffDisplayOffTransition;
+        lastCalibrationStateChange=loopStartTime+millis();
+        getLocalTime(&lastCalibrationStateChangeTimeInfo);
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [updateBatteryVoltageAndStatus] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", batADCVolt="+String(batADCVolt)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+      #endif
     }
     
     //Take battery charge when the Battery is plugged

@@ -7,6 +7,16 @@ void checkButton1() {
   if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) {
     digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
     lastTimeTurnOffBacklightCheck=nowTimeGlobal;
+    #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+      digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+      float_t batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+      digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+      if (batADCVolt >= VOLTAGE_TH_STATE) calibrationNextState=usbOnDisplayOnTransition;
+      else calibrationNextState=usbOffDisplayOnTransition;
+      lastCalibrationStateChange=loopStartTime+millis();
+      getLocalTime(&lastCalibrationStateChangeTimeInfo);
+      if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [checkButton1] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", batADCVolt="+String(batADCVolt)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+    #endif
 
     //Display samples when back to light if displaying in sequential mode
     forceDisplayRefresh=true;
@@ -154,6 +164,16 @@ void checkButton2() {
   if (digitalRead(PIN_TFT_BACKLIGHT)==LOW) {
       digitalWrite(PIN_TFT_BACKLIGHT,HIGH);
       lastTimeTurnOffBacklightCheck=nowTimeGlobal;
+      #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+        digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+        float_t batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+        digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+        if (batADCVolt >= VOLTAGE_TH_STATE) calibrationNextState=usbOnDisplayOnTransition;
+        else calibrationNextState=usbOffDisplayOnTransition;
+        lastCalibrationStateChange=loopStartTime+millis();
+        getLocalTime(&lastCalibrationStateChangeTimeInfo);
+        if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [checkButton2] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", batADCVolt="+String(batADCVolt)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+      #endif
 
       //Display samples when back to light if displaying in sequential mode
       forceDisplayRefresh=true;
@@ -448,6 +468,16 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
         //Turn off back light
         digitalWrite(PIN_TFT_BACKLIGHT,LOW);
         lastTimeTurnOffBacklightCheck=loopStartTime+millis();
+        #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+          digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+          float_t batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+          digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+          if (batADCVolt >= VOLTAGE_TH_STATE) calibrationNextState=usbOnDisplayOffTransition;
+          else calibrationNextState=usbOffDisplayOffTransition;
+          lastCalibrationStateChange=loopStartTime+millis();
+          getLocalTime(&lastCalibrationStateChangeTimeInfo);
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [checkButtonsActions] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", batADCVolt="+String(batADCVolt)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+        #endif
       }
       else {
         //Display message in the screen
@@ -455,6 +485,17 @@ uint8_t checkButtonsActions(enum callingAction fromAction) {
         tft.setCursor(0,tft.height()/2+2,TEXT_FONT_MENU);tft.println("     Disabled");
         delay(2500);
         tft.fillScreen(TFT_BLACK);
+
+        #if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+          digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_ENABLE); delay(POWER_ENABLE_DELAY);
+          float_t batADCVolt=0; for (u_int8_t i=1; i<=ADC_SAMPLES; i++) batADCVolt+=analogReadMilliVolts(BAT_ADC_PIN); batADCVolt=batADCVolt/ADC_SAMPLES;
+          digitalWrite(POWER_ENABLE_PIN, BAT_CHECK_DISABLE); //To minimize BAT consume
+          if (batADCVolt >= VOLTAGE_TH_STATE) calibrationNextState=usbOnDisplayOnTransition;
+          else calibrationNextState=usbOffDisplayOnTransition;
+          lastCalibrationStateChange=loopStartTime+millis();
+          getLocalTime(&lastCalibrationStateChangeTimeInfo);
+          if (debugModeOn) {Serial.println(String(nowTimeGlobal)+" [checkButtonsActions] - State change. calibrationCurrentState="+String(calibrationCurrentState)+", calibrationNextState="+String(calibrationNextState)+", batADCVolt="+String(batADCVolt)+", lastCalibrationStateChange="+String(lastCalibrationStateChange)+", time to chage status="+String(lastCalibrationStateChange+transitionEndTime[calibrationNextState]-nowTimeGlobal));}
+        #endif
       }
     }
   }

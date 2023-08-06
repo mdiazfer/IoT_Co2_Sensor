@@ -9,6 +9,9 @@ BAT duration
 
 Version Date          Change
 ------- -----------   ------------------------------------------------------------------------------------
+- 1.5.2 25/jul/2023   - Buf fix
+                        + Wrong softResetOn deteccion after hibernation
+                        + Temp & Hum calibration for case model 2
 - 1.5.1 06/jun/2023   - Web server
                         + Added status info on wifi, ble, cloud server and mqtt connection (info.html)
                         + Add graphs

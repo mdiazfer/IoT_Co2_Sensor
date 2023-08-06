@@ -44,7 +44,12 @@ extern RTC_DATA_ATTR boolean firstBoot;
 extern RTC_DATA_ATTR boolean wifiEnabled,bluetoothEnabled,uploadSamplesEnabled,webServerEnabled;
 extern RTC_DATA_ATTR enum BLEStatus BLECurrentStatus;
 extern RTC_DATA_ATTR enum CloudSyncStatus CloudSyncCurrentStatus;
-
+#if BUILD_ENV_NAME==BUILD_TYPE_SENSOR_CASE_2
+  extern RTC_DATA_ATTR calibrationStates calibrationCurrentState;
+  extern RTC_DATA_ATTR calibrationStates calibrationNextState;
+  extern RTC_DATA_ATTR uint64_t elapsedTransitionTime,endTransitionTime,lastCalibrationStateChange;
+  extern RTC_DATA_ATTR struct tm lastCalibrationStateChangeTimeInfo;
+#endif
 
 void checkButton1();
 void checkButton2();
